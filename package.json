@@ -35,6 +35,9 @@
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
+  "prisma": {
+    "seed": "ts-node -r dotenv/config --project tsconfig.seed.json prisma/seed.ts"
+  },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.9.1",
