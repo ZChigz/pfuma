@@ -1,0 +1,575 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  DIRECTOR
+  HEAD
+  BURSAR
+  TEACHER
+  LIBRARIAN
+}
+
+enum Currency {
+  USD
+  ZIG
+}
+
+enum PaymentMethod {
+  CASH
+  ECOCASH
+  SWIPE
+  ZIPIT
+}
+
+enum PaymentStatus {
+  PENDING
+  VERIFIED
+  VOIDED
+}
+
+enum ExpenseStatus {
+  ACTIVE
+  VOIDED
+}
+
+enum SubjectType {
+  CORE
+  ELECTIVE
+}
+
+enum AssetCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  CONDEMNED
+}
+
+enum AssetStatus {
+  ACTIVE
+  UNDER_MAINTENANCE
+  DISPOSED
+}
+
+enum DisposalMethod {
+  SOLD
+  SCRAPPED
+  DONATED
+}
+
+enum CopyCondition {
+  NEW
+  GOOD
+  FAIR
+  DAMAGED
+}
+
+enum CopyStatus {
+  AVAILABLE
+  BORROWED
+  LOST
+}
+
+enum AuditAction {
+  RECORD_PAYMENT
+  VERIFY_PAYMENT
+  VOID_PAYMENT
+  RECORD_EXPENSE
+  VOID_EXPENSE
+  APPLY_CHARGE
+  CREATE_STUDENT
+  UPDATE_STUDENT
+  PUBLISH_RESULTS
+  CREATE_ASSET
+  UPDATE_ASSET
+  DISPOSE_ASSET
+  CHECKOUT_BOOK
+  RETURN_BOOK
+}
+
+// ─── Core ────────────────────────────────────────────────────────────────────
+
+model School {
+  id          String   @id @default(cuid())
+  name        String
+  location    String?
+  currentTerm String?
+  createdAt   DateTime @default(now())
+
+  users              User[]
+  students           Student[]
+  feeStructures      FeeStructure[]
+  charges            Charge[]
+  payments           Payment[]
+  expenses           Expense[]
+  auditLogs          AuditLog[]
+  subjects           Subject[]
+  subjectAssignments SubjectAssignment[]
+  marks              Mark[]
+  termResults        TermResult[]
+  gradeBoundaries    GradeBoundary[]
+  assetCategories    AssetCategory[]
+  assets             Asset[]
+  assetMaintenances  AssetMaintenance[]
+  assetDisposals     AssetDisposal[]
+  books              Book[]
+  bookCopies         BookCopy[]
+  libraryMembers     LibraryMember[]
+  borrowings         Borrowing[]
+  exchangeRates      ExchangeRate[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  schoolId     String
+  fullName     String
+  email        String
+  passwordHash String
+  role         Role     @default(TEACHER)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  recordedPayments   Payment[]           @relation("RecordedPayments")
+  verifiedPayments   Payment[]           @relation("VerifiedPayments")
+  voidedPayments     Payment[]           @relation("VoidedPayments")
+  recordedExpenses   Expense[]           @relation("RecordedExpenses")
+  voidedExpenses     Expense[]           @relation("VoidedExpenses")
+  auditLogs          AuditLog[]
+  subjectAssignments SubjectAssignment[]
+  marks              Mark[]
+  assetMaintenances  AssetMaintenance[]
+  assetDisposals     AssetDisposal[]
+  libraryMember      LibraryMember?
+
+  accounts      Account[]
+  sessions      Session[]
+  exchangeRates ExchangeRate[]
+
+  @@unique([schoolId, email])
+  @@index([schoolId])
+}
+
+// ─── Accounting ──────────────────────────────────────────────────────────────
+
+model Student {
+  id          String   @id @default(cuid())
+  schoolId    String
+  fullName    String
+  grade       String
+  parentName  String
+  parentPhone String
+  active      Boolean  @default(true)
+  portalToken String   @unique @default(cuid())
+  createdAt   DateTime @default(now())
+
+  school      School       @relation(fields: [schoolId], references: [id])
+  charges     Charge[]
+  payments    Payment[]
+  marks       Mark[]
+  termResults TermResult[]
+
+  @@index([schoolId])
+}
+
+model FeeStructure {
+  id        String   @id @default(cuid())
+  schoolId  String
+  grade     String
+  term      String
+  label     String
+  currency  Currency
+  amount    Decimal  @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+}
+
+model Charge {
+  id        String   @id @default(cuid())
+  schoolId  String
+  studentId String
+  term      String
+  label     String
+  currency  Currency
+  amount    Decimal  @db.Decimal(14, 2)
+  issuedAt  DateTime @default(now())
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([schoolId])
+  @@index([schoolId, studentId])
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  schoolId   String
+  studentId  String
+  currency   Currency
+  amount     Decimal       @db.Decimal(14, 2)
+  method     PaymentMethod
+  reference  String?
+  feeLabel   String
+  status     PaymentStatus @default(PENDING)
+  popUrl     String?
+  recordedBy String
+  verifiedBy String?
+  voidedBy   String?
+  recordedAt       DateTime      @default(now())
+  verifiedAt       DateTime?
+  voidedAt         DateTime?
+  paidInZig        Boolean       @default(false)
+  zigAmountPaid    Decimal?      @db.Decimal(14, 2)
+  exchangeRateUsed Decimal?      @db.Decimal(14, 2)
+
+  school         School  @relation(fields: [schoolId], references: [id])
+  student        Student @relation(fields: [studentId], references: [id])
+  recorder       User    @relation("RecordedPayments", fields: [recordedBy], references: [id])
+  verifier       User?   @relation("VerifiedPayments", fields: [verifiedBy], references: [id])
+  voider         User?   @relation("VoidedPayments", fields: [voidedBy], references: [id])
+
+  @@index([schoolId])
+  @@index([schoolId, status])
+  @@index([schoolId, studentId])
+}
+
+model Expense {
+  id         String        @id @default(cuid())
+  schoolId   String
+  category   String
+  currency   Currency
+  amount     Decimal       @db.Decimal(14, 2)
+  note       String?
+  spentOn    DateTime
+  recordedBy String
+  status     ExpenseStatus @default(ACTIVE)
+  voidedBy   String?
+  createdAt  DateTime      @default(now())
+
+  school   School @relation(fields: [schoolId], references: [id])
+  recorder User   @relation("RecordedExpenses", fields: [recordedBy], references: [id])
+  voider   User?  @relation("VoidedExpenses", fields: [voidedBy], references: [id])
+
+  @@index([schoolId])
+  @@index([schoolId, status])
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  schoolId   String
+  actorId    String
+  action     AuditAction
+  entityType String
+  entityId   String
+  detail     String?
+  createdAt  DateTime    @default(now())
+
+  school School @relation(fields: [schoolId], references: [id])
+  actor  User   @relation(fields: [actorId], references: [id])
+
+  @@index([schoolId])
+}
+
+// ─── Results ─────────────────────────────────────────────────────────────────
+
+model Subject {
+  id        String      @id @default(cuid())
+  schoolId  String
+  name      String
+  code      String
+  grade     String
+  maxMark   Int
+  type      SubjectType
+  active    Boolean     @default(true)
+
+  school      School              @relation(fields: [schoolId], references: [id])
+  assignments SubjectAssignment[]
+  marks       Mark[]
+
+  @@index([schoolId])
+}
+
+model SubjectAssignment {
+  id        String @id @default(cuid())
+  schoolId  String
+  teacherId String
+  subjectId String
+  term      String
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  teacher User    @relation(fields: [teacherId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([teacherId, subjectId, term])
+  @@index([schoolId])
+}
+
+model Mark {
+  id          String   @id @default(cuid())
+  schoolId    String
+  studentId   String
+  subjectId   String
+  term        String
+  rawMark     Decimal  @db.Decimal(14, 2)
+  percentage  Decimal? @db.Decimal(14, 2)
+  letterGrade String?
+  enteredBy   String
+  enteredAt   DateTime @default(now())
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+  enterer User    @relation(fields: [enteredBy], references: [id])
+
+  @@unique([studentId, subjectId, term])
+  @@index([schoolId])
+  @@index([schoolId, studentId])
+}
+
+model TermResult {
+  id            String    @id @default(cuid())
+  schoolId      String
+  studentId     String
+  term          String
+  totalMarks    Decimal   @db.Decimal(14, 2)
+  percentage    Decimal   @db.Decimal(14, 2)
+  classPosition Int?
+  headRemark    String?
+  published     Boolean   @default(false)
+  publishedAt   DateTime?
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, term])
+  @@index([schoolId])
+  @@index([schoolId, studentId])
+}
+
+model GradeBoundary {
+  id          String  @id @default(cuid())
+  schoolId    String
+  minPercent  Decimal @db.Decimal(14, 2)
+  maxPercent  Decimal @db.Decimal(14, 2)
+  letterGrade String
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+}
+
+// ─── Assets ──────────────────────────────────────────────────────────────────
+
+model AssetCategory {
+  id       String @id @default(cuid())
+  schoolId String
+  name     String
+
+  school School  @relation(fields: [schoolId], references: [id])
+  assets Asset[]
+
+  @@index([schoolId])
+}
+
+model Asset {
+  id              String         @id @default(cuid())
+  schoolId        String
+  name            String
+  categoryId      String
+  description     String?
+  tagNumber       String
+  acquisitionDate DateTime
+  acquisitionCost Decimal        @db.Decimal(14, 2)
+  currency        Currency
+  location        String
+  custodian       String?
+  condition       AssetCondition @default(GOOD)
+  status          AssetStatus    @default(ACTIVE)
+  imageUrl        String?
+  createdAt       DateTime       @default(now())
+
+  school      School             @relation(fields: [schoolId], references: [id])
+  category    AssetCategory      @relation(fields: [categoryId], references: [id])
+  maintenance AssetMaintenance[]
+  disposal    AssetDisposal?
+
+  @@index([schoolId])
+  @@index([schoolId, status])
+}
+
+model AssetMaintenance {
+  id              String    @id @default(cuid())
+  schoolId        String
+  assetId         String
+  maintenanceDate DateTime
+  description     String
+  cost            Decimal?  @db.Decimal(14, 2)
+  currency        Currency?
+  provider        String?
+  nextServiceDate DateTime?
+  recordedBy      String
+  createdAt       DateTime  @default(now())
+
+  school   School @relation(fields: [schoolId], references: [id])
+  asset    Asset  @relation(fields: [assetId], references: [id])
+  recorder User   @relation(fields: [recordedBy], references: [id])
+
+  @@index([schoolId])
+}
+
+model AssetDisposal {
+  id           String         @id @default(cuid())
+  schoolId     String
+  assetId      String         @unique
+  disposalDate DateTime
+  reason       String
+  method       DisposalMethod
+  proceeds     Decimal?       @db.Decimal(14, 2)
+  currency     Currency?
+  recordedBy   String
+  createdAt    DateTime       @default(now())
+
+  school   School @relation(fields: [schoolId], references: [id])
+  asset    Asset  @relation(fields: [assetId], references: [id])
+  recorder User   @relation(fields: [recordedBy], references: [id])
+
+  @@index([schoolId])
+}
+
+// ─── Library ─────────────────────────────────────────────────────────────────
+
+model Book {
+  id            String  @id @default(cuid())
+  schoolId      String
+  isbn          String?
+  title         String
+  author        String
+  subject       String?
+  publisher     String?
+  year          Int?
+  shelfLocation String?
+  coverUrl      String?
+  totalCopies   Int     @default(1)
+
+  school School     @relation(fields: [schoolId], references: [id])
+  copies BookCopy[]
+
+  @@index([schoolId])
+}
+
+model BookCopy {
+  id               String        @id @default(cuid())
+  schoolId         String
+  bookId           String
+  accessionNumber  String
+  condition        CopyCondition @default(NEW)
+  status           CopyStatus    @default(AVAILABLE)
+
+  school     School      @relation(fields: [schoolId], references: [id])
+  book       Book        @relation(fields: [bookId], references: [id])
+  borrowings Borrowing[]
+
+  @@unique([schoolId, accessionNumber])
+  @@index([schoolId])
+}
+
+model LibraryMember {
+  id                 String  @id @default(cuid())
+  schoolId           String
+  userId             String  @unique
+  borrowingSuspended Boolean @default(false)
+  suspensionReason   String?
+
+  school     School      @relation(fields: [schoolId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
+  borrowings Borrowing[]
+
+  @@index([schoolId])
+}
+
+model Borrowing {
+  id                String         @id @default(cuid())
+  schoolId          String
+  copyId            String
+  memberId          String
+  checkoutDate      DateTime
+  dueDate           DateTime
+  returnDate        DateTime?
+  conditionOnReturn CopyCondition?
+  fineAmount        Decimal        @default(0) @db.Decimal(14, 2)
+  fineSettled       Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+
+  school School        @relation(fields: [schoolId], references: [id])
+  copy   BookCopy      @relation(fields: [copyId], references: [id])
+  member LibraryMember @relation(fields: [memberId], references: [id])
+
+  @@index([schoolId])
+  @@index([schoolId, copyId])
+}
+
+// ─── Finance Settings ────────────────────────────────────────────────────────
+
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id])
+  usdToZig  Decimal
+  setBy     String
+  user      User     @relation(fields: [setBy], references: [id])
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([schoolId, createdAt])
+}
+
+// ─── Auth.js (NextAuth) ─────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
