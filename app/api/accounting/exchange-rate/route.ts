@@ -13,7 +13,7 @@ const SetExchangeRateSchema = z.object({
 
 const ALLOWED_ROLES = ['BURSAR', 'HEAD', 'DIRECTOR'] as const;
 
-async function _GET(req: NextRequest) {
+async function _GET(_req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;

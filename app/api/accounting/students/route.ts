@@ -49,7 +49,7 @@ async function _GET(req: NextRequest) {
         ? s.charges.reduce((min, c) => (c.issuedAt < min ? c.issuedAt : min), s.charges[0].issuedAt)
         : null;
     const overdueDays = hasBalance && earliest ? getDaysOverdue(earliest) : 0;
-    const { charges, payments, ...rest } = s;
+    const { charges: _charges, payments: _payments, ...rest } = s;
     return { ...rest, balanceUSD, balanceZiG, overdueDays };
   });
 

@@ -64,7 +64,6 @@ export default function BorrowingPage() {
     if (next === 'history' && !historyLoaded) fetchHistory();
   }
 
-  const now     = new Date();
   const overdue = active.filter((b) => b.daysOverdue > 0);
 
   const shownRows = tab === 'active'  ? active

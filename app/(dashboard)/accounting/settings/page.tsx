@@ -47,7 +47,7 @@ export default async function SettingsPage() {
             <div className="mt-3 space-y-1 text-sm text-[#78716c]">
               <p>Set by <span className="font-medium text-[#292524]">{current.user.fullName}</span>, {formatDateTime(current.createdAt)}</p>
               {current.note && (
-                <p className="italic">"{current.note}"</p>
+                <p className="italic">&ldquo;{current.note}&rdquo;</p>
               )}
             </div>
           ) : (
