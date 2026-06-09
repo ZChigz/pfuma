@@ -37,3 +37,11 @@ export async function canManageStudents(role: UserRole): Promise<void> { await g
 export async function canVoidExpense(role: UserRole): Promise<void>    { await guard(role, Permission.voidExpense);    }
 export async function canManageSubjects(role: UserRole): Promise<void> { await guard(role, Permission.manageSubjects); }
 export async function canEnterMarks(role: UserRole): Promise<void>     { await guard(role, Permission.enterMarks);     }
+
+export function canEnterMarksSync(role: UserRole): void {
+  if (!Permission.enterMarks.includes(role)) throw forbidden();
+}
+
+export function canManageGradeBoundaries(role: UserRole): void {
+  if (!(['HEAD', 'DIRECTOR'] as UserRole[]).includes(role)) throw forbidden();
+}

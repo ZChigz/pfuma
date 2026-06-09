@@ -5,6 +5,7 @@ import { Permission } from '@/lib/permissions';
 import { Badge } from '@/components/ui/Badge';
 import { AddSubjectModal } from '@/components/results/AddSubjectModal';
 import { AssignTeacherModal } from '@/components/results/AssignTeacherModal';
+import { GradeBoundariesManager } from '@/components/results/GradeBoundariesManager';
 import type { SessionUser } from '@/types';
 
 export default async function SubjectsPage() {
@@ -122,6 +123,12 @@ export default async function SubjectsPage() {
             </section>
           ))}
         </div>
+      )}
+
+      {canManage && (
+        <section className="mt-4 rounded-xl border border-[#e7e5e4] bg-white p-6">
+          <GradeBoundariesManager />
+        </section>
       )}
     </div>
   );

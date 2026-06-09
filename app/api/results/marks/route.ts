@@ -1,12 +1,13 @@
-import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { apiSuccess, apiUnauthorized, apiError, apiForbidden, apiNotFound, parseBody, withApi } from '@/lib/api';
-import { canEnterMarks } from '@/lib/permissions';
+import {
+  apiSuccess, apiUnauthorized, apiError, apiForbidden, apiNotFound, parseBody,
+} from '@/lib/api';
+import { canEnterMarksSync } from '@/lib/permissions';
 import { EnterMarkSchema } from '@/lib/validations/results';
 import type { SessionUser } from '@/types';
 
-async function _GET(req: NextRequest) {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
@@ -23,55 +24,58 @@ async function _GET(req: NextRequest) {
     if (!assignment) return apiForbidden();
   }
 
-  const [marks, subject] = await Promise.all([
+  const subject = await prisma.subject.findFirst({
+    where: { id: subjectId, schoolId: user.schoolId },
+  });
+  if (!subject) return apiNotFound('Subject');
+
+  const [students, marks, publishedCount] = await Promise.all([
+    prisma.student.findMany({
+      where: { schoolId: user.schoolId, grade: subject.grade, active: true },
+      select: { id: true, fullName: true, grade: true },
+      orderBy: { fullName: 'asc' },
+    }),
     prisma.mark.findMany({
       where: { schoolId: user.schoolId, subjectId, term },
-      include: { student: { select: { fullName: true, grade: true } } },
-      orderBy: { student: { fullName: 'asc' } },
     }),
-    prisma.subject.findFirst({
-      where: { id: subjectId, schoolId: user.schoolId },
-      select: { grade: true },
-    }),
-  ]);
-
-  // Check if the grade-term combination is published
-  let published = false;
-  if (subject) {
-    const count = await prisma.termResult.count({
+    prisma.termResult.count({
       where: {
         schoolId: user.schoolId,
         term,
         published: true,
         student: { grade: subject.grade },
       },
-    });
-    published = count > 0;
-  }
+    }),
+  ]);
 
   return apiSuccess({
+    subject,
+    students,
     marks: marks.map((m) => ({
       ...m,
       rawMark:    m.rawMark.toNumber(),
       percentage: m.percentage?.toNumber() ?? null,
     })),
-    published,
+    isPublished: publishedCount > 0,
+    term,
   });
 }
 
-async function _POST(req: NextRequest) {
+export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
 
-  try { await canEnterMarks(user.role); }
-  catch (e) { if (e instanceof Response) return e; throw e; }
+  try {
+    canEnterMarksSync(user.role);
+  } catch (e) {
+    return e as Response;
+  }
 
   const parsed = await parseBody(req, EnterMarkSchema);
   if ('error' in parsed) return parsed.error;
   const { studentId, subjectId, term, rawMark } = parsed.data;
 
-  // Verify subject belongs to this school and get maxMark
   const subject = await prisma.subject.findFirst({
     where: { id: subjectId, schoolId: user.schoolId },
   });
@@ -81,7 +85,6 @@ async function _POST(req: NextRequest) {
     return apiError(`Mark cannot exceed maximum of ${subject.maxMark}`, 422);
   }
 
-  // If TEACHER, verify assignment
   if (user.role === 'TEACHER') {
     const assignment = await prisma.subjectAssignment.findFirst({
       where: { schoolId: user.schoolId, teacherId: user.id, subjectId, term },
@@ -89,7 +92,6 @@ async function _POST(req: NextRequest) {
     if (!assignment) return apiForbidden();
   }
 
-  // Block if term results are already published for this student
   const termResult = await prisma.termResult.findUnique({
     where: { studentId_term: { studentId, term } },
   });
@@ -97,11 +99,10 @@ async function _POST(req: NextRequest) {
     return apiError('Results are published and locked for this term', 403);
   }
 
-  // Compute letter grade
   const percentage = subject.maxMark > 0 ? (rawMark / subject.maxMark) * 100 : 0;
   const boundary = await prisma.gradeBoundary.findFirst({
     where: {
-      schoolId: user.schoolId,
+      schoolId:   user.schoolId,
       minPercent: { lte: percentage },
       maxPercent: { gte: percentage },
     },
@@ -110,23 +111,8 @@ async function _POST(req: NextRequest) {
 
   const mark = await prisma.mark.upsert({
     where: { studentId_subjectId_term: { studentId, subjectId, term } },
-    update: {
-      rawMark,
-      percentage,
-      letterGrade,
-      enteredBy: user.id,
-      enteredAt: new Date(),
-    },
-    create: {
-      schoolId: user.schoolId,
-      studentId,
-      subjectId,
-      term,
-      rawMark,
-      percentage,
-      letterGrade,
-      enteredBy: user.id,
-    },
+    update: { rawMark, percentage, letterGrade, enteredBy: user.id, enteredAt: new Date() },
+    create: { schoolId: user.schoolId, studentId, subjectId, term, rawMark, percentage, letterGrade, enteredBy: user.id },
   });
 
   return apiSuccess({
@@ -137,7 +123,3 @@ async function _POST(req: NextRequest) {
     },
   });
 }
-
-type H = (req: Request, ctx?: unknown) => Promise<Response>;
-export const GET  = withApi('GET /api/results/marks',  _GET  as H);
-export const POST = withApi('POST /api/results/marks', _POST as H);

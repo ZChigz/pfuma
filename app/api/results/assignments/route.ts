@@ -6,6 +6,28 @@ import { canManageSubjects } from '@/lib/permissions';
 import { AssignTeacherSchema } from '@/lib/validations/results';
 import type { SessionUser } from '@/types';
 
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) return apiUnauthorized();
+  const user = session.user as unknown as SessionUser;
+
+  const where =
+    user.role === 'TEACHER'
+      ? { schoolId: user.schoolId, teacherId: user.id }
+      : { schoolId: user.schoolId };
+
+  const assignments = await prisma.subjectAssignment.findMany({
+    where,
+    include: {
+      subject: { select: { id: true, name: true, code: true, grade: true, maxMark: true } },
+      teacher: { select: { id: true, fullName: true } },
+    },
+    orderBy: [{ subject: { grade: 'asc' } }, { subject: { name: 'asc' } }, { term: 'desc' }],
+  });
+
+  return apiSuccess({ assignments });
+}
+
 async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();

@@ -25,3 +25,15 @@ export const PublishResultsSchema = z.object({
   grade: z.string().min(1, 'Grade is required'),
   term:  z.string().min(1, 'Term is required'),
 });
+
+export const SaveBoundariesSchema = z.object({
+  boundaries: z
+    .array(
+      z.object({
+        minPercent:  z.number().min(0).max(100),
+        maxPercent:  z.number().min(0).max(100),
+        letterGrade: z.string().min(1).max(5),
+      }),
+    )
+    .min(1, 'At least one boundary is required'),
+});
