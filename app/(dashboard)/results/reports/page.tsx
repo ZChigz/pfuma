@@ -35,6 +35,7 @@ export default async function ReportsPage({
 
   let results: ResultRow[] = [];
   let isPublished = false;
+  let pendingMarkCount = 0;
 
   if (grade && term) {
     const gradeBoundaries = await prisma.gradeBoundary.findMany({
@@ -71,6 +72,12 @@ export default async function ReportsPage({
     }));
 
     isPublished = results.some((r) => r.published);
+
+    if (results.length === 0) {
+      pendingMarkCount = await prisma.mark.count({
+        where: { schoolId: user.schoolId, term, student: { grade } },
+      });
+    }
   }
 
   return (
@@ -100,10 +107,26 @@ export default async function ReportsPage({
           Select a grade and term to view results.
         </p>
       ) : results.length === 0 ? (
-        <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-12 text-center text-sm text-[#78716c]">
-          No results found for <strong>{grade}</strong> — <strong>{term}</strong>.
-          {canPublish && ' Use the Publish Results button after entering marks.'}
-        </p>
+        <div className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-12 text-center">
+          {pendingMarkCount > 0 ? (
+            <>
+              <p className="text-sm font-medium text-[#292524]">
+                {pendingMarkCount} mark{pendingMarkCount !== 1 ? 's' : ''} entered for{' '}
+                <strong>{grade}</strong> — <strong>{term}</strong>
+              </p>
+              <p className="mt-1 text-sm text-[#78716c]">
+                {canPublish
+                  ? 'Click "Publish Results" above to compute totals, assign positions, and make results visible on student portals.'
+                  : 'Results have not been published yet. Ask your Head or Director to publish.'}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-[#78716c]">
+              No marks entered yet for <strong>{grade}</strong> — <strong>{term}</strong>.
+              {canPublish ? ' Teachers must enter marks before you can publish.' : ''}
+            </p>
+          )}
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
           <table className="w-full text-left text-sm text-[#292524]">
