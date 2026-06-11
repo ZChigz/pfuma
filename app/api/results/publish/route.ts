@@ -1,10 +1,11 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
+import { apiSuccess, apiError, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { canPublishResults } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { PublishResultsSchema } from '@/lib/validations/results';
+import { assignPositions, getLetterGrade } from '@/lib/results';
 import type { SessionUser } from '@/types';
 
 async function _POST(req: NextRequest) {
@@ -17,62 +18,109 @@ async function _POST(req: NextRequest) {
 
   const parsed = await parseBody(req, PublishResultsSchema);
   if ('error' in parsed) return parsed.error;
-  const { grade, term } = parsed.data;
+  const { classId, term } = parsed.data;
 
-  // Fetch all active students in the grade with their marks for the term
-  const students = await prisma.student.findMany({
-    where: { schoolId: user.schoolId, grade, active: true },
-    include: {
-      marks: {
-        where: { term, schoolId: user.schoolId },
-        include: { subject: { select: { maxMark: true } } },
-      },
+  const schoolClass = await prisma.schoolClass.findFirst({
+    where: { id: classId, schoolId: user.schoolId },
+  });
+  if (!schoolClass) return apiNotFound('Class');
+
+  const assignments = await prisma.subjectAssignment.findMany({
+    where: { schoolId: user.schoolId, classId, term },
+    include: { subject: { select: { id: true, name: true, maxMark: true } } },
+  });
+
+  if (assignments.length === 0) {
+    return apiError('No subjects are assigned to this class for this term', 400);
+  }
+
+  const notVerified = assignments.filter((a) => a.marksStatus !== 'VERIFIED');
+  if (notVerified.length > 0) {
+    return apiError(
+      `${notVerified.length} subject(s) not yet verified by teacher: ${notVerified.map((a) => a.subject.name).join(', ')}`,
+      400,
+    );
+  }
+
+  const [students, boundaryRows] = await Promise.all([
+    prisma.student.findMany({
+      where: { schoolId: user.schoolId, classId, active: true },
+      select: { id: true, fullName: true },
+    }),
+    prisma.gradeBoundary.findMany({ where: { schoolId: user.schoolId } }),
+  ]);
+
+  const boundaries = boundaryRows.map((b) => ({
+    minPercent:  b.minPercent.toNumber(),
+    maxPercent:  b.maxPercent.toNumber(),
+    letterGrade: b.letterGrade,
+  }));
+
+  const totalPossible = assignments.reduce((n, a) => n + a.subject.maxMark, 0);
+
+  const subjectIds = assignments.map((a) => a.subjectId);
+  const allMarks = await prisma.mark.findMany({
+    where: {
+      schoolId:  user.schoolId,
+      subjectId: { in: subjectIds },
+      term,
+      status:    'VERIFIED',
+      student:   { classId },
     },
   });
 
-  // Compute totals per student
   const summaries = students.map((s) => {
-    const totalRaw = s.marks.reduce((n, m) => n + m.rawMark.toNumber(), 0);
-    const totalMax = s.marks.reduce((n, m) => n + m.subject.maxMark, 0);
-    const percentage = totalMax > 0 ? (totalRaw / totalMax) * 100 : 0;
-    return { studentId: s.id, totalMarks: totalRaw, percentage, classPosition: 0 };
+    const subjectMarks = allMarks.filter((m) => m.studentId === s.id);
+    const totalMarks = subjectMarks.reduce((n, m) => n + m.rawMark.toNumber(), 0);
+    const percentage = totalPossible > 0 ? (totalMarks / totalPossible) * 100 : 0;
+    const letterGrade = getLetterGrade(percentage, boundaries);
+    return { studentId: s.id, fullName: s.fullName, totalMarks, percentage, letterGrade };
   });
 
-  // Sort by percentage descending and assign positions (ties share same rank)
-  summaries.sort((a, b) => b.percentage - a.percentage);
-  let pos = 1;
-  for (let i = 0; i < summaries.length; i++) {
-    if (i > 0 && summaries[i].percentage < summaries[i - 1].percentage) pos = i + 1;
-    summaries[i].classPosition = pos;
-  }
+  summaries.sort((a, b) => b.totalMarks - a.totalMarks);
+  const positions = assignPositions(summaries.map((s) => ({ id: s.studentId, totalMarks: s.totalMarks })));
 
   const now = new Date();
 
-  const published = await prisma.$transaction(async (tx) => {
-    await Promise.all(
-      summaries.map((s) =>
-        tx.termResult.upsert({
-          where:  { studentId_term: { studentId: s.studentId, term } },
-          update: {
-            totalMarks:    s.totalMarks,
-            percentage:    s.percentage,
-            classPosition: s.classPosition,
-            published:     true,
-            publishedAt:   now,
-          },
-          create: {
-            schoolId:      user.schoolId,
-            studentId:     s.studentId,
-            term,
-            totalMarks:    s.totalMarks,
-            percentage:    s.percentage,
-            classPosition: s.classPosition,
-            published:     true,
-            publishedAt:   now,
-          },
-        }),
-      ),
-    );
+  await prisma.$transaction(async (tx) => {
+    for (const s of summaries) {
+      await tx.termResult.upsert({
+        where:  { studentId_term: { studentId: s.studentId, term } },
+        update: {
+          totalMarks:    s.totalMarks,
+          percentage:    s.percentage,
+          classPosition: positions.get(s.studentId) ?? null,
+          published:     true,
+          publishedAt:   now,
+        },
+        create: {
+          schoolId:      user.schoolId,
+          studentId:     s.studentId,
+          term,
+          totalMarks:    s.totalMarks,
+          percentage:    s.percentage,
+          classPosition: positions.get(s.studentId) ?? null,
+          published:     true,
+          publishedAt:   now,
+        },
+      });
+    }
+
+    await tx.mark.updateMany({
+      where: {
+        schoolId:  user.schoolId,
+        subjectId: { in: subjectIds },
+        term,
+        status:    'VERIFIED',
+        student:   { classId },
+      },
+      data: { status: 'PUBLISHED' },
+    });
+
+    await tx.subjectAssignment.updateMany({
+      where: { schoolId: user.schoolId, classId, term },
+      data: { marksStatus: 'PUBLISHED' },
+    });
 
     await logAudit(
       {
@@ -80,16 +128,22 @@ async function _POST(req: NextRequest) {
         actorId:    user.id,
         action:     'PUBLISH_RESULTS',
         entityType: 'TermResult',
-        entityId:   `${grade}:${term}`,
-        detail:     `Published ${summaries.length} results for ${grade} — ${term}`,
+        entityId:   `${classId}:${term}`,
+        detail:     `Published ${summaries.length} results for ${schoolClass.name} — ${term}`,
       },
       tx,
     );
-
-    return summaries.length;
   });
 
-  return apiSuccess({ published });
+  const classAverage = summaries.length > 0
+    ? summaries.reduce((n, s) => n + s.percentage, 0) / summaries.length
+    : 0;
+
+  return apiSuccess({
+    published:    summaries.length,
+    topStudent:   summaries[0]?.fullName ?? null,
+    classAverage,
+  });
 }
 
 type H = (req: Request, ctx?: unknown) => Promise<Response>;

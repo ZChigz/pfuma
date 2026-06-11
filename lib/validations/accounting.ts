@@ -27,6 +27,8 @@ export const CreateFeeStructureSchema = z.object({
   amount: z.number().positive(),
 });
 
+export const UpdateFeeStructureSchema = CreateFeeStructureSchema.partial();
+
 export const ApplyFeeStructureSchema = z.object({
   feeStructureId: z.string().min(1),
   studentIds: z.array(z.string().min(1)).min(1),
@@ -79,4 +81,38 @@ export const CreateExpenseSchema = z.object({
     .positive('Amount must be greater than zero'),
   spentOn: z.string().min(1, 'Date is required'),
   note: z.string().optional(),
+});
+
+// ─── Expense requests ────────────────────────────────────────────────────────
+
+export const ExpenseRequestItemSchema = z.object({
+  description: z.string().min(1, 'Description is required'),
+  quantity: z
+    .number({ invalid_type_error: 'Quantity is required' })
+    .int()
+    .positive('Quantity must be greater than zero'),
+  unitPrice: z
+    .number({ invalid_type_error: 'Unit price is required' })
+    .positive('Unit price must be greater than zero'),
+});
+
+export const CreateExpenseRequestSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  type: z.enum(['PURCHASE_ORDER', 'UTILITY_BILL', 'FUEL', 'SALARY_ADVANCE', 'MAINTENANCE', 'OTHER']),
+  department: z.string().min(1, 'Department is required'),
+  justification: z.string().min(1, 'Justification is required'),
+  currency: z.enum(['USD', 'ZIG']),
+  items: z.array(ExpenseRequestItemSchema).min(1, 'Add at least one item'),
+});
+
+export const RejectExpenseRequestSchema = z.object({
+  reason: z.string().min(10, 'Reason must be at least 10 characters'),
+});
+
+export const DisburseExpenseRequestSchema = z.object({
+  actualTotal: z
+    .number({ invalid_type_error: 'Please enter an amount' })
+    .positive('Amount must be greater than zero'),
+  paymentMethod: z.enum(['CASH', 'ECOCASH', 'SWIPE', 'ZIPIT']),
+  disbursementNote: z.string().optional(),
 });

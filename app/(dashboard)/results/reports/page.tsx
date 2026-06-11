@@ -1,9 +1,9 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { Permission } from '@/lib/permissions';
 import { ResultsFilters } from '@/components/results/ResultsFilters';
-import { PublishButton } from '@/components/results/PublishButton';
 import type { SessionUser } from '@/types';
 
 export default async function ReportsPage({
@@ -89,7 +89,12 @@ export default async function ReportsPage({
           <p className="mt-0.5 text-sm text-[#78716c]">View results and download PDF reports</p>
         </div>
         {canPublish && grade && term && !isPublished && (
-          <PublishButton grade={grade} term={term} />
+          <Link
+            href="/head/results"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-[#065f46] bg-white px-4 text-sm font-medium text-[#065f46] hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+          >
+            Go to Results to verify &amp; publish
+          </Link>
         )}
         {isPublished && (
           <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-800">
@@ -116,7 +121,7 @@ export default async function ReportsPage({
               </p>
               <p className="mt-1 text-sm text-[#78716c]">
                 {canPublish
-                  ? 'Click "Publish Results" above to compute totals, assign positions, and make results visible on student portals.'
+                  ? 'Use "Go to Results to verify & publish" above once all subjects have been verified by their teachers.'
                   : 'Results have not been published yet. Ask your Head or Director to publish.'}
               </p>
             </>

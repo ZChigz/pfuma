@@ -11,6 +11,11 @@ import {
   canVoidExpense,
   canManageSubjects,
   canEnterMarks,
+  canManageUsers,
+  canManageClasses,
+  canBulkApplyFees,
+  canRecordPayment,
+  canRecordExpense,
 } from '@/lib/permissions';
 import type { UserRole } from '@/types';
 
@@ -51,7 +56,7 @@ describe('canVoidPayment', () => {
 // ─── canApplyCharge ──────────────────────────────────────────────────────────
 
 describe('canApplyCharge', () => {
-  it.each(['DIRECTOR', 'HEAD'] as UserRole[])('%s is allowed', async (role) => {
+  it.each(['ADMIN', 'DIRECTOR', 'HEAD'] as UserRole[])('%s is allowed', async (role) => {
     await expectAllowed(() => canApplyCharge(role));
   });
   it.each(['BURSAR', 'TEACHER', 'LIBRARIAN'] as UserRole[])('%s is forbidden', async (role) => {
@@ -95,7 +100,7 @@ describe('canDisposeAsset', () => {
 // ─── canManageLibrary ────────────────────────────────────────────────────────
 
 describe('canManageLibrary', () => {
-  it.each(['DIRECTOR', 'HEAD', 'LIBRARIAN'] as UserRole[])('%s is allowed', async (role) => {
+  it.each(['DIRECTOR', 'HEAD', 'LIBRARIAN', 'ADMIN'] as UserRole[])('%s is allowed', async (role) => {
     await expectAllowed(() => canManageLibrary(role));
   });
   it.each(['BURSAR', 'TEACHER'] as UserRole[])('%s is forbidden', async (role) => {
@@ -106,10 +111,10 @@ describe('canManageLibrary', () => {
 // ─── canManageStudents ───────────────────────────────────────────────────────
 
 describe('canManageStudents', () => {
-  it.each(['DIRECTOR', 'HEAD', 'BURSAR'] as UserRole[])('%s is allowed', async (role) => {
+  it.each(['ADMIN', 'DIRECTOR', 'HEAD'] as UserRole[])('%s is allowed', async (role) => {
     await expectAllowed(() => canManageStudents(role));
   });
-  it.each(['TEACHER', 'LIBRARIAN'] as UserRole[])('%s is forbidden', async (role) => {
+  it.each(['BURSAR', 'TEACHER', 'LIBRARIAN'] as UserRole[])('%s is forbidden', async (role) => {
     await expectForbidden(() => canManageStudents(role));
   });
 });
@@ -128,7 +133,7 @@ describe('canVoidExpense', () => {
 // ─── canManageSubjects ───────────────────────────────────────────────────────
 
 describe('canManageSubjects', () => {
-  it.each(['DIRECTOR', 'HEAD'] as UserRole[])('%s is allowed', async (role) => {
+  it.each(['ADMIN', 'DIRECTOR', 'HEAD'] as UserRole[])('%s is allowed', async (role) => {
     await expectAllowed(() => canManageSubjects(role));
   });
   it.each(['BURSAR', 'TEACHER', 'LIBRARIAN'] as UserRole[])('%s is forbidden', async (role) => {
@@ -144,6 +149,61 @@ describe('canEnterMarks', () => {
   });
   it.each(['BURSAR', 'LIBRARIAN'] as UserRole[])('%s is forbidden', async (role) => {
     await expectForbidden(() => canEnterMarks(role));
+  });
+});
+
+// ─── canManageUsers ──────────────────────────────────────────────────────────
+
+describe('canManageUsers', () => {
+  it.each(['ADMIN', 'DIRECTOR'] as UserRole[])('%s is allowed', async (role) => {
+    await expectAllowed(() => canManageUsers(role));
+  });
+  it.each(['HEAD', 'BURSAR', 'TEACHER', 'LIBRARIAN'] as UserRole[])('%s is forbidden', async (role) => {
+    await expectForbidden(() => canManageUsers(role));
+  });
+});
+
+// ─── canManageClasses ────────────────────────────────────────────────────────
+
+describe('canManageClasses', () => {
+  it.each(['ADMIN', 'DIRECTOR', 'HEAD'] as UserRole[])('%s is allowed', async (role) => {
+    await expectAllowed(() => canManageClasses(role));
+  });
+  it.each(['BURSAR', 'TEACHER', 'LIBRARIAN'] as UserRole[])('%s is forbidden', async (role) => {
+    await expectForbidden(() => canManageClasses(role));
+  });
+});
+
+// ─── canBulkApplyFees ────────────────────────────────────────────────────────
+
+describe('canBulkApplyFees', () => {
+  it.each(['ADMIN', 'DIRECTOR', 'HEAD'] as UserRole[])('%s is allowed', async (role) => {
+    await expectAllowed(() => canBulkApplyFees(role));
+  });
+  it.each(['BURSAR', 'TEACHER', 'LIBRARIAN'] as UserRole[])('%s is forbidden', async (role) => {
+    await expectForbidden(() => canBulkApplyFees(role));
+  });
+});
+
+// ─── canRecordPayment ────────────────────────────────────────────────────────
+
+describe('canRecordPayment', () => {
+  it.each(['ADMIN', 'DIRECTOR', 'HEAD', 'BURSAR'] as UserRole[])('%s is allowed', async (role) => {
+    await expectAllowed(() => canRecordPayment(role));
+  });
+  it.each(['TEACHER', 'LIBRARIAN'] as UserRole[])('%s is forbidden', async (role) => {
+    await expectForbidden(() => canRecordPayment(role));
+  });
+});
+
+// ─── canRecordExpense ────────────────────────────────────────────────────────
+
+describe('canRecordExpense', () => {
+  it.each(['DIRECTOR', 'HEAD', 'BURSAR'] as UserRole[])('%s is allowed', async (role) => {
+    await expectAllowed(() => canRecordExpense(role));
+  });
+  it.each(['ADMIN', 'TEACHER', 'LIBRARIAN'] as UserRole[])('%s is forbidden', async (role) => {
+    await expectForbidden(() => canRecordExpense(role));
   });
 });
 

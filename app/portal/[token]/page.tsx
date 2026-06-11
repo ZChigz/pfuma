@@ -34,6 +34,7 @@ export default async function PortalPage({ params }: { params: { token: string }
         orderBy: { recordedAt: 'desc' },
       },
       marks: {
+        where:   { status: 'PUBLISHED' },
         include: { subject: { select: { name: true, maxMark: true } } },
         orderBy: [{ term: 'asc' }, { subject: { name: 'asc' } }],
       },
@@ -89,6 +90,22 @@ export default async function PortalPage({ params }: { params: { token: string }
   }
 
   const publishedTerms = student.termResults;
+
+  // ── Class size per term (for "Position N out of M") ───────────────────────
+  const classSizeByTerm = new Map<string, number>();
+  if (publishedTerms.length > 0 && student.classId) {
+    const counts = await prisma.termResult.groupBy({
+      by: ['term'],
+      where: {
+        schoolId:  student.schoolId,
+        published: true,
+        term:      { in: publishedTerms.map((tr) => tr.term) },
+        student:   { classId: student.classId },
+      },
+      _count: { _all: true },
+    });
+    for (const c of counts) classSizeByTerm.set(c.term, c._count._all);
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f5f4]">
@@ -187,20 +204,25 @@ export default async function PortalPage({ params }: { params: { token: string }
               {publishedTerms.map((tr) => {
                 const termMarks = marksByTerm.get(tr.term) ?? [];
                 const pct = tr.percentage.toNumber();
+                const classSize = classSizeByTerm.get(tr.term);
                 return (
                   <div key={tr.id} className="rounded-xl border border-[#e7e5e4] bg-white shadow-sm overflow-hidden">
                     {/* Term header */}
                     <div className="border-b border-[#e7e5e4] bg-[#065f46] px-4 py-3 text-white">
                       <p className="text-sm font-bold">{tr.term}</p>
+                      {tr.classPosition != null && classSize != null && (
+                        <p className="mt-0.5 text-xs text-emerald-100">
+                          Position {tr.classPosition} out of {classSize} students
+                        </p>
+                      )}
                     </div>
 
                     {/* Summary row */}
-                    <div className="grid grid-cols-4 divide-x divide-[#e7e5e4] border-b border-[#e7e5e4]">
+                    <div className="grid grid-cols-3 divide-x divide-[#e7e5e4] border-b border-[#e7e5e4]">
                       {[
                         { label: 'Total', value: tr.totalMarks.toNumber().toFixed(1) },
                         { label: 'Percentage', value: `${pct.toFixed(1)}%` },
                         { label: 'Grade', value: getGrade(pct) },
-                        { label: 'Position', value: tr.classPosition != null ? `${tr.classPosition}` : '—' },
                       ].map(({ label, value }) => (
                         <div key={label} className="p-3 text-center">
                           <p className="text-xs text-[#78716c]">{label}</p>
@@ -214,7 +236,7 @@ export default async function PortalPage({ params }: { params: { token: string }
                       <table className="w-full text-sm">
                         <thead className="bg-[#f5f5f4] border-b border-[#e7e5e4]">
                           <tr>
-                            {['Subject', 'Mark', 'Max', 'Grade'].map((h) => (
+                            {['Subject', 'Mark', 'Out of', '%', 'Grade'].map((h) => (
                               <th key={h} className="px-4 py-2 text-left text-xs font-medium text-[#78716c]">{h}</th>
                             ))}
                           </tr>
@@ -225,6 +247,7 @@ export default async function PortalPage({ params }: { params: { token: string }
                               <td className="px-4 py-2">{m.subject.name}</td>
                               <td className="px-4 py-2 tabular-nums">{m.rawMark.toNumber().toFixed(1)}</td>
                               <td className="px-4 py-2 tabular-nums text-[#78716c]">{m.subject.maxMark}</td>
+                              <td className="px-4 py-2 tabular-nums text-[#78716c]">{m.percentage != null ? `${m.percentage.toNumber().toFixed(1)}%` : '—'}</td>
                               <td className="px-4 py-2 font-semibold">{m.letterGrade ?? '—'}</td>
                             </tr>
                           ))}

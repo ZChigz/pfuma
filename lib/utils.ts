@@ -48,6 +48,16 @@ export function buildWhatsAppLink(phone: string, message: string): string {
   return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
 }
 
+const TEMP_PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+
+export function generateTempPassword(length = 10): string {
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += TEMP_PASSWORD_CHARS[Math.floor(Math.random() * TEMP_PASSWORD_CHARS.length)];
+  }
+  return out;
+}
+
 export function isoWeekKey(date: Date): string {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const day = d.getUTCDay() || 7;

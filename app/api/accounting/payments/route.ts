@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
+import { canRecordPayment } from '@/lib/permissions';
 import { CreatePaymentSchema } from '@/lib/validations/accounting';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
@@ -41,6 +42,8 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+
+  try { await canRecordPayment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
   const parsed = await parseBody(req, CreatePaymentSchema);
   if ('error' in parsed) return parsed.error;

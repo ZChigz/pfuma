@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import type { ReactNode } from 'react';
 
-type BadgeVariant = 'success' | 'warning' | 'danger' | 'neutral' | 'gold';
+export type BadgeVariant = 'success' | 'warning' | 'danger' | 'neutral' | 'gold' | 'info';
 
 interface BadgeProps {
   variant?: BadgeVariant;
@@ -16,6 +16,7 @@ const variants: Record<BadgeVariant, string> = {
   danger:  'bg-[#fee2e2] text-[#b91c1c]',
   neutral: 'bg-[#f5f5f4] text-[#78716c]',
   gold:    'bg-[#fef3c7] text-[#b45309]',
+  info:    'bg-[#dbeafe] text-[#1d4ed8]',
 };
 
 export function Badge({ variant = 'neutral', label, icon, className }: BadgeProps) {

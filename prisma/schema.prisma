@@ -10,6 +10,7 @@ datasource db {
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 enum Role {
+  ADMIN
   DIRECTOR
   HEAD
   BURSAR
@@ -40,9 +41,39 @@ enum ExpenseStatus {
   VOIDED
 }
 
+enum RequestStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  DISBURSED
+}
+
+enum ExpenseRequestType {
+  PURCHASE_ORDER
+  UTILITY_BILL
+  FUEL
+  SALARY_ADVANCE
+  MAINTENANCE
+  OTHER
+}
+
 enum SubjectType {
   CORE
   ELECTIVE
+}
+
+enum MarkStatus {
+  DRAFT
+  VERIFIED
+  PUBLISHED
+}
+
+enum AssignmentMarkStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  VERIFIED
+  PUBLISHED
 }
 
 enum AssetCondition {
@@ -87,12 +118,29 @@ enum AuditAction {
   APPLY_CHARGE
   CREATE_STUDENT
   UPDATE_STUDENT
+  RECORD_MARK
+  VERIFY_MARKS
+  UNVERIFY_MARKS
   PUBLISH_RESULTS
   CREATE_ASSET
   UPDATE_ASSET
   DISPOSE_ASSET
   CHECKOUT_BOOK
   RETURN_BOOK
+  CREATE_USER
+  UPDATE_USER
+  RESET_PASSWORD
+  CREATE_CLASS
+  UPDATE_CLASS
+  MOVE_STUDENT
+  BULK_APPLY_FEES
+  CREATE_FEE_STRUCTURE
+  UPDATE_FEE_STRUCTURE
+  CREATE_EXPENSE_REQUEST
+  SUBMIT_EXPENSE_REQUEST
+  APPROVE_EXPENSE_REQUEST
+  REJECT_EXPENSE_REQUEST
+  DISBURSE_EXPENSE_REQUEST
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
@@ -110,6 +158,7 @@ model School {
   charges            Charge[]
   payments           Payment[]
   expenses           Expense[]
+  expenseRequests    ExpenseRequest[]
   auditLogs          AuditLog[]
   subjects           Subject[]
   subjectAssignments SubjectAssignment[]
@@ -125,6 +174,7 @@ model School {
   libraryMembers     LibraryMember[]
   borrowings         Borrowing[]
   exchangeRates      ExchangeRate[]
+  schoolClasses      SchoolClass[]
 }
 
 model User {
@@ -144,12 +194,18 @@ model User {
   voidedPayments     Payment[]           @relation("VoidedPayments")
   recordedExpenses   Expense[]           @relation("RecordedExpenses")
   voidedExpenses     Expense[]           @relation("VoidedExpenses")
+  requestedExpenses  ExpenseRequest[]    @relation("RequestedExpenses")
+  approvedExpenses   ExpenseRequest[]    @relation("ApprovedExpenses")
+  rejectedExpenses   ExpenseRequest[]    @relation("RejectedExpenses")
+  disbursedExpenses  ExpenseRequest[]    @relation("DisbursedExpenses")
   auditLogs          AuditLog[]
   subjectAssignments SubjectAssignment[]
+  verifiedAssignments SubjectAssignment[] @relation("VerifiedAssignments")
   marks              Mark[]
   assetMaintenances  AssetMaintenance[]
   assetDisposals     AssetDisposal[]
   libraryMember      LibraryMember?
+  classesTaught      SchoolClass[]
 
   accounts      Account[]
   sessions      Session[]
@@ -159,6 +215,28 @@ model User {
   @@index([schoolId])
 }
 
+// ─── Classes ─────────────────────────────────────────────────────────────────
+
+model SchoolClass {
+  id             String   @id @default(cuid())
+  schoolId       String
+  name           String
+  grade          String
+  section        String?
+  classTeacherId String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  school       School              @relation(fields: [schoolId], references: [id])
+  classTeacher User?               @relation(fields: [classTeacherId], references: [id])
+  students     Student[]
+  assignments  SubjectAssignment[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@index([schoolId, grade])
+}
+
 // ─── Accounting ──────────────────────────────────────────────────────────────
 
 model Student {
@@ -166,6 +244,7 @@ model Student {
   schoolId    String
   fullName    String
   grade       String
+  classId     String?
   parentName  String
   parentPhone String
   active      Boolean  @default(true)
@@ -173,12 +252,14 @@ model Student {
   createdAt   DateTime @default(now())
 
   school      School       @relation(fields: [schoolId], references: [id])
+  class       SchoolClass? @relation(fields: [classId], references: [id])
   charges     Charge[]
   payments    Payment[]
   marks       Mark[]
   termResults TermResult[]
 
   @@index([schoolId])
+  @@index([schoolId, classId])
 }
 
 model FeeStructure {
@@ -246,17 +327,20 @@ model Payment {
 }
 
 model Expense {
-  id         String        @id @default(cuid())
-  schoolId   String
-  category   String
-  currency   Currency
-  amount     Decimal       @db.Decimal(14, 2)
-  note       String?
-  spentOn    DateTime
-  recordedBy String
-  status     ExpenseStatus @default(ACTIVE)
-  voidedBy   String?
-  createdAt  DateTime      @default(now())
+  id               String          @id @default(cuid())
+  schoolId         String
+  category         String
+  currency         Currency
+  amount           Decimal         @db.Decimal(14, 2)
+  note             String?
+  spentOn          DateTime
+  recordedBy       String
+  status           ExpenseStatus   @default(ACTIVE)
+  voidedBy         String?
+  createdAt        DateTime        @default(now())
+
+  expenseRequestId String?         @unique
+  expenseRequest   ExpenseRequest? @relation(fields: [expenseRequestId], references: [id])
 
   school   School @relation(fields: [schoolId], references: [id])
   recorder User   @relation("RecordedExpenses", fields: [recordedBy], references: [id])
@@ -264,6 +348,62 @@ model Expense {
 
   @@index([schoolId])
   @@index([schoolId, status])
+}
+
+model ExpenseRequest {
+  id               String              @id @default(cuid())
+  schoolId         String
+  school           School              @relation(fields: [schoolId], references: [id])
+  requestNumber    String
+  title            String
+  type             ExpenseRequestType
+  department       String
+  justification    String
+  currency         Currency
+  estimatedTotal   Decimal             @db.Decimal(14, 2)
+  actualTotal      Decimal?            @db.Decimal(14, 2)
+
+  status           RequestStatus       @default(DRAFT)
+
+  requestedById    String
+  requestedBy      User                @relation("RequestedExpenses", fields: [requestedById], references: [id])
+  requestedAt      DateTime            @default(now())
+
+  approvedById     String?
+  approvedBy       User?               @relation("ApprovedExpenses", fields: [approvedById], references: [id])
+  approvedAt       DateTime?
+
+  rejectedById     String?
+  rejectedBy       User?               @relation("RejectedExpenses", fields: [rejectedById], references: [id])
+  rejectedAt       DateTime?
+  rejectionReason  String?
+
+  disbursedById    String?
+  disbursedBy      User?               @relation("DisbursedExpenses", fields: [disbursedById], references: [id])
+  disbursedAt      DateTime?
+  disbursementNote String?
+  paymentMethod    PaymentMethod?
+
+  items            ExpenseRequestItem[]
+  expense          Expense?
+
+  createdAt        DateTime            @default(now())
+
+  @@index([schoolId])
+  @@index([schoolId, status])
+  @@index([requestedById])
+}
+
+model ExpenseRequestItem {
+  id          String         @id @default(cuid())
+  requestId   String
+  request     ExpenseRequest @relation(fields: [requestId], references: [id])
+  description String
+  quantity    Int            @default(1)
+  unitPrice   Decimal        @db.Decimal(14, 2)
+  total       Decimal        @db.Decimal(14, 2)
+
+  @@index([requestId])
 }
 
 model AuditLog {
@@ -289,44 +429,54 @@ model Subject {
   schoolId  String
   name      String
   code      String
-  grade     String
-  maxMark   Int
-  type      SubjectType
+  maxMark   Int         @default(100)
+  type      SubjectType @default(CORE)
   active    Boolean     @default(true)
 
   school      School              @relation(fields: [schoolId], references: [id])
   assignments SubjectAssignment[]
   marks       Mark[]
 
+  @@unique([schoolId, code])
   @@index([schoolId])
 }
 
 model SubjectAssignment {
-  id        String @id @default(cuid())
+  id        String      @id @default(cuid())
   schoolId  String
+  school    School      @relation(fields: [schoolId], references: [id])
   teacherId String
+  teacher   User        @relation(fields: [teacherId], references: [id])
   subjectId String
+  subject   Subject     @relation(fields: [subjectId], references: [id])
+  classId   String
+  class     SchoolClass @relation(fields: [classId], references: [id])
   term      String
+  createdAt DateTime    @default(now())
 
-  school  School  @relation(fields: [schoolId], references: [id])
-  teacher User    @relation(fields: [teacherId], references: [id])
-  subject Subject @relation(fields: [subjectId], references: [id])
+  marksStatus     AssignmentMarkStatus @default(NOT_STARTED)
+  marksVerifiedAt DateTime?
+  marksVerifiedById String?
+  marksVerifiedBy   User?              @relation("VerifiedAssignments", fields: [marksVerifiedById], references: [id])
 
-  @@unique([teacherId, subjectId, term])
+  @@unique([subjectId, classId, term])
   @@index([schoolId])
+  @@index([teacherId, schoolId])
 }
 
 model Mark {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   schoolId    String
   studentId   String
   subjectId   String
   term        String
-  rawMark     Decimal  @db.Decimal(14, 2)
-  percentage  Decimal? @db.Decimal(14, 2)
+  rawMark     Decimal    @db.Decimal(14, 2)
+  percentage  Decimal?   @db.Decimal(14, 2)
   letterGrade String?
+  status      MarkStatus @default(DRAFT)
+  verifiedAt  DateTime?
   enteredBy   String
-  enteredAt   DateTime @default(now())
+  enteredAt   DateTime   @default(now())
 
   school  School  @relation(fields: [schoolId], references: [id])
   student Student @relation(fields: [studentId], references: [id])

@@ -30,7 +30,7 @@ async function main() {
   // ── 2. Users ─────────────────────────────────────────────────────────────────
   const pw = await bcrypt.hash('School@2026', 10);
 
-  const [director, head, bursar, teacher, librarian] = await Promise.all([
+  const [director, head, bursar, teacher, librarian, admin, teacher2] = await Promise.all([
     prisma.user.upsert({
       where:  { schoolId_email: { schoolId: SCHOOL_ID, email: 'director@ruvimbo.co.zw' } },
       update: {},
@@ -91,9 +91,56 @@ async function main() {
         role:         'LIBRARIAN',
       },
     }),
+    prisma.user.upsert({
+      where:  { schoolId_email: { schoolId: SCHOOL_ID, email: 'admin@ruvimbo.co.zw' } },
+      update: {},
+      create: {
+        id:           'seed-u-admin',
+        schoolId:     SCHOOL_ID,
+        email:        'admin@ruvimbo.co.zw',
+        fullName:     'Mrs T. Chikwanda',
+        passwordHash: pw,
+        role:         'ADMIN',
+      },
+    }),
+    prisma.user.upsert({
+      where:  { schoolId_email: { schoolId: SCHOOL_ID, email: 'mrs.chikomo@ruvimbo.co.zw' } },
+      update: {},
+      create: {
+        id:           'seed-u-teacher2',
+        schoolId:     SCHOOL_ID,
+        email:        'mrs.chikomo@ruvimbo.co.zw',
+        fullName:     'Mrs B. Chikomo',
+        passwordHash: pw,
+        role:         'TEACHER',
+      },
+    }),
   ]);
 
-  // ── 3. AssetCategories ───────────────────────────────────────────────────────
+  // ── 3. Classes ───────────────────────────────────────────────────────────────
+  const classesData = [
+    { id: 'seed-class-form1a', name: 'Form 1A', grade: 'Form 1', section: 'A' },
+    { id: 'seed-class-form2a', name: 'Form 2A', grade: 'Form 2', section: 'A' },
+    { id: 'seed-class-form3a', name: 'Form 3A', grade: 'Form 3', section: 'A' },
+    { id: 'seed-class-form4a', name: 'Form 4A', grade: 'Form 4', section: 'A' },
+  ];
+
+  for (const c of classesData) {
+    await prisma.schoolClass.upsert({
+      where:  { id: c.id },
+      update: {},
+      create: { ...c, schoolId: SCHOOL_ID },
+    });
+  }
+
+  const classIdByGrade: Record<string, string> = {
+    'Form 1': 'seed-class-form1a',
+    'Form 2': 'seed-class-form2a',
+    'Form 3': 'seed-class-form3a',
+    'Form 4': 'seed-class-form4a',
+  };
+
+  // ── 4. AssetCategories ───────────────────────────────────────────────────────
   const catNames = [
     'Furniture',
     'ICT Equipment',
@@ -114,7 +161,7 @@ async function main() {
     catIds[name] = id;
   }
 
-  // ── 4. GradeBoundaries ───────────────────────────────────────────────────────
+  // ── 5. GradeBoundaries ───────────────────────────────────────────────────────
   const boundaries = [
     { id: 'seed-gb-a', min: 80, max: 100, letter: 'A' },
     { id: 'seed-gb-b', min: 70, max: 79,  letter: 'B' },
@@ -137,7 +184,7 @@ async function main() {
     });
   }
 
-  // ── 5. Students ──────────────────────────────────────────────────────────────
+  // ── 6. Students ──────────────────────────────────────────────────────────────
   const studentsData = [
     { id: 'seed-stu-tanaka',   fullName: 'Tanaka Mutasa',   grade: 'Form 4', parentName: 'Mrs S. Mutasa', parentPhone: '0772114552' },
     { id: 'seed-stu-nyasha',   fullName: 'Nyasha Banda',    grade: 'Form 4', parentName: 'Mr K. Banda',   parentPhone: '0783220117' },
@@ -152,14 +199,15 @@ async function main() {
   ];
 
   for (const s of studentsData) {
+    const classId = classIdByGrade[s.grade];
     await prisma.student.upsert({
       where:  { id: s.id },
-      update: {},
-      create: { ...s, schoolId: SCHOOL_ID },
+      update: { classId },
+      create: { ...s, classId, schoolId: SCHOOL_ID },
     });
   }
 
-  // ── 6. FeeStructures ─────────────────────────────────────────────────────────
+  // ── 7. FeeStructures ─────────────────────────────────────────────────────────
   const feeStructures = [
     { id: 'seed-fs-f4-tuition',   grade: 'Form 4', label: 'Tuition',        currency: 'USD' as const, amount: 320  },
     { id: 'seed-fs-f4-transport', grade: 'Form 4', label: 'Transport Levy', currency: 'USD' as const, amount: 45   },
@@ -180,7 +228,7 @@ async function main() {
     });
   }
 
-  // ── 7. Charges ───────────────────────────────────────────────────────────────
+  // ── 8. Charges ───────────────────────────────────────────────────────────────
   // tuition + transport amount by grade
   const gradeCharges: Record<string, { tuition: number; transport: number }> = {
     'Form 4': { tuition: 320, transport: 45 },
@@ -205,7 +253,7 @@ async function main() {
     }
   }
 
-  // ── 8. Payments ──────────────────────────────────────────────────────────────
+  // ── 9. Payments ──────────────────────────────────────────────────────────────
   type PaymentSeed = {
     id:         string;
     studentId:  string;
@@ -254,7 +302,7 @@ async function main() {
     });
   }
 
-  // ── 9. Expenses ──────────────────────────────────────────────────────────────
+  // ── 10. Expenses ─────────────────────────────────────────────────────────────
   const expensesData = [
     { id: 'seed-exp-salaries',    category: 'Staff Salaries', currency: 'USD' as const, amount: 1850, note: 'January teaching staff',  spentOn: '2026-05-02' },
     { id: 'seed-exp-fuel',        category: 'Fuel',           currency: 'USD' as const, amount: 140,  note: 'Bus reg ABW 1234',         spentOn: '2026-05-05' },
@@ -282,43 +330,129 @@ async function main() {
     });
   }
 
-  // ── 10. Subjects ─────────────────────────────────────────────────────────────
+  // ── 10b. Expense Requests ────────────────────────────────────────────────────
+  await prisma.expenseRequest.upsert({
+    where:  { id: 'seed-req-1' },
+    update: {},
+    create: {
+      id:              'seed-req-1',
+      schoolId:        SCHOOL_ID,
+      requestNumber:   'REQ-2026-001',
+      title:           '5x Science laboratory chemicals',
+      type:            'PURCHASE_ORDER',
+      department:      'Science Department',
+      justification:   'Stock depleted for Form 3 experiments',
+      currency:        'USD',
+      estimatedTotal:  48,
+      actualTotal:     48,
+      status:          'DISBURSED',
+      requestedById:   teacher.id,
+      requestedAt:     d('2026-05-20T08:00:00Z'),
+      approvedById:    head.id,
+      approvedAt:      d('2026-05-21T09:00:00Z'),
+      disbursedById:   bursar.id,
+      disbursedAt:     d('2026-05-22T10:00:00Z'),
+      paymentMethod:   'CASH',
+      items: {
+        create: [
+          { id: 'seed-req-1-item-1', description: 'Hydrochloric acid 1L',  quantity: 2, unitPrice: 12, total: 24 },
+          { id: 'seed-req-1-item-2', description: 'Sodium hydroxide 500g', quantity: 3, unitPrice: 8,  total: 24 },
+        ],
+      },
+    },
+  });
+
+  await prisma.expense.upsert({
+    where:  { id: 'seed-exp-req1' },
+    update: {},
+    create: {
+      id:               'seed-exp-req1',
+      schoolId:         SCHOOL_ID,
+      category:         'Purchase Order',
+      currency:         'USD',
+      amount:           48,
+      note:             '5x Science laboratory chemicals — REQ-2026-001',
+      spentOn:          d('2026-05-22'),
+      recordedBy:       bursar.id,
+      status:           'ACTIVE',
+      expenseRequestId: 'seed-req-1',
+    },
+  });
+
+  await prisma.expenseRequest.upsert({
+    where:  { id: 'seed-req-2' },
+    update: {},
+    create: {
+      id:              'seed-req-2',
+      schoolId:        SCHOOL_ID,
+      requestNumber:   'REQ-2026-002',
+      title:           '2x Dell computers for IT lab',
+      type:            'PURCHASE_ORDER',
+      department:      'IT Department',
+      justification:   'Existing computers are 8 years old',
+      currency:        'USD',
+      estimatedTotal:  700,
+      status:          'PENDING',
+      requestedById:   teacher.id,
+      requestedAt:     d('2026-06-08T08:00:00Z'),
+      items: {
+        create: [
+          { id: 'seed-req-2-item-1', description: 'Dell Optiplex 3000', quantity: 2, unitPrice: 350, total: 700 },
+        ],
+      },
+    },
+  });
+
+  // ── 11. Subjects ─────────────────────────────────────────────────────────────
   const subjectsData = [
-    { id: 'seed-sub-math', name: 'Mathematics', code: 'MATH', grade: 'Form 4', maxMark: 100, type: 'CORE' as const },
-    { id: 'seed-sub-eng',  name: 'English',     code: 'ENG',  grade: 'Form 4', maxMark: 100, type: 'CORE' as const },
-    { id: 'seed-sub-sci',  name: 'Science',     code: 'SCI',  grade: 'Form 3', maxMark: 100, type: 'CORE' as const },
-    { id: 'seed-sub-sho',  name: 'Shona',       code: 'SHO',  grade: 'Form 3', maxMark: 100, type: 'CORE' as const },
+    { id: 'seed-sub-math', name: 'Mathematics',       code: 'MATH',  maxMark: 100, type: 'CORE' as const },
+    { id: 'seed-sub-eng',  name: 'English Language',  code: 'ENG',   maxMark: 100, type: 'CORE' as const },
+    { id: 'seed-sub-sci',  name: 'Combined Science',  code: 'SCI',   maxMark: 100, type: 'CORE' as const },
+    { id: 'seed-sub-geo',  name: 'Geography',         code: 'GEO',   maxMark: 100, type: 'CORE' as const },
+    { id: 'seed-sub-hist', name: 'History',           code: 'HIST',  maxMark: 100, type: 'CORE' as const },
+    { id: 'seed-sub-sho',  name: 'Shona',             code: 'SHONA', maxMark: 100, type: 'CORE' as const },
+    { id: 'seed-sub-comp', name: 'Computer Studies',  code: 'COMP',  maxMark: 100, type: 'ELECTIVE' as const },
   ];
 
   for (const s of subjectsData) {
     await prisma.subject.upsert({
       where:  { id: s.id },
-      update: {},
+      update: { name: s.name, code: s.code, maxMark: s.maxMark, type: s.type },
       create: { ...s, schoolId: SCHOOL_ID },
     });
   }
 
-  // ── 11. SubjectAssignments ───────────────────────────────────────────────────
-  for (const s of subjectsData) {
-    await prisma.subjectAssignment.upsert({
-      where:  { teacherId_subjectId_term: { teacherId: teacher.id, subjectId: s.id, term: TERM } },
-      update: {},
-      create: {
-        id:        `seed-sa-${s.id}`,
+  // ── 12. SubjectAssignments ───────────────────────────────────────────────────
+  const assignmentsData = [
+    { id: 'seed-sa-1', teacherId: teacher.id,  subjectId: 'seed-sub-math', classId: 'seed-class-form4a' },
+    { id: 'seed-sa-2', teacherId: teacher.id,  subjectId: 'seed-sub-math', classId: 'seed-class-form3a' },
+    { id: 'seed-sa-3', teacherId: teacher.id,  subjectId: 'seed-sub-sci',  classId: 'seed-class-form3a' },
+    { id: 'seed-sa-4', teacherId: teacher2.id, subjectId: 'seed-sub-eng',  classId: 'seed-class-form4a' },
+    { id: 'seed-sa-5', teacherId: teacher2.id, subjectId: 'seed-sub-eng',  classId: 'seed-class-form3a' },
+    { id: 'seed-sa-6', teacherId: teacher2.id, subjectId: 'seed-sub-sho',  classId: 'seed-class-form4a' },
+  ];
+
+  await prisma.subjectAssignment.deleteMany({ where: { schoolId: SCHOOL_ID, term: TERM } });
+
+  for (const a of assignmentsData) {
+    await prisma.subjectAssignment.create({
+      data: {
+        id:        a.id,
         schoolId:  SCHOOL_ID,
-        teacherId: teacher.id,
-        subjectId: s.id,
+        teacherId: a.teacherId,
+        subjectId: a.subjectId,
+        classId:   a.classId,
         term:      TERM,
       },
     });
   }
 
-  // ── 12. Marks ────────────────────────────────────────────────────────────────
+  // ── 13. Marks ────────────────────────────────────────────────────────────────
   const marksData = [
-    { studentId: 'seed-stu-tanaka', subjectId: 'seed-sub-math', rawMark: 78, percentage: 78, letterGrade: 'B' },
-    { studentId: 'seed-stu-tanaka', subjectId: 'seed-sub-eng',  rawMark: 82, percentage: 82, letterGrade: 'A' },
-    { studentId: 'seed-stu-nyasha', subjectId: 'seed-sub-math', rawMark: 65, percentage: 65, letterGrade: 'C' },
-    { studentId: 'seed-stu-nyasha', subjectId: 'seed-sub-eng',  rawMark: 71, percentage: 71, letterGrade: 'B' },
+    { studentId: 'seed-stu-tanaka', subjectId: 'seed-sub-math', rawMark: 78, percentage: 78, letterGrade: 'B', enteredBy: teacher.id },
+    { studentId: 'seed-stu-tanaka', subjectId: 'seed-sub-eng',  rawMark: 82, percentage: 82, letterGrade: 'A', enteredBy: teacher2.id },
+    { studentId: 'seed-stu-nyasha', subjectId: 'seed-sub-math', rawMark: 65, percentage: 65, letterGrade: 'C', enteredBy: teacher.id },
+    { studentId: 'seed-stu-nyasha', subjectId: 'seed-sub-eng',  rawMark: 71, percentage: 71, letterGrade: 'B', enteredBy: teacher2.id },
   ];
 
   for (const m of marksData) {
@@ -333,12 +467,12 @@ async function main() {
         rawMark:     m.rawMark,
         percentage:  m.percentage,
         letterGrade: m.letterGrade,
-        enteredBy:   teacher.id,
+        enteredBy:   m.enteredBy,
       },
     });
   }
 
-  // ── 13. Assets ───────────────────────────────────────────────────────────────
+  // ── 14. Assets ───────────────────────────────────────────────────────────────
   const assetsData = [
     { id: 'seed-ast-bus',       name: 'School Bus',      catKey: 'Vehicles',         tag: 'VEH-001', cost: 45000, currency: 'USD' as const, location: 'School Yard',       condition: 'GOOD'      as const, status: 'ACTIVE'            as const, acquired: '2022-01-15' },
     { id: 'seed-ast-proj-a',    name: 'Projector A',     catKey: 'ICT Equipment',    tag: 'ICT-001', cost: 800,   currency: 'USD' as const, location: 'Science Lab',       condition: 'GOOD'      as const, status: 'ACTIVE'            as const, acquired: '2023-03-10' },
@@ -386,7 +520,7 @@ async function main() {
     },
   });
 
-  // ── 14. Books & Copies ───────────────────────────────────────────────────────
+  // ── 15. Books & Copies ───────────────────────────────────────────────────────
   const booksData = [
     { id: 'seed-book-math', isbn: '9780333564561', title: 'Mathematics for Zimbabwe', author: 'A. Macrae',     subject: 'Mathematics',     publisher: 'Macmillan',                  year: 2006, shelf: 'M1',  acc: ['SCH-2026-0001', 'SCH-2026-0002'] },
     { id: 'seed-book-eng',  isbn: '9780521544856', title: 'English Language Skills',  author: 'B. Heaton',     subject: 'English',         publisher: 'Cambridge',                  year: 2004, shelf: 'E1',  acc: ['SCH-2026-0003', 'SCH-2026-0004'] },
@@ -432,10 +566,10 @@ async function main() {
     }
   }
 
-  // ── 15. LibraryMembers ───────────────────────────────────────────────────────
+  // ── 16. LibraryMembers ───────────────────────────────────────────────────────
   // NOTE: LibraryMember.userId references the User table. The 10 students are in
-  // the Student table (no User record), so only the 5 staff users can be members.
-  const staffUsers = [director, head, bursar, teacher, librarian];
+  // the Student table (no User record), so only the 6 staff users can be members.
+  const staffUsers = [director, head, bursar, teacher, librarian, admin];
   const memberIds: Record<string, string> = {};
 
   for (const u of staffUsers) {
@@ -452,7 +586,7 @@ async function main() {
     memberIds[u.id] = memberId;
   }
 
-  // ── 16. Borrowings ───────────────────────────────────────────────────────────
+  // ── 17. Borrowings ───────────────────────────────────────────────────────────
   // Borrowing 1 — Librarian: Mathematics for Zimbabwe copy 1 (active)
   //   checkoutDate 2026-05-20, dueDate 2026-06-03
   await prisma.borrowing.upsert({
@@ -494,8 +628,18 @@ async function main() {
   // ── Summary ──────────────────────────────────────────────────────────────────
   console.log('\n✓ Seed complete');
   console.log('  School: Ruvimbo Independent College');
-  console.log('  Users: 5  Students: 10  Books: 6 titles  Assets: 8');
-  console.log('  Login: director@ruvimbo.co.zw / School@2026');
+  console.log('  Users: 7  Classes: 4  Students: 10  Books: 6 titles  Assets: 8');
+  console.log('  Subjects: 7  Subject assignments: 6');
+  console.log(`
+    ADMIN:     admin@ruvimbo.co.zw       → /admin
+    DIRECTOR:  director@ruvimbo.co.zw    → /director
+    HEAD:      head@ruvimbo.co.zw        → /head
+    BURSAR:    bursar@ruvimbo.co.zw      → /bursar/students
+    TEACHER:   teacher@ruvimbo.co.zw     → /teacher/marks
+    TEACHER:   mrs.chikomo@ruvimbo.co.zw → /teacher/marks
+    LIBRARIAN: librarian@ruvimbo.co.zw   → /library
+    Password for all: School@2026
+  `);
 }
 
 main()

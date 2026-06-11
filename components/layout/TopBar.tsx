@@ -1,14 +1,27 @@
 'use client';
 
 import { useSidebarStore } from '@/lib/sidebar-store';
+import type { UserRole } from '@/types';
+
+const ROLE_TITLE_PREFIX: Record<UserRole, string> = {
+  ADMIN:     'Admin Panel',
+  DIRECTOR:  'Profitability',
+  HEAD:      "Head's Office",
+  BURSAR:    'Fee Collection',
+  TEACHER:   'Mark Entry',
+  LIBRARIAN: 'Library',
+};
 
 interface TopBarProps {
   schoolName: string;
   currentTerm?: string;
+  role?: UserRole;
 }
 
-export function TopBar({ schoolName, currentTerm }: TopBarProps) {
+export function TopBar({ schoolName, currentTerm, role }: TopBarProps) {
   const { toggle } = useSidebarStore();
+
+  const title = role ? `${ROLE_TITLE_PREFIX[role]} — ${schoolName}` : schoolName;
 
   return (
     <header className="fixed left-16 right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-[#e7e5e4] bg-white px-4 shadow-sm md:left-64">
@@ -25,9 +38,9 @@ export function TopBar({ schoolName, currentTerm }: TopBarProps) {
         </svg>
       </button>
 
-      {/* School name — absolutely centred */}
+      {/* Title — absolutely centred */}
       <p className="absolute left-1/2 -translate-x-1/2 truncate text-sm font-semibold text-[#292524]">
-        {schoolName}
+        {title}
       </p>
 
       {/* Current term — right-aligned */}

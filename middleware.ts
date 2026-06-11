@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth';
 import type { NextRequest } from 'next/server';
+import type { UserRole } from '@/types';
 
 // ─── In-memory rate limiter ───────────────────────────────────────────────────
 // TODO: Replace with a Redis-based limiter (e.g. @upstash/ratelimit) before
@@ -31,9 +32,63 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
+// ─── Role-based route protection ──────────────────────────────────────────────
+
+const ROLE_HOME: Record<UserRole, string> = {
+  ADMIN:     '/admin',
+  DIRECTOR:  '/director',
+  HEAD:      '/head',
+  BURSAR:    '/bursar/students',
+  TEACHER:   '/teacher/marks',
+  LIBRARIAN: '/library',
+};
+
+function startsWithAny(pathname: string, prefixes: string[]): boolean {
+  return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+// Director may void verified payments/expenses via the accounting API.
+const VOID_API_PATTERN = /^\/api\/accounting\/(payments|expenses)\/[^/]+\/void$/;
+
+const ROLE_ALLOWED: Record<UserRole, (pathname: string) => boolean> = {
+  ADMIN: (p) => startsWithAny(p, ['/admin', '/api/admin']),
+
+  DIRECTOR: (p) =>
+    startsWithAny(p, ['/director', '/accounting/dashboard', '/api/accounting/dashboard', '/api/accounting/requests']) ||
+    VOID_API_PATTERN.test(p),
+
+  HEAD: (p) =>
+    startsWithAny(p, [
+      '/head',
+      '/accounting/students',
+      '/accounting/payments',
+      '/accounting/expenses',
+      '/accounting/settings',
+      '/results',
+      '/assets',
+      '/api/accounting',
+      '/api/results',
+    ]),
+
+  BURSAR: (p) =>
+    startsWithAny(p, [
+      '/bursar',
+      '/api/accounting/students',
+      '/api/accounting/payments',
+      '/api/accounting/expenses',
+      '/api/accounting/exchange-rate',
+      '/api/accounting/requests',
+    ]),
+
+  TEACHER: (p) =>
+    startsWithAny(p, ['/teacher', '/api/results/marks', '/api/accounting/requests']),
+
+  LIBRARIAN: (p) => startsWithAny(p, ['/library', '/api/library']),
+};
+
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
-export default auth((req: NextRequest & { auth: unknown }) => {
+export default auth((req: NextRequest & { auth: { user?: { role: UserRole } } | null }) => {
   const { nextUrl } = req;
   const { pathname } = nextUrl;
 
@@ -55,8 +110,8 @@ export default auth((req: NextRequest & { auth: unknown }) => {
     }
   }
 
-  // Auth gate — allow public paths through
-  const isLoggedIn = !!(req as { auth: unknown }).auth;
+  const role = req.auth?.user?.role;
+  const isLoggedIn = !!role;
 
   const isPublic =
     pathname.startsWith('/login') ||
@@ -70,7 +125,14 @@ export default auth((req: NextRequest & { auth: unknown }) => {
   }
 
   if (isLoggedIn && pathname.startsWith('/login')) {
-    return Response.redirect(new URL('/accounting', nextUrl));
+    return Response.redirect(new URL(ROLE_HOME[role], nextUrl));
+  }
+
+  // Each role only sees their own routes — anything else bounces home.
+  if (isLoggedIn && !isPublic && pathname !== '/') {
+    if (!ROLE_ALLOWED[role](pathname)) {
+      return Response.redirect(new URL(ROLE_HOME[role], nextUrl));
+    }
   }
 });
 

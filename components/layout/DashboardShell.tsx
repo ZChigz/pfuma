@@ -19,6 +19,7 @@ export async function DashboardShell({ children }: { children: ReactNode }) {
       <TopBar
         schoolName={school?.name ?? ''}
         currentTerm={school?.currentTerm ?? undefined}
+        role={session?.user?.role}
       />
       {/* Content: offset right of sidebar (16 on mobile, 64 on md+) and below TopBar */}
       <main className="ml-16 min-h-screen overflow-y-auto bg-[#f5f5f4] p-6 pt-[80px] md:ml-64">

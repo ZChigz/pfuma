@@ -38,8 +38,8 @@ const icons = {
   reports:   'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
   assets:    'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
   library:   'M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z',
+  classes:   'M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222',
   signout:   'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
-  settings:  'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
 };
 
 // ─── Nav config ──────────────────────────────────────────────────────────────
@@ -48,7 +48,6 @@ interface NavItem {
   href: string;
   label: string;
   icon: keyof typeof icons;
-  roles?: UserRole[];
 }
 
 interface NavSection {
@@ -56,47 +55,118 @@ interface NavSection {
   items: NavItem[];
 }
 
-const sections: NavSection[] = [
-  {
-    title: 'Finance',
-    items: [
-      { href: '/accounting',          label: 'Dashboard', icon: 'dashboard' },
-      { href: '/accounting/settings', label: 'Settings',  icon: 'settings',  roles: ['DIRECTOR', 'HEAD', 'BURSAR'] },
+interface RoleNav {
+  header: string;
+  sections: NavSection[];
+}
+
+const ROLE_NAV: Record<UserRole, RoleNav> = {
+  ADMIN: {
+    header: 'Admin Panel',
+    sections: [
+      {
+        title: 'Setup',
+        items: [
+          { href: '/admin/users',    label: 'Users',    icon: 'students' },
+          { href: '/admin/classes',  label: 'Classes',  icon: 'classes'  },
+          { href: '/admin/students', label: 'Students', icon: 'students' },
+          { href: '/admin/subjects', label: 'Subjects', icon: 'subjects' },
+        ],
+      },
     ],
   },
-  {
-    title: 'Students',
-    items: [
-      { href: '/accounting/students', label: 'Students', icon: 'students' },
-      { href: '/accounting/payments', label: 'Payments', icon: 'payments' },
-      { href: '/accounting/expenses', label: 'Expenses', icon: 'expenses' },
+  DIRECTOR: {
+    header: 'Director',
+    sections: [
+      {
+        title: 'Finance',
+        items: [
+          { href: '/director',       label: 'Profitability', icon: 'dashboard' },
+          { href: '/director/voids', label: 'Void Entries',  icon: 'expenses'  },
+        ],
+      },
     ],
   },
-  {
-    title: 'Academic',
-    items: [
-      { href: '/results',          label: 'Results',     icon: 'results'  },
-      { href: '/results/subjects', label: 'Subjects',    icon: 'subjects', roles: ['DIRECTOR', 'HEAD'] },
-      { href: '/results/marks',    label: 'Mark Entry',  icon: 'marks',    roles: ['DIRECTOR', 'HEAD', 'TEACHER'] },
-      { href: '/results/reports',  label: 'Reports',     icon: 'reports'  },
+  HEAD: {
+    header: "Head's Office",
+    sections: [
+      {
+        title: 'Finance',
+        items: [
+          { href: '/head/fees',     label: 'Fee Management',   icon: 'payments' },
+          { href: '/head/payments', label: 'Payments',         icon: 'payments' },
+          { href: '/head/expenses', label: 'Expenses',         icon: 'expenses' },
+          { href: '/head/requests', label: 'Expense Requests', icon: 'expenses' },
+        ],
+      },
+      {
+        title: 'Academic',
+        items: [
+          { href: '/head/results', label: 'Results', icon: 'results' },
+          { href: '/head/reports', label: 'Reports', icon: 'reports' },
+        ],
+      },
     ],
   },
-  {
-    title: 'Admin',
-    items: [
-      { href: '/assets',  label: 'Assets',  icon: 'assets',  roles: ['DIRECTOR', 'HEAD', 'BURSAR'] },
-      { href: '/library', label: 'Library', icon: 'library', roles: ['DIRECTOR', 'HEAD', 'LIBRARIAN'] },
+  BURSAR: {
+    header: 'Bursar',
+    sections: [
+      {
+        title: 'Daily Work',
+        items: [
+          { href: '/bursar/students',      label: 'Students',        icon: 'students' },
+          { href: '/bursar/payments',      label: 'Record Payment',  icon: 'payments' },
+          { href: '/bursar/disbursements', label: 'Disbursements',   icon: 'expenses' },
+          { href: '/bursar/expenses',      label: 'Direct Expenses', icon: 'expenses' },
+        ],
+      },
     ],
   },
-];
+  TEACHER: {
+    header: 'Teacher',
+    sections: [
+      {
+        title: 'Academic',
+        items: [
+          { href: '/teacher/marks',   label: 'Mark Entry', icon: 'marks'   },
+          { href: '/teacher/classes', label: 'My Classes', icon: 'classes' },
+        ],
+      },
+      {
+        title: 'Finance',
+        items: [
+          { href: '/teacher/requests', label: 'Requests', icon: 'expenses' },
+        ],
+      },
+    ],
+  },
+  LIBRARIAN: {
+    header: 'Library',
+    sections: [
+      {
+        title: 'Library',
+        items: [
+          { href: '/library',          label: 'Dashboard', icon: 'dashboard' },
+          { href: '/library/catalog',  label: 'Catalog',   icon: 'library'   },
+          { href: '/library/borrowing', label: 'Checkout', icon: 'students'  },
+        ],
+      },
+    ],
+  },
+};
 
 const ROLE_LABELS: Record<UserRole, string> = {
+  ADMIN:     'Admin',
   DIRECTOR:  'Director',
   HEAD:      'Head Teacher',
   BURSAR:    'Bursar',
   TEACHER:   'Teacher',
   LIBRARIAN: 'Librarian',
 };
+
+// Routes that have nested sub-pages need exact matching on their root
+// so the parent link isn't highlighted while viewing a child page.
+const EXACT_MATCH_ROUTES = new Set(['/director', '/library']);
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -107,17 +177,11 @@ export function Sidebar() {
   const role = session?.user?.role as UserRole | undefined;
 
   function isActive(href: string) {
-    if (href === '/accounting') return pathname === '/accounting';
-    if (href === '/results')    return pathname === '/results';
-    return pathname.startsWith(href);
+    if (EXACT_MATCH_ROUTES.has(href)) return pathname === href;
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
 
-  const visibleSections = sections.map((section) => ({
-    ...section,
-    items: section.items.filter(
-      (item) => !item.roles || (role && item.roles.includes(role)),
-    ),
-  })).filter((s) => s.items.length > 0);
+  const nav = role ? ROLE_NAV[role] : null;
 
   return (
     <>
@@ -144,13 +208,13 @@ export function Sidebar() {
           </div>
           <div className={cn('overflow-hidden transition-all', isMobileExpanded ? 'w-auto' : 'w-0 md:w-auto')}>
             <p className="whitespace-nowrap text-sm font-bold text-white">Pfuma</p>
-            <p className="whitespace-nowrap text-xs text-emerald-200">School Management</p>
+            <p className="whitespace-nowrap text-xs text-emerald-200">{nav?.header ?? 'School Management'}</p>
           </div>
         </div>
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Main navigation">
-          {visibleSections.map((section) => (
+          {nav?.sections.map((section) => (
             <div key={section.title} className="mb-4">
               <p
                 className={cn(
