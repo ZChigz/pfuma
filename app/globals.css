@@ -6,3 +6,27 @@ body {
   color: theme('colors.brand.text');
   background-color: theme('colors.brand.bg');
 }
+
+/* Dark-green surface with soft contour lines, used for the term card */
+.term-card {
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(110, 231, 160, 0.28) 0%, transparent 55%),
+    repeating-radial-gradient(circle at 85% 110%, rgba(255, 255, 255, 0.07) 0 2px, transparent 2px 14px),
+    linear-gradient(150deg, #14613f 0%, #0b3a25 100%);
+}
+
+/* Diagonal hatch for the non-highlighted bars */
+.hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #b9c6bd 0 1.5px,
+    transparent 1.5px 6px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

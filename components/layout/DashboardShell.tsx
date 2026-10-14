@@ -14,17 +14,18 @@ export async function DashboardShell({ children }: { children: ReactNode }) {
     : null;
 
   return (
-    <div className="min-h-screen bg-[#f5f5f4]">
-      <Sidebar />
-      <TopBar
-        schoolName={school?.name ?? ''}
-        currentTerm={school?.currentTerm ?? undefined}
-        role={session?.user?.role}
-      />
-      {/* Content: offset right of sidebar (16 on mobile, 64 on md+) and below TopBar */}
-      <main className="ml-16 min-h-screen overflow-y-auto bg-[#f5f5f4] p-6 pt-[80px] md:ml-64">
-        {children}
-      </main>
+    <div className="min-h-screen bg-[#e4e7e5] md:h-screen md:p-5">
+      <div className="flex min-h-screen gap-3 bg-white p-3 md:h-full md:min-h-0 md:rounded-[28px] md:shadow-[0_24px_60px_-24px_rgba(20,48,31,0.35)]">
+        <Sidebar currentTerm={school?.currentTerm ?? undefined} />
+        <div className="flex min-w-0 flex-1 flex-col rounded-2xl bg-[#f4f6f4] p-4 md:overflow-hidden md:p-5">
+          <TopBar
+            schoolName={school?.name ?? ''}
+            currentTerm={school?.currentTerm ?? undefined}
+            role={session?.user?.role}
+          />
+          <main className="min-h-0 flex-1 md:overflow-y-auto md:pr-1">{children}</main>
+        </div>
+      </div>
     </div>
   );
 }

@@ -23,15 +23,15 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-xl border border-[#e7e5e4] bg-white shadow-sm',
+        'rounded-2xl bg-white',
         className,
       )}
     >
       {hasHeader && (
-        <div className="flex items-start justify-between border-b border-[#e7e5e4] px-6 py-4">
+        <div className="flex items-start justify-between px-6 pb-2 pt-5">
           <div>
             {title && (
-              <h3 className="text-base font-semibold text-[#292524]">{title}</h3>
+              <h3 className="text-base font-semibold text-[#14301f]">{title}</h3>
             )}
             {subtitle && (
               <p className="mt-0.5 text-sm text-[#78716c]">{subtitle}</p>
