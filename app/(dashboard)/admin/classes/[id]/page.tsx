@@ -41,15 +41,15 @@ export default async function AdminClassDetailPage({ params }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href="/admin/classes" className="text-sm text-[#14613f] hover:underline">
+        <Link href="/admin/classes" className="text-sm text-primary hover:underline">
           ← Back to Classes
         </Link>
       </div>
 
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#14301f]">{schoolClass.name}</h1>
-          <p className="mt-0.5 text-sm text-[#6b7a70]">
+          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">{schoolClass.name}</h1>
+          <p className="mt-1 text-sm text-muted">
             {schoolClass.grade}{schoolClass.section ? ` · Section ${schoolClass.section}` : ''}
             {' · '}Class Teacher: {schoolClass.classTeacher?.fullName ?? 'Unassigned'}
             {' · '}
@@ -70,28 +70,28 @@ export default async function AdminClassDetailPage({ params }: Props) {
 
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#14301f]">Students ({schoolClass.students.length})</h2>
-          <Link href={`/admin/students?classId=${schoolClass.id}`} className="text-sm font-medium text-[#14613f] hover:underline">
+          <h2 className="text-base font-semibold text-ink">Students ({schoolClass.students.length})</h2>
+          <Link href={`/admin/students?classId=${schoolClass.id}`} className="text-sm font-medium text-primary hover:underline">
             Manage Students →
           </Link>
         </div>
-        <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
-          <table className="w-full text-left text-sm text-[#14301f]">
-            <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
+        <div className="overflow-x-auto rounded-2xl bg-white">
+          <table className="w-full text-left text-sm text-ink">
+            <thead className="border-b border-line bg-white">
               <tr>
                 {['Name', 'Parent/Guardian', 'Phone', 'Active'].map((h, i) => (
-                  <th key={i} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
+                  <th key={i} className="px-4 py-3.5 text-xs font-medium text-subtle">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e3e9e4] bg-white">
+            <tbody className="divide-y divide-line bg-white">
               {schoolClass.students.map((s) => (
                 <tr key={s.id}>
                   <td className="px-4 py-3 font-medium">{s.fullName}</td>
                   <td className="px-4 py-3">{s.parentName}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#6b7a70]">{s.parentPhone}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted">{s.parentPhone}</td>
                   <td className="px-4 py-3">
                     <Badge label={s.active ? 'Active' : 'Inactive'} variant={s.active ? 'success' : 'danger'} />
                   </td>
@@ -99,7 +99,7 @@ export default async function AdminClassDetailPage({ params }: Props) {
               ))}
               {schoolClass.students.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-[#6b7a70]">
+                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted">
                     No students in this class yet.
                   </td>
                 </tr>

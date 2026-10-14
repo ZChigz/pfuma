@@ -37,11 +37,11 @@ const S = StyleSheet.create({
   // ── Info grid
   infoGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 },
   infoCell: { width: '50%', paddingVertical: 4, paddingRight: 8 },
-  infoLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#6b7a70', textTransform: '', marginBottom: 2, letterSpacing: 0.8 },
+  infoLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#6b7a70', textTransform: 'uppercase', marginBottom: 2, letterSpacing: 0.8 },
   infoValue: { fontSize: 11 },
 
   // ── Section heading
-  sectionHead: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#14613f', textTransform: '', letterSpacing: 0.8, marginBottom: 6 },
+  sectionHead: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#14613f', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 },
 
   // ── Marks table
   tableHead: { flexDirection: 'row', backgroundColor: '#14613f', paddingVertical: 6, paddingHorizontal: 8 },

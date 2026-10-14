@@ -32,38 +32,38 @@ export default async function TeacherRequestDetailPage({ params }: { params: { i
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href="/teacher/requests" className="text-sm font-medium text-[#14613f]">
+        <Link href="/teacher/requests" className="text-sm font-medium text-primary">
           &larr; Back to requests
         </Link>
       </div>
 
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold   text-[#6b7a70]">{request.requestNumber}</p>
-          <h1 className="text-2xl font-bold text-[#14301f]">{request.title}</h1>
-          <p className="mt-1 text-sm text-[#6b7a70]">{request.department} · {REQUEST_TYPE_LABELS[request.type]}</p>
+          <p className="text-xs font-medium text-muted">{request.requestNumber}</p>
+          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">{request.title}</h1>
+          <p className="mt-1 text-sm text-muted">{request.department} · {REQUEST_TYPE_LABELS[request.type]}</p>
         </div>
         <Badge label={status.label} variant={status.variant} />
       </div>
 
-      <div className="rounded-2xl bg-white p-4">
-        <p className="text-xs font-semibold   text-[#6b7a70]">Justification</p>
-        <p className="mt-1 text-sm text-[#14301f]">{request.justification}</p>
+      <div className="rounded-2xl bg-white p-5">
+        <p className="text-xs font-medium text-muted">Justification</p>
+        <p className="mt-1 text-sm text-ink">{request.justification}</p>
       </div>
 
       {/* Line items */}
-      <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
-        <table className="w-full text-left text-sm text-[#14301f]">
-          <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
+      <div className="overflow-x-auto rounded-2xl bg-white">
+        <table className="w-full text-left text-sm text-ink">
+          <thead className="border-b border-line bg-white">
             <tr>
               {['Description', 'Qty', 'Unit Price', 'Total'].map((h) => (
-                <th key={h} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
+                <th key={h} className="px-4 py-3.5 text-xs font-medium text-subtle">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#e3e9e4] bg-white">
+          <tbody className="divide-y divide-line bg-white">
             {request.items.map((item) => (
               <tr key={item.id}>
                 <td className="px-4 py-3">{item.description}</td>
@@ -74,11 +74,11 @@ export default async function TeacherRequestDetailPage({ params }: { params: { i
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-[#e3e9e4] bg-[#f4f6f4]">
-              <td colSpan={3} className="px-4 py-3 text-right text-sm font-semibold text-[#14301f]">
+            <tr className="border-t border-line bg-canvas">
+              <td colSpan={3} className="px-4 py-3 text-right text-sm font-semibold text-ink">
                 {request.status === 'DISBURSED' && request.actualTotal ? 'Actual total' : 'Estimated total'}
               </td>
-              <td className="px-4 py-3 text-sm font-bold tabular-nums text-[#14301f]">
+              <td className="px-4 py-3 text-sm font-bold tabular-nums text-ink">
                 {formatAmount(
                   request.status === 'DISBURSED' && request.actualTotal
                     ? request.actualTotal.toNumber()
@@ -91,9 +91,9 @@ export default async function TeacherRequestDetailPage({ params }: { params: { i
       </div>
 
       {/* Timeline */}
-      <div className="rounded-2xl bg-white p-4">
-        <p className="mb-3 text-xs font-semibold   text-[#6b7a70]">Timeline</p>
-        <ul className="flex flex-col gap-2 text-sm text-[#14301f]">
+      <div className="rounded-2xl bg-white p-5">
+        <p className="mb-3 text-xs font-medium text-muted">Timeline</p>
+        <ul className="flex flex-col gap-2 text-sm text-ink">
           <li>Created by {request.requestedBy.fullName} on {formatDateTime(request.createdAt)}</li>
           {request.status !== 'DRAFT' && (
             <li>Submitted on {formatDateTime(request.requestedAt)}</li>
@@ -105,7 +105,7 @@ export default async function TeacherRequestDetailPage({ params }: { params: { i
             <li>
               Rejected by {request.rejectedBy.fullName} on {formatDateTime(request.rejectedAt)}
               {request.rejectionReason && (
-                <span className="block text-[#6b7a70]">Reason: {request.rejectionReason}</span>
+                <span className="block text-muted">Reason: {request.rejectionReason}</span>
               )}
             </li>
           )}

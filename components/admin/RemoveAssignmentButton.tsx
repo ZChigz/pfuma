@@ -35,7 +35,7 @@ export function RemoveAssignmentButton({ id }: Props) {
       type="button"
       onClick={handleRemove}
       disabled={busy}
-      className="rounded px-2 py-1 text-xs font-medium text-[#b91c1c] hover:underline focus:outline-none focus:ring-2 focus:ring-[#b91c1c]/40 disabled:opacity-50"
+      className="rounded px-2 py-1 text-xs font-medium text-danger hover:underline focus:outline-none focus:ring-2 focus:ring-danger/40 disabled:opacity-50"
     >
       Remove
     </button>

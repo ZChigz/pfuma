@@ -133,16 +133,16 @@ export function AssignSubjectModal({ classId, className, term, subjects, teacher
           />
 
           {selectedTeacherId && (
-            <div className="rounded-lg border border-[#e3e9e4] bg-[#fafaf9] p-3">
-              <p className="text-xs font-semibold   text-[#6b7a70]">
+            <div className="rounded-xl border border-line bg-rowhover p-3">
+              <p className="text-xs font-medium text-muted">
                 This teacher&apos;s current assignments this term
               </p>
               {loadingLoad ? (
-                <p className="mt-2 text-sm text-[#6b7a70]">Loading…</p>
+                <p className="mt-2 text-sm text-muted">Loading…</p>
               ) : teacherLoad.length === 0 ? (
-                <p className="mt-2 text-sm text-[#6b7a70]">No assignments yet.</p>
+                <p className="mt-2 text-sm text-muted">No assignments yet.</p>
               ) : (
-                <ul className="mt-2 flex flex-col gap-1 text-sm text-[#14301f]">
+                <ul className="mt-2 flex flex-col gap-1 text-sm text-ink">
                   {teacherLoad.map((a) => (
                     <li key={a.id}>{a.class.name} — {a.subject.name}</li>
                   ))}

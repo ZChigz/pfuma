@@ -85,19 +85,19 @@ export default async function ReportsPage({
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#14301f]">Report Cards</h1>
-          <p className="mt-0.5 text-sm text-[#6b7a70]">View results and download PDF reports</p>
+          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Report Cards</h1>
+          <p className="mt-1 text-sm text-muted">View results and download PDF reports</p>
         </div>
         {canPublish && grade && term && !isPublished && (
           <Link
             href="/head/results"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-[#14613f] bg-white px-4 text-sm font-medium text-[#14613f] hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-primary bg-white px-5 text-sm font-semibold text-primary transition-colors hover:bg-tint focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
           >
             Go to Results to verify &amp; publish
           </Link>
         )}
         {isPublished && (
-          <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-800">
+          <span className="inline-flex items-center rounded-full bg-success-bg px-3 py-1 text-sm font-medium text-primary">
             ✓ Published
           </span>
         )}
@@ -108,58 +108,58 @@ export default async function ReportsPage({
 
       {/* Results table */}
       {!grade || !term ? (
-        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-[#6b7a70]">
+        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
           Select a grade and term to view results.
         </p>
       ) : results.length === 0 ? (
         <div className="rounded-2xl bg-white px-4 py-12 text-center">
           {pendingMarkCount > 0 ? (
             <>
-              <p className="text-sm font-medium text-[#14301f]">
+              <p className="text-sm font-medium text-ink">
                 {pendingMarkCount} mark{pendingMarkCount !== 1 ? 's' : ''} entered for{' '}
                 <strong>{grade}</strong> — <strong>{term}</strong>
               </p>
-              <p className="mt-1 text-sm text-[#6b7a70]">
+              <p className="mt-1 text-sm text-muted">
                 {canPublish
                   ? 'Use "Go to Results to verify & publish" above once all subjects have been verified by their teachers.'
                   : 'Results have not been published yet. Ask your Head or Director to publish.'}
               </p>
             </>
           ) : (
-            <p className="text-sm text-[#6b7a70]">
+            <p className="text-sm text-muted">
               No marks entered yet for <strong>{grade}</strong> — <strong>{term}</strong>.
               {canPublish ? ' Teachers must enter marks before you can publish.' : ''}
             </p>
           )}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
-          <table className="w-full text-left text-sm text-[#14301f]">
-            <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
+        <div className="overflow-x-auto rounded-2xl bg-white">
+          <table className="w-full text-left text-sm text-ink">
+            <thead className="border-b border-line bg-white">
               <tr>
                 {['Pos', 'Student', 'Total', '%', 'Grade', 'PDF'].map((h, i) => (
-                  <th key={i} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
+                  <th key={i} className="px-4 py-3.5 text-xs font-medium text-subtle">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e3e9e4] bg-white">
+            <tbody className="divide-y divide-line bg-white">
               {results.map((r) => (
                 <tr key={r.id}>
-                  <td className="w-12 px-4 py-3 tabular-nums text-[#6b7a70]">
+                  <td className="w-12 px-4 py-3 tabular-nums text-muted">
                     {r.classPosition ?? '—'}
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-medium">{r.student.fullName}</p>
-                    <p className="text-xs text-[#6b7a70]">{r.student.grade}</p>
+                    <p className="text-xs text-muted">{r.student.grade}</p>
                   </td>
                   <td className="px-4 py-3 tabular-nums">{r.totalMarks.toFixed(1)}</td>
                   <td className="px-4 py-3 tabular-nums font-medium">
                     {r.percentage.toFixed(1)}%
                   </td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-semibold text-[#14301f]">
+                    <span className="inline-flex items-center rounded-full bg-tint px-2.5 py-0.5 text-xs font-semibold text-ink">
                       {r.letterGrade}
                     </span>
                   </td>
@@ -167,7 +167,7 @@ export default async function ReportsPage({
                     <a
                       href={`/api/results/reports/${r.studentId}?term=${encodeURIComponent(term)}`}
                       download
-                      className="inline-flex min-h-[32px] items-center gap-1 rounded-xl border border-[#e3e9e4] bg-white px-2.5 py-1 text-xs font-medium text-[#14613f] hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
+                      className="inline-flex min-h-[32px] items-center gap-1 rounded-xl border border-line bg-white px-2.5 py-1 text-xs font-medium text-primary hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-primary/40"
                     >
                       <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path

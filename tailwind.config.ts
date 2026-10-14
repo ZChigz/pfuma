@@ -9,18 +9,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          green: '#065f46',
-          hover: '#047857',
-          gold: '#f59e0b',
-          bg: '#f5f5f4',
-          surface: '#ffffff',
-          text: '#292524',
-          muted: '#78716c',
-          positive: '#15803d',
-          negative: '#b91c1c',
-          border: '#e7e5e4',
-        },
+        // Semantic UI tokens: use these (text-ink, bg-canvas, border-line...) instead of raw hex.
+        ink: '#14301f',
+        muted: '#6b7a70',
+        subtle: '#8a968e',
+        line: '#e3e9e4',
+        canvas: '#f4f6f4',
+        frame: '#e4e7e5',
+        primary: { DEFAULT: '#14613f', hover: '#0f4d32' },
+        tint: '#eef4ef',
+        rowhover: '#f4f8f5',
+        gold: '#f59e0b',
+        danger: { DEFAULT: '#b91c1c', bg: '#fde8e6', line: '#f6c9c4' },
+        success: { DEFAULT: '#15803d', bg: '#e3f1e8' },
+        warn: { DEFAULT: '#8a5a00', bg: '#fdf3dc', line: '#f1dc9d' },
       },
     },
   },

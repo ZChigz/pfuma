@@ -38,9 +38,9 @@ export function useToast() {
 }
 
 const typeStyles: Record<ToastType, string> = {
-  success: 'bg-[#14613f]',
-  error:   'bg-[#b91c1c]',
-  info:    'bg-[#14301f]',
+  success: 'bg-primary',
+  error:   'bg-danger',
+  info:    'bg-ink',
 };
 
 function ToastItemComponent({
@@ -60,7 +60,7 @@ function ToastItemComponent({
       role="status"
       aria-live="polite"
       className={cn(
-        'flex min-w-[280px] items-center justify-between gap-4 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg',
+        'flex min-w-[280px] items-center justify-between gap-4 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg',
         typeStyles[item.type],
       )}
     >

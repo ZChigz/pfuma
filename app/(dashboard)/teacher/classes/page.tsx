@@ -43,32 +43,32 @@ export default async function TeacherClassesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#14301f]">My Classes</h1>
-        <p className="mt-0.5 text-sm text-[#6b7a70]">Your class and subject assignments</p>
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">My Classes</h1>
+        <p className="mt-1 text-sm text-muted">Your class and subject assignments</p>
       </div>
 
       {rows.length === 0 ? (
-        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-[#6b7a70]">
+        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
           No classes are assigned to you. Ask your head of department.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
-          <table className="w-full text-left text-sm text-[#14301f]">
-            <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
+        <div className="overflow-x-auto rounded-2xl bg-white">
+          <table className="w-full text-left text-sm text-ink">
+            <thead className="border-b border-line bg-white">
               <tr>
                 {['Class', 'Subject', 'Term', 'Marks Entered'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
+                  <th key={h} className="px-4 py-3.5 text-xs font-medium text-subtle">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e3e9e4] bg-white">
+            <tbody className="divide-y divide-line bg-white">
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td className="px-4 py-3 font-medium">{r.className}</td>
                   <td className="px-4 py-3">{r.subjectName}</td>
-                  <td className="px-4 py-3 text-[#6b7a70]">{r.term}</td>
+                  <td className="px-4 py-3 text-muted">{r.term}</td>
                   <td className="px-4 py-3 tabular-nums">
                     {r.marksEntered} / {r.totalStudents}
                   </td>

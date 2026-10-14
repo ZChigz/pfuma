@@ -31,37 +31,37 @@ export default async function HeadPaymentsPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#14301f]">Payments</h1>
-        <p className="mt-0.5 text-sm text-[#6b7a70]">Verify pending payments and review recent activity</p>
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Payments</h1>
+        <p className="mt-1 text-sm text-muted">Verify pending payments and review recent activity</p>
       </div>
 
       <section>
-        <h2 className="mb-3 text-base font-semibold text-[#14301f]">Pending verification ({pending.length})</h2>
+        <h2 className="mb-3 text-base font-semibold text-ink">Pending verification ({pending.length})</h2>
         {pending.length === 0 ? (
-          <p className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-[#6b7a70]">
+          <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
             No payments awaiting verification.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
-            <table className="w-full text-left text-sm text-[#14301f]">
-              <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
+          <div className="overflow-x-auto rounded-2xl bg-white">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-line bg-white">
                 <tr>
                   {['Student', 'Class', 'Method', 'Reference', 'Amount', ''].map((h, i) => (
-                    <th key={i} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">{h}</th>
+                    <th key={i} className="px-4 py-3.5 text-xs font-medium text-subtle">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e3e9e4] bg-white">
+              <tbody className="divide-y divide-line bg-white">
                 {pending.map((p) => (
                   <tr key={p.id}>
                     <td className="px-4 py-3 font-medium">{p.student.fullName}</td>
-                    <td className="px-4 py-3 text-[#6b7a70]">{p.student.class?.name ?? p.student.grade}</td>
+                    <td className="px-4 py-3 text-muted">{p.student.class?.name ?? p.student.grade}</td>
                     <td className="px-4 py-3">
                       <Badge label={p.method} variant={p.method === 'CASH' ? 'success' : 'neutral'} />
                     </td>
-                    <td className="px-4 py-3 text-[#6b7a70]">{p.reference ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted">{p.reference ?? '—'}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">
                       {p.currency === 'USD' ? formatUSD(p.amount.toNumber()) : formatZiG(p.amount.toNumber())}
                     </td>
@@ -77,34 +77,34 @@ export default async function HeadPaymentsPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-base font-semibold text-[#14301f]">Recent verified</h2>
+        <h2 className="mb-3 text-base font-semibold text-ink">Recent verified</h2>
         {verified.length === 0 ? (
-          <p className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-[#6b7a70]">
+          <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
             No verified payments yet.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
-            <table className="w-full text-left text-sm text-[#14301f]">
-              <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
+          <div className="overflow-x-auto rounded-2xl bg-white">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-line bg-white">
                 <tr>
                   {['Student', 'Class', 'Method', 'Reference', 'Amount', 'Date'].map((h, i) => (
-                    <th key={i} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">{h}</th>
+                    <th key={i} className="px-4 py-3.5 text-xs font-medium text-subtle">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e3e9e4] bg-white">
+              <tbody className="divide-y divide-line bg-white">
                 {verified.map((p) => (
                   <tr key={p.id}>
                     <td className="px-4 py-3 font-medium">{p.student.fullName}</td>
-                    <td className="px-4 py-3 text-[#6b7a70]">{p.student.class?.name ?? p.student.grade}</td>
+                    <td className="px-4 py-3 text-muted">{p.student.class?.name ?? p.student.grade}</td>
                     <td className="px-4 py-3">
                       <Badge label={p.method} variant="neutral" />
                     </td>
-                    <td className="px-4 py-3 text-[#6b7a70]">{p.reference ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted">{p.reference ?? '—'}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">
                       {p.currency === 'USD' ? formatUSD(p.amount.toNumber()) : formatZiG(p.amount.toNumber())}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-[#6b7a70]">{formatDateTime(p.recordedAt)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted">{formatDateTime(p.recordedAt)}</td>
                   </tr>
                 ))}
               </tbody>

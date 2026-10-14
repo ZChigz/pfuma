@@ -22,7 +22,7 @@ export function PaymentActionButton({ paymentId, action, disabled, disabledLabel
   if (disabled && disabledLabel) {
     return (
       <span
-        className="inline-flex min-h-[36px] items-center gap-1 rounded-xl border border-[#e3e9e4] bg-stone-50 px-2.5 text-xs font-medium text-[#6b7a70]"
+        className="inline-flex min-h-[36px] items-center gap-1 rounded-xl border border-line bg-canvas px-2.5 text-xs font-medium text-muted"
         title={disabledLabel}
       >
         <svg className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

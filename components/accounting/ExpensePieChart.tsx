@@ -15,8 +15,8 @@ const SLICE_COLORS = [
   '#059669',
   '#10b981',
   '#f59e0b',
-  '#d97706',
-  '#b45309',
+  '#8a5a00',
+  '#8a5a00',
 ] as const;
 
 export interface ExpenseSlice {
@@ -32,7 +32,7 @@ interface Props {
 export function ExpensePieChart({ data, currency }: Props) {
   if (data.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-[#6b7a70]">
+      <div className="flex h-64 items-center justify-center text-sm text-muted">
         No expense data for this currency
       </div>
     );

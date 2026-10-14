@@ -62,7 +62,7 @@ export function ImportStudentsModal() {
         footer={<Button onClick={handleClose}>Done</Button>}
       >
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-[#6b7a70]">
+          <p className="text-sm text-muted">
             Upload a CSV file with the columns: <code className="font-mono text-xs">fullName, parentName, parentPhone, class</code>.
             The <code className="font-mono text-xs">class</code> value must match an existing class name exactly (e.g. &quot;Form 4A&quot;).
           </p>
@@ -75,16 +75,16 @@ export function ImportStudentsModal() {
               const file = e.target.files?.[0];
               if (file) handleFile(file);
             }}
-            className="block w-full text-sm text-[#14301f] file:mr-4 file:min-h-[44px] file:rounded-xl file:border-0 file:bg-[#14613f] file:px-4 file:text-sm file:font-medium file:text-white hover:file:bg-[#0f4d32]"
+            className="block w-full text-sm text-ink file:mr-4 file:min-h-[44px] file:rounded-xl file:border-0 file:bg-primary file:px-4 file:text-sm file:font-medium file:text-white hover:file:bg-primary-hover"
           />
-          {busy && <p className="text-sm text-[#6b7a70]">Importing…</p>}
+          {busy && <p className="text-sm text-muted">Importing…</p>}
           {result && (
-            <div className="rounded-lg border border-[#e3e9e4] bg-[#fafaf9] p-4 text-sm">
-              <p className="font-medium text-[#14301f]">
+            <div className="rounded-xl border border-line bg-rowhover p-4 text-sm">
+              <p className="font-medium text-ink">
                 Imported {result.imported} student(s), skipped {result.skipped}.
               </p>
               {result.errors.length > 0 && (
-                <ul className="mt-2 list-disc pl-5 text-xs text-[#b91c1c]">
+                <ul className="mt-2 list-disc pl-5 text-xs text-danger">
                   {result.errors.map((err, i) => (
                     <li key={i}>{err}</li>
                   ))}

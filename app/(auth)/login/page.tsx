@@ -46,8 +46,8 @@ export default function LoginPage() {
 
   return (
     <>
-      <h1 className="mb-1 text-3xl font-bold tracking-tight text-[#14301f]">Sign in</h1>
-      <p className="mb-8 text-sm text-[#6b7a70]">Enter your credentials to access your account.</p>
+      <h1 className="mb-1 text-3xl font-bold tracking-tight text-ink">Sign in</h1>
+      <p className="mb-8 text-sm text-muted">Enter your credentials to access your account.</p>
 
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -57,7 +57,7 @@ export default function LoginPage() {
       >
         {/* Email */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-sm font-medium text-[#14301f]">
+          <label htmlFor="email" className="text-sm font-medium text-ink">
             Email
           </label>
           <input
@@ -68,10 +68,10 @@ export default function LoginPage() {
             placeholder="you@school.ac.zw"
             aria-invalid={!!errors.email}
             aria-describedby={errors.email ? 'email-error' : undefined}
-            className="min-h-[48px] rounded-xl border border-[#e3e9e4] bg-[#f4f6f4] px-4 text-sm text-[#14301f] placeholder:text-[#8a968e] focus:outline-none focus:border-[#14613f] focus:bg-white focus:ring-2 focus:ring-[#14613f]/30 aria-[invalid=true]:border-red-500"
+            className="min-h-[48px] rounded-xl border border-line bg-canvas px-4 text-sm text-ink placeholder:text-subtle focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/30 aria-[invalid=true]:border-danger"
           />
           {errors.email && (
-            <p id="email-error" role="alert" className="text-xs text-red-600">
+            <p id="email-error" role="alert" className="text-xs text-danger">
               {errors.email.message}
             </p>
           )}
@@ -79,7 +79,7 @@ export default function LoginPage() {
 
         {/* Password */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="password" className="text-sm font-medium text-[#14301f]">
+          <label htmlFor="password" className="text-sm font-medium text-ink">
             Password
           </label>
           <input
@@ -90,10 +90,10 @@ export default function LoginPage() {
             placeholder="••••••••"
             aria-invalid={!!errors.password}
             aria-describedby={errors.password ? 'password-error' : undefined}
-            className="min-h-[48px] rounded-xl border border-[#e3e9e4] bg-[#f4f6f4] px-4 text-sm text-[#14301f] placeholder:text-[#8a968e] focus:outline-none focus:border-[#14613f] focus:bg-white focus:ring-2 focus:ring-[#14613f]/30 aria-[invalid=true]:border-red-500"
+            className="min-h-[48px] rounded-xl border border-line bg-canvas px-4 text-sm text-ink placeholder:text-subtle focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/30 aria-[invalid=true]:border-danger"
           />
           {errors.password && (
-            <p id="password-error" role="alert" className="text-xs text-red-600">
+            <p id="password-error" role="alert" className="text-xs text-danger">
               {errors.password.message}
             </p>
           )}
@@ -101,15 +101,15 @@ export default function LoginPage() {
 
         {/* Auth-level error */}
         {authError && (
-          <div role="alert" aria-live="assertive" className="rounded-xl bg-red-50 px-4 py-3">
-            <p className="text-sm text-red-700">{authError}</p>
+          <div role="alert" aria-live="assertive" className="rounded-xl bg-danger-bg px-4 py-3">
+            <p className="text-sm text-danger">{authError}</p>
           </div>
         )}
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-2 flex min-h-[48px] w-full items-center justify-center rounded-full bg-[#14613f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0f4d32] focus:outline-none focus:ring-2 focus:ring-[#14613f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-2 flex min-h-[48px] w-full items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting ? (
             <>

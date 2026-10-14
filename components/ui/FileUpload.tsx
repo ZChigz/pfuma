@@ -81,12 +81,12 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       {label && (
-        <span className="text-sm font-medium text-[#14301f]">{label}</span>
+        <span className="text-sm font-medium text-ink">{label}</span>
       )}
 
       {/* Done state */}
       {status === 'done' && uploadedUrl && (
-        <div className="flex items-center justify-between gap-2 rounded-xl border border-[#14613f] bg-[#f0fdf4] px-3 py-2">
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-primary bg-success-bg px-3 py-2">
           <div className="flex min-w-0 items-center gap-2">
             {uploadedUrl.match(/\.(jpe?g|png|webp|gif)$/i) ? (
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -96,7 +96,7 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
                 className="h-8 w-8 flex-shrink-0 rounded object-cover"
               />
             ) : (
-              <svg className="h-5 w-5 flex-shrink-0 text-[#14613f]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <svg className="h-5 w-5 flex-shrink-0 text-primary" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fillRule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z" clipRule="evenodd" />
               </svg>
             )}
@@ -104,7 +104,7 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
               href={uploadedUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="truncate text-sm text-[#14613f] underline underline-offset-2"
+              className="truncate text-sm text-primary underline underline-offset-2"
             >
               {uploadedName ?? 'View file'}
             </a>
@@ -112,7 +112,7 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
           <button
             type="button"
             onClick={handleChange}
-            className="flex-shrink-0 text-xs font-medium text-[#6b7a70] hover:text-[#14301f]"
+            className="flex-shrink-0 text-xs font-medium text-muted hover:text-ink"
           >
             Change
           </button>
@@ -137,28 +137,28 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
           onDrop={onDrop}
           className={cn(
             'flex min-h-[100px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed transition-colors',
-            'focus:outline-none focus:ring-2 focus:ring-[#14613f]/40',
+            'focus:outline-none focus:ring-2 focus:ring-primary/40',
             status === 'uploading'
-              ? 'cursor-not-allowed border-[#e3e9e4] bg-stone-50'
+              ? 'cursor-not-allowed border-line bg-canvas'
               : isDragging
-                ? 'cursor-copy border-[#14613f] bg-[#14613f]/5'
-                : 'cursor-pointer border-[#e3e9e4] hover:border-[#14613f]/50 hover:bg-stone-50',
+                ? 'cursor-copy border-primary bg-primary/5'
+                : 'cursor-pointer border-line hover:border-primary/50 hover:bg-rowhover',
           )}
         >
           {status === 'uploading' ? (
             <div className="flex w-full max-w-[220px] flex-col items-center gap-3 px-4">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
                 <div
-                  className="h-full rounded-full bg-[#14613f] transition-all duration-150"
+                  className="h-full rounded-full bg-primary transition-all duration-150"
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <p className="text-xs text-[#6b7a70]">Uploading… {progress}%</p>
+              <p className="text-xs text-muted">Uploading… {progress}%</p>
             </div>
           ) : (
             <>
               <svg
-                className="h-8 w-8 text-[#6b7a70]"
+                className="h-8 w-8 text-muted"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -167,9 +167,9 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.338-2.32 5.75 5.75 0 011.548 9.095" />
               </svg>
-              <p className="text-sm text-[#6b7a70]">
+              <p className="text-sm text-muted">
                 Drag & drop or{' '}
-                <span className="font-medium text-[#14613f]">click to upload</span>
+                <span className="font-medium text-primary">click to upload</span>
               </p>
             </>
           )}
@@ -186,7 +186,7 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
       />
 
       {status === 'error' && errorMsg && (
-        <p role="alert" className="text-xs text-[#b91c1c]">{errorMsg}</p>
+        <p role="alert" className="text-xs text-danger">{errorMsg}</p>
       )}
     </div>
   );

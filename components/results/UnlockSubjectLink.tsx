@@ -42,7 +42,7 @@ export function UnlockSubjectLink({ assignmentId, teacherName, subjectName, clas
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="text-xs font-medium text-[#14613f] hover:underline focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
+        className="text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40"
       >
         Unlock subject
       </button>
@@ -60,7 +60,7 @@ export function UnlockSubjectLink({ assignmentId, teacherName, subjectName, clas
           </>
         }
       >
-        <p className="text-sm text-[#14301f]">
+        <p className="text-sm text-ink">
           This will allow <strong>{teacherName}</strong> to edit <strong>{subjectName}</strong> marks for{' '}
           <strong>{className}</strong>. Continue?
         </p>
