@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 body {
-  color: theme('colors.brand.text');
-  background-color: theme('colors.brand.bg');
+  color: theme("colors.ink");
+  background-color: theme("colors.canvas");
 }
 
 /* Dark-green surface with soft contour lines, used for the term card */

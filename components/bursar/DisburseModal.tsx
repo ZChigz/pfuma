@@ -96,10 +96,10 @@ export function DisburseModal({ request }: { request: DisbursableRequest }) {
         }
       >
         <form id="disburse-form" onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-          <div className="rounded-lg border border-[#e3e9e4] bg-[#fafaf9] p-3 text-sm">
-            <p className="font-medium text-[#14301f]">{request.title}</p>
-            <p className="mt-0.5 text-[#6b7a70]">{request.department} · {REQUEST_TYPE_LABELS[request.type]}</p>
-            <p className="mt-1 text-[#6b7a70]">Estimated total: <span className="font-medium text-[#14301f]">{formatAmount(request.estimatedTotal)}</span></p>
+          <div className="rounded-xl border border-line bg-rowhover p-3 text-sm">
+            <p className="font-medium text-ink">{request.title}</p>
+            <p className="mt-0.5 text-muted">{request.department} · {REQUEST_TYPE_LABELS[request.type]}</p>
+            <p className="mt-1 text-muted">Estimated total: <span className="font-medium text-ink">{formatAmount(request.estimatedTotal)}</span></p>
           </div>
 
           <Input
@@ -114,27 +114,27 @@ export function DisburseModal({ request }: { request: DisbursableRequest }) {
           />
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-[#14301f]">Currency</span>
+            <span className="text-sm font-medium text-ink">Currency</span>
             <input
               type="text"
               readOnly
               value={request.currency === 'USD' ? 'USD' : 'ZiG'}
-              className="min-h-[44px] rounded-xl border border-[#e3e9e4] bg-stone-50 px-3 py-2 text-sm text-[#6b7a70]"
+              className="min-h-[44px] rounded-xl border border-line bg-canvas px-3 py-2 text-sm text-muted"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-[#14301f]">Payment method</span>
+            <span className="text-sm font-medium text-ink">Payment method</span>
             <div className="grid grid-cols-4 gap-2">
               {PAYMENT_METHODS.map((m) => (
                 <button
                   key={m.value}
                   type="button"
                   onClick={() => setValue('paymentMethod', m.value, { shouldValidate: true })}
-                  className={`min-h-[44px] rounded-xl border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#14613f]/40 ${
+                  className={`min-h-[44px] rounded-xl border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 ${
                     paymentMethod === m.value
-                      ? 'border-[#14613f] bg-[#14613f] text-white'
-                      : 'border-[#e3e9e4] bg-white text-[#6b7a70] hover:border-[#14613f]/50 hover:bg-stone-50'
+                      ? 'border-primary bg-primary text-white'
+                      : 'border-line bg-white text-muted hover:border-primary/50 hover:bg-rowhover'
                   }`}
                 >
                   {m.label}
@@ -144,19 +144,19 @@ export function DisburseModal({ request }: { request: DisbursableRequest }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="disbursementNote" className="text-sm font-medium text-[#14301f]">
-              Note <span className="font-normal text-[#6b7a70]">(optional)</span>
+            <label htmlFor="disbursementNote" className="text-sm font-medium text-ink">
+              Note <span className="font-normal text-muted">(optional)</span>
             </label>
             <textarea
               id="disbursementNote"
               rows={2}
               placeholder="Additional details…"
-              className="rounded-xl border border-[#e3e9e4] bg-white px-3 py-2 text-sm text-[#14301f] placeholder:text-[#6b7a70] focus:outline-none focus:ring-2 focus:ring-[#14613f]/30"
+              className="rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
               {...register('disbursementNote')}
             />
           </div>
 
-          <p className="text-xs text-[#6b7a70]">This will create an expense entry in the ledger.</p>
+          <p className="text-xs text-muted">This will create an expense entry in the ledger.</p>
         </form>
       </Modal>
     </>

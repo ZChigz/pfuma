@@ -199,20 +199,20 @@ export function AssetDetailClient({ asset: initialAsset, categories, userRole }:
   return (
     <div className="flex flex-col gap-6">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-[#6b7a70]">
-        <Link href="/assets" className="hover:text-[#14301f] hover:underline">
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <Link href="/assets" className="hover:text-ink hover:underline">
           Assets
         </Link>
         <span>/</span>
-        <span className="text-[#14301f]">{asset.name}</span>
+        <span className="text-ink">{asset.name}</span>
       </div>
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-[#14301f]">{asset.name}</h1>
-            <p className="mt-0.5 font-mono text-sm text-[#6b7a70]">{asset.tagNumber}</p>
+            <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">{asset.name}</h1>
+            <p className="mt-0.5 font-mono text-sm text-muted">{asset.tagNumber}</p>
           </div>
           {statusBadge(asset.status)}
         </div>
@@ -301,24 +301,24 @@ export function AssetDetailClient({ asset: initialAsset, categories, userRole }:
               { label: 'Added',            value: formatDate(asset.createdAt) },
             ].map(({ label, value }) => (
               <div key={label}>
-                <p className="text-xs font-semibold   text-[#6b7a70]">{label}</p>
-                <p className="mt-1 text-sm text-[#14301f]">{value}</p>
+                <p className="text-xs font-medium text-muted">{label}</p>
+                <p className="mt-1 text-sm text-ink">{value}</p>
               </div>
             ))}
             {asset.description && (
               <div className="sm:col-span-2 lg:col-span-3">
-                <p className="text-xs font-semibold   text-[#6b7a70]">Description</p>
-                <p className="mt-1 text-sm text-[#14301f]">{asset.description}</p>
+                <p className="text-xs font-medium text-muted">Description</p>
+                <p className="mt-1 text-sm text-ink">{asset.description}</p>
               </div>
             )}
             {asset.imageUrl && (
               <div className="sm:col-span-2 lg:col-span-3">
-                <p className="text-xs font-semibold   text-[#6b7a70]">Image</p>
+                <p className="text-xs font-medium text-muted">Image</p>
                 <a
                   href={asset.imageUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-1 text-sm text-[#14613f] underline underline-offset-2"
+                  className="mt-1 text-sm text-primary underline underline-offset-2"
                 >
                   View image
                 </a>
@@ -339,13 +339,13 @@ export function AssetDetailClient({ asset: initialAsset, categories, userRole }:
               { label: 'Recorded by',  value: asset.disposal.recorder.fullName },
             ].map(({ label, value }) => (
               <div key={label}>
-                <p className="text-xs font-semibold   text-[#6b7a70]">{label}</p>
-                <p className="mt-1 text-sm text-[#14301f]">{value}</p>
+                <p className="text-xs font-medium text-muted">{label}</p>
+                <p className="mt-1 text-sm text-ink">{value}</p>
               </div>
             ))}
             <div className="sm:col-span-2 lg:col-span-3">
-              <p className="text-xs font-semibold   text-[#6b7a70]">Reason</p>
-              <p className="mt-1 text-sm text-[#14301f]">{asset.disposal.reason}</p>
+              <p className="text-xs font-medium text-muted">Reason</p>
+              <p className="mt-1 text-sm text-ink">{asset.disposal.reason}</p>
             </div>
           </div>
         </Card>

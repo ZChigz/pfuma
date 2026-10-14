@@ -31,10 +31,10 @@ export function Card({
         <div className="flex items-start justify-between px-6 pb-2 pt-5">
           <div>
             {title && (
-              <h3 className="text-base font-semibold text-[#14301f]">{title}</h3>
+              <h3 className="text-base font-semibold text-ink">{title}</h3>
             )}
             {subtitle && (
-              <p className="mt-0.5 text-sm text-[#6b7a70]">{subtitle}</p>
+              <p className="mt-0.5 text-sm text-muted">{subtitle}</p>
             )}
           </div>
           {action && <div className="ml-4 flex-shrink-0">{action}</div>}

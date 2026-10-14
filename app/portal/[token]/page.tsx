@@ -48,16 +48,16 @@ export default async function PortalPage({ params }: { params: { token: string }
   // ── Not found ──────────────────────────────────────────────────────────────
   if (!student) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f4f6f4] p-6">
+      <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
         <div className="w-full max-w-md rounded-2xl bg-white p-10 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
-            <svg className="h-7 w-7 text-[#b91c1c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-danger-bg">
+            <svg className="h-7 w-7 text-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
               <path d="M15 9l-6 6M9 9l6 6" />
             </svg>
           </div>
-          <h1 className="text-lg font-bold text-[#14301f]">Link not found or expired</h1>
-          <p className="mt-2 text-sm text-[#6b7a70]">
+          <h1 className="text-base font-semibold text-ink">Link not found or expired</h1>
+          <p className="mt-1 text-sm text-muted">
             This portal link is invalid. Please contact the school office for a new link.
           </p>
         </div>
@@ -108,11 +108,11 @@ export default async function PortalPage({ params }: { params: { token: string }
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f6f4]">
+    <div className="min-h-screen bg-canvas">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="bg-[#14613f] px-4 py-6 text-white shadow-sm">
+      <header className="term-card px-4 py-8 text-white">
         <div className="mx-auto max-w-2xl">
-          <p className="text-xs font-semibold   text-emerald-200">Student Portal</p>
+          <p className="text-xs font-medium text-emerald-200">Student Portal</p>
           <h1 className="mt-1 text-2xl font-bold">{student.school.name}</h1>
         </div>
       </header>
@@ -120,32 +120,32 @@ export default async function PortalPage({ params }: { params: { token: string }
       <main className="mx-auto max-w-2xl space-y-6 px-4 py-6">
         {/* Student summary */}
         <div className="rounded-2xl bg-white p-5">
-          <p className="text-xs font-semibold   text-[#6b7a70]">Student</p>
-          <p className="mt-1 text-xl font-bold text-[#14301f]">{student.fullName}</p>
-          <p className="text-sm text-[#6b7a70]">{student.grade}</p>
+          <p className="text-xs font-medium text-muted">Student</p>
+          <p className="mt-1 text-xl font-bold text-ink">{student.fullName}</p>
+          <p className="text-sm text-muted">{student.grade}</p>
         </div>
 
         {/* ── Section 1: Fee Balance ──────────────────────────────────────── */}
         <section>
-          <h2 className="mb-3 text-base font-bold text-[#14301f]">Fee Balance</h2>
+          <h2 className="mb-3 text-base font-semibold text-ink">Fee Balance</h2>
 
           <div className="rounded-2xl bg-white overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-[#f4f6f4] border-b border-[#e3e9e4]">
+              <thead className="border-b border-line bg-white">
                 <tr>
                   {['Currency', 'Billed', 'Paid', 'Balance'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold   text-[#6b7a70]">
+                    <th key={h} className="px-4 py-3.5 text-left text-xs font-medium text-subtle">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e3e9e4]">
+              <tbody className="divide-y divide-line">
                 <tr>
                   <td className="px-4 py-3 font-semibold">USD</td>
                   <td className="px-4 py-3 tabular-nums">{fmt(chargesUSD, 'USD')}</td>
                   <td className="px-4 py-3 tabular-nums">{fmt(paidUSD, 'USD')}</td>
-                  <td className={`px-4 py-3 tabular-nums font-bold ${balUSD > 0 ? 'text-[#b91c1c]' : 'text-[#15803d]'}`}>
+                  <td className={`px-4 py-3 tabular-nums font-bold ${balUSD > 0 ? 'text-danger' : 'text-success'}`}>
                     {fmt(balUSD, 'USD')}
                   </td>
                 </tr>
@@ -153,7 +153,7 @@ export default async function PortalPage({ params }: { params: { token: string }
                   <td className="px-4 py-3 font-semibold">ZiG</td>
                   <td className="px-4 py-3 tabular-nums">{fmt(chargesZiG, 'ZIG')}</td>
                   <td className="px-4 py-3 tabular-nums">{fmt(paidZiG, 'ZIG')}</td>
-                  <td className={`px-4 py-3 tabular-nums font-bold ${balZiG > 0 ? 'text-[#b91c1c]' : 'text-[#15803d]'}`}>
+                  <td className={`px-4 py-3 tabular-nums font-bold ${balZiG > 0 ? 'text-danger' : 'text-success'}`}>
                     {fmt(balZiG, 'ZIG')}
                   </td>
                 </tr>
@@ -163,31 +163,31 @@ export default async function PortalPage({ params }: { params: { token: string }
 
           {recentPayments.length > 0 && (
             <div className="mt-4 rounded-2xl bg-white overflow-hidden">
-              <p className="border-b border-[#e3e9e4] px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
+              <p className="border-b border-line px-4 py-3 text-xs font-medium text-muted">
                 Recent Payments
               </p>
               <table className="w-full text-sm">
-                <thead className="bg-[#f4f6f4] border-b border-[#e3e9e4]">
+                <thead className="border-b border-line bg-white">
                   <tr>
                     {['Date', 'Method', 'Amount', 'Currency'].map((h) => (
-                      <th key={h} className="px-4 py-2 text-left text-xs font-medium text-[#6b7a70]">{h}</th>
+                      <th key={h} className="px-4 py-3.5 text-left text-xs font-medium text-subtle">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#e3e9e4]">
+                <tbody className="divide-y divide-line">
                   {recentPayments.map((p, i) => (
                     <tr key={i}>
-                      <td className="px-4 py-2 text-xs text-[#6b7a70]">{fmtDate(p.recordedAt)}</td>
+                      <td className="px-4 py-2 text-xs text-muted">{fmtDate(p.recordedAt)}</td>
                       <td className="px-4 py-2 text-xs">{p.method}</td>
                       <td className="px-4 py-2 tabular-nums text-xs">
                         <span>{fmt(p.amount.toNumber(), p.currency)}</span>
                         {p.paidInZig && p.zigAmountPaid && (
-                          <p className="mt-0.5 text-[10px] text-[#6b7a70]">
+                          <p className="mt-0.5 text-[10px] text-muted">
                             ZiG {Math.round(p.zigAmountPaid.toNumber()).toLocaleString('en-US')} @ {p.exchangeRateUsed?.toNumber().toFixed(2)}
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-2 text-xs text-[#6b7a70]">{p.currency}</td>
+                      <td className="px-4 py-2 text-xs text-muted">{p.currency}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -199,7 +199,7 @@ export default async function PortalPage({ params }: { params: { token: string }
         {/* ── Section 2: Academic Results ────────────────────────────────── */}
         {publishedTerms.length > 0 && (
           <section>
-            <h2 className="mb-3 text-base font-bold text-[#14301f]">Academic Results</h2>
+            <h2 className="mb-3 text-base font-semibold text-ink">Academic Results</h2>
             <div className="flex flex-col gap-4">
               {publishedTerms.map((tr) => {
                 const termMarks = marksByTerm.get(tr.term) ?? [];
@@ -208,7 +208,7 @@ export default async function PortalPage({ params }: { params: { token: string }
                 return (
                   <div key={tr.id} className="rounded-2xl bg-white overflow-hidden">
                     {/* Term header */}
-                    <div className="border-b border-[#e3e9e4] bg-[#14613f] px-4 py-3 text-white">
+                    <div className="border-b border-line bg-primary px-4 py-3 text-white">
                       <p className="text-sm font-bold">{tr.term}</p>
                       {tr.classPosition != null && classSize != null && (
                         <p className="mt-0.5 text-xs text-emerald-100">
@@ -218,15 +218,15 @@ export default async function PortalPage({ params }: { params: { token: string }
                     </div>
 
                     {/* Summary row */}
-                    <div className="grid grid-cols-3 divide-x divide-[#e3e9e4] border-b border-[#e3e9e4]">
+                    <div className="grid grid-cols-3 divide-x divide-line border-b border-line">
                       {[
                         { label: 'Total', value: tr.totalMarks.toNumber().toFixed(1) },
                         { label: 'Percentage', value: `${pct.toFixed(1)}%` },
                         { label: 'Grade', value: getGrade(pct) },
                       ].map(({ label, value }) => (
                         <div key={label} className="p-3 text-center">
-                          <p className="text-xs text-[#6b7a70]">{label}</p>
-                          <p className="mt-0.5 text-sm font-bold text-[#14301f]">{value}</p>
+                          <p className="text-xs text-muted">{label}</p>
+                          <p className="mt-0.5 text-sm font-bold text-ink">{value}</p>
                         </div>
                       ))}
                     </div>
@@ -234,20 +234,20 @@ export default async function PortalPage({ params }: { params: { token: string }
                     {/* Marks breakdown */}
                     {termMarks.length > 0 && (
                       <table className="w-full text-sm">
-                        <thead className="bg-[#f4f6f4] border-b border-[#e3e9e4]">
+                        <thead className="border-b border-line bg-white">
                           <tr>
                             {['Subject', 'Mark', 'Out of', '%', 'Grade'].map((h) => (
-                              <th key={h} className="px-4 py-2 text-left text-xs font-medium text-[#6b7a70]">{h}</th>
+                              <th key={h} className="px-4 py-3.5 text-left text-xs font-medium text-subtle">{h}</th>
                             ))}
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#e3e9e4]">
+                        <tbody className="divide-y divide-line">
                           {termMarks.map((m, i) => (
-                            <tr key={i} className={i % 2 === 1 ? 'bg-[#f4f6f4]' : ''}>
+                            <tr key={i} className={i % 2 === 1 ? 'bg-canvas' : ''}>
                               <td className="px-4 py-2">{m.subject.name}</td>
                               <td className="px-4 py-2 tabular-nums">{m.rawMark.toNumber().toFixed(1)}</td>
-                              <td className="px-4 py-2 tabular-nums text-[#6b7a70]">{m.subject.maxMark}</td>
-                              <td className="px-4 py-2 tabular-nums text-[#6b7a70]">{m.percentage != null ? `${m.percentage.toNumber().toFixed(1)}%` : '—'}</td>
+                              <td className="px-4 py-2 tabular-nums text-muted">{m.subject.maxMark}</td>
+                              <td className="px-4 py-2 tabular-nums text-muted">{m.percentage != null ? `${m.percentage.toNumber().toFixed(1)}%` : '—'}</td>
                               <td className="px-4 py-2 font-semibold">{m.letterGrade ?? '—'}</td>
                             </tr>
                           ))}
@@ -263,8 +263,8 @@ export default async function PortalPage({ params }: { params: { token: string }
 
         {publishedTerms.length === 0 && (
           <section>
-            <h2 className="mb-3 text-base font-bold text-[#14301f]">Academic Results</h2>
-            <div className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-[#6b7a70]">
+            <h2 className="mb-3 text-base font-semibold text-ink">Academic Results</h2>
+            <div className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
               No published results yet.
             </div>
           </section>
@@ -272,7 +272,7 @@ export default async function PortalPage({ params }: { params: { token: string }
       </main>
 
       {/* Footer */}
-      <footer className="mt-8 border-t border-[#e3e9e4] px-4 py-5 text-center text-xs text-[#6b7a70]">
+      <footer className="mt-8 border-t border-line px-4 py-5 text-center text-xs text-muted">
         This is a read-only view. Contact the school office for any changes or queries.
       </footer>
     </div>

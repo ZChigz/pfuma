@@ -84,8 +84,8 @@ export default async function HeadDashboard() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#14301f]">Head&apos;s Office</h1>
-        <p className="mt-0.5 text-sm text-[#6b7a70]">{currentTerm || 'Term not set'} — overview</p>
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Head&apos;s Office</h1>
+        <p className="mt-1 text-sm text-muted">{currentTerm || 'Term not set'} — overview</p>
       </div>
 
       {/* Summary row */}
@@ -105,23 +105,23 @@ export default async function HeadDashboard() {
 
       {/* Quick actions */}
       <div>
-        <p className="mb-3 text-xs font-semibold   text-[#6b7a70]">Quick actions</p>
+        <p className="mb-3 text-xs font-medium text-muted">Quick actions</p>
         <div className="flex flex-wrap gap-3">
           <Link
             href="/head/payments"
-            className="inline-flex min-h-[44px] items-center rounded-full bg-[#14613f] px-4 text-sm font-medium text-white transition-colors hover:bg-[#0f4d32] focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
           >
             Verify pending payments
           </Link>
           <Link
             href="/head/fees"
-            className="inline-flex min-h-[44px] items-center rounded-full border border-[#e3e9e4] bg-white px-4 text-sm font-medium text-[#14301f] transition-colors hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
+            className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-medium text-ink transition-colors hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
             Apply fees to a grade
           </Link>
           <Link
             href="/head/results"
-            className="inline-flex min-h-[44px] items-center rounded-full border border-[#e3e9e4] bg-white px-4 text-sm font-medium text-[#14301f] transition-colors hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
+            className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-medium text-ink transition-colors hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
             Publish results
           </Link>

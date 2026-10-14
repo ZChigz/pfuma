@@ -63,7 +63,7 @@ export function UserRowActions({ userId, active }: Props) {
         type="button"
         onClick={toggleActive}
         disabled={busy}
-        className="rounded px-2 py-1 text-xs font-medium text-[#14613f] hover:underline focus:outline-none focus:ring-2 focus:ring-[#14613f]/40 disabled:opacity-50"
+        className="rounded px-2 py-1 text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
       >
         {active ? 'Deactivate' : 'Reactivate'}
       </button>
@@ -71,7 +71,7 @@ export function UserRowActions({ userId, active }: Props) {
         type="button"
         onClick={resetPassword}
         disabled={busy}
-        className="rounded px-2 py-1 text-xs font-medium text-[#14613f] hover:underline focus:outline-none focus:ring-2 focus:ring-[#14613f]/40 disabled:opacity-50"
+        className="rounded px-2 py-1 text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
       >
         Reset Password
       </button>
@@ -84,12 +84,12 @@ export function UserRowActions({ userId, active }: Props) {
       >
         {tempPassword && (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-[#6b7a70]">
+            <p className="text-sm text-muted">
               Share this temporary password with the user. It will not be shown again.
             </p>
-            <div className="rounded-lg border border-[#e3e9e4] bg-[#fafaf9] p-4">
-              <p className="text-xs font-semibold   text-[#6b7a70]">New Temporary Password</p>
-              <p className="mt-1 font-mono text-lg font-bold  text-[#14613f]">{tempPassword}</p>
+            <div className="rounded-xl border border-line bg-rowhover p-4">
+              <p className="text-xs font-medium text-muted">New Temporary Password</p>
+              <p className="mt-1 font-mono text-lg font-bold  text-primary">{tempPassword}</p>
             </div>
           </div>
         )}

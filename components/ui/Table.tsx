@@ -21,7 +21,7 @@ function SkeletonRow({ cols }: { cols: number }) {
     <tr aria-hidden="true">
       {Array.from({ length: cols }).map((_, i) => (
         <td key={i} className="px-4 py-3">
-          <div className="h-4 animate-pulse rounded-full bg-[#e3e9e4]" />
+          <div className="h-4 animate-pulse rounded-full bg-line" />
         </td>
       ))}
     </tr>
@@ -43,21 +43,21 @@ export function Table<T extends Record<string, unknown>>({
         className,
       )}
     >
-      <table className="w-full text-left text-sm text-[#14301f]">
-        <thead className="sticky top-0 border-b border-[#e3e9e4] bg-white">
+      <table className="w-full text-left text-sm text-ink">
+        <thead className="sticky top-0 border-b border-line bg-white">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
                 scope="col"
-                className="px-4 py-3.5 text-xs font-medium text-[#8a968e]"
+                className="px-4 py-3.5 text-xs font-medium text-subtle"
               >
                 {col.label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#e3e9e4] bg-white">
+        <tbody className="divide-y divide-line bg-white">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => (
               <SkeletonRow key={i} cols={columns.length} />
@@ -66,7 +66,7 @@ export function Table<T extends Record<string, unknown>>({
             <tr>
               <td
                 colSpan={columns.length}
-                className="px-4 py-12 text-center text-sm text-[#6b7a70]"
+                className="px-4 py-12 text-center text-sm text-muted"
               >
                 {emptyMessage}
               </td>
@@ -85,7 +85,7 @@ export function Table<T extends Record<string, unknown>>({
                 className={cn(
                   'transition-colors',
                   onRowClick &&
-                    'cursor-pointer hover:bg-[#f4f8f5] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#14613f]/30',
+                    'cursor-pointer hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary/30',
                 )}
               >
                 {columns.map((col) => (

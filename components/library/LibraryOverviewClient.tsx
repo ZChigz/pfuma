@@ -41,8 +41,8 @@ export function LibraryOverviewClient({ stats, overdueList, userRole }: Props) {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#14301f]">Library</h1>
-          <p className="mt-0.5 text-sm text-[#6b7a70]">Book catalog and borrowing management</p>
+          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Library</h1>
+          <p className="mt-1 text-sm text-muted">Book catalog and borrowing management</p>
         </div>
         {canManage && (
           <div className="flex gap-2">
@@ -66,32 +66,32 @@ export function LibraryOverviewClient({ stats, overdueList, userRole }: Props) {
 
       {/* Overdue alert */}
       {overdueList.length > 0 && (
-        <div className="rounded-2xl border border-[#fde68a] bg-[#fffbeb] p-4">
+        <div className="rounded-2xl border border-warn-line bg-warn-bg p-4">
           <div className="mb-3 flex items-center gap-2">
-            <svg className="h-5 w-5 flex-shrink-0 text-[#d97706]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg className="h-5 w-5 flex-shrink-0 text-warn" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
             </svg>
-            <p className="font-semibold text-[#92400e]">
+            <p className="font-semibold text-warn">
               {overdueList.length} overdue borrowing{overdueList.length !== 1 ? 's' : ''}
             </p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-[#92400e]">
+            <table className="w-full text-sm text-warn">
               <thead>
-                <tr className="border-b border-[#fde68a]">
+                <tr className="border-b border-warn-line">
                   {['Member', 'Book', 'Accession', 'Due Date', 'Days Overdue'].map((h) => (
-                    <th key={h} className="pb-2 pr-4 text-left text-xs font-semibold  ">{h}</th>
+                    <th key={h} className="pb-2 pr-4 text-left text-xs font-medium ">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#fde68a]">
+              <tbody className="divide-y divide-warn-line">
                 {overdueList.map((item) => (
                   <tr key={item.id}>
                     <td className="py-2 pr-4 font-medium">{item.memberName}</td>
                     <td className="py-2 pr-4">{item.bookTitle}</td>
                     <td className="py-2 pr-4 font-mono text-xs">{item.accession}</td>
                     <td className="py-2 pr-4">{formatDate(item.dueDate)}</td>
-                    <td className="py-2 font-bold text-[#b91c1c]">{item.daysOverdue}d</td>
+                    <td className="py-2 font-bold text-danger">{item.daysOverdue}d</td>
                   </tr>
                 ))}
               </tbody>
@@ -102,7 +102,7 @@ export function LibraryOverviewClient({ stats, overdueList, userRole }: Props) {
 
       {/* Quick access */}
       <div>
-        <p className="mb-3 text-xs font-semibold   text-[#6b7a70]">Quick Access</p>
+        <p className="mb-3 text-xs font-medium text-muted">Quick Access</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {[
             { href: '/library/catalog',   label: 'Book Catalog',  desc: 'Browse and manage books'    },
@@ -111,10 +111,10 @@ export function LibraryOverviewClient({ stats, overdueList, userRole }: Props) {
             <button
               key={href}
               onClick={() => router.push(href)}
-              className="rounded-2xl bg-white p-4 text-left transition-shadow hover:shadow-md"
+              className="rounded-2xl bg-white p-5 text-left transition-shadow hover:shadow-md"
             >
-              <p className="font-semibold text-[#14301f]">{label}</p>
-              <p className="mt-0.5 text-xs text-[#6b7a70]">{desc}</p>
+              <p className="font-semibold text-ink">{label}</p>
+              <p className="mt-0.5 text-xs text-muted">{desc}</p>
             </button>
           ))}
         </div>

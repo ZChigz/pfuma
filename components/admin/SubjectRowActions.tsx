@@ -103,7 +103,7 @@ export function SubjectRowActions({ subject }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded px-2 py-1 text-xs font-medium text-[#14613f] hover:underline focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
+        className="rounded px-2 py-1 text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40"
       >
         Edit
       </button>
@@ -111,7 +111,7 @@ export function SubjectRowActions({ subject }: Props) {
         type="button"
         onClick={toggleActive}
         disabled={busy}
-        className="rounded px-2 py-1 text-xs font-medium text-[#14613f] hover:underline focus:outline-none focus:ring-2 focus:ring-[#14613f]/40 disabled:opacity-50"
+        className="rounded px-2 py-1 text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
       >
         {subject.active ? 'Deactivate' : 'Reactivate'}
       </button>

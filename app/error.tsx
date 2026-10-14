@@ -17,7 +17,7 @@ export default function GlobalError({ error, reset }: Props) {
 
   return (
     <html lang="en">
-      <body className="flex min-h-screen items-center justify-center bg-[#f4f6f4] p-6 antialiased">
+      <body className="flex min-h-screen items-center justify-center bg-frame p-6 antialiased">
         <ErrorCard reset={reset} />
       </body>
     </html>
@@ -27,9 +27,9 @@ export default function GlobalError({ error, reset }: Props) {
 function ErrorCard({ reset }: { reset: () => void }) {
   return (
     <div className="w-full max-w-md rounded-2xl bg-white p-10 text-center">
-      <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
+      <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-danger-bg">
         <svg
-          className="h-7 w-7 text-[#b91c1c]"
+          className="h-7 w-7 text-danger"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -42,15 +42,15 @@ function ErrorCard({ reset }: { reset: () => void }) {
         </svg>
       </div>
 
-      <h1 className="text-lg font-bold text-[#14301f]">Something went wrong</h1>
-      <p className="mt-2 text-sm text-[#6b7a70]">
+      <h1 className="text-base font-semibold text-ink">Something went wrong</h1>
+      <p className="mt-1 text-sm text-muted">
         An unexpected error occurred. Please try again, or contact support if the
         problem persists.
       </p>
 
       <button
         onClick={reset}
-        className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-full bg-[#14613f] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#0f4d32] focus:outline-none focus:ring-2 focus:ring-[#14613f]/40 focus:ring-offset-2"
+        className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 mt-6"
       >
         Try again
       </button>

@@ -22,8 +22,8 @@ function ArrowButton({ light }: { light?: boolean }) {
       className={cn(
         'flex h-9 w-9 items-center justify-center rounded-full border transition-colors',
         light
-          ? 'border-white/60 bg-white text-[#14613f]'
-          : 'border-[#14301f]/70 text-[#14301f] group-hover:bg-[#14613f] group-hover:text-white group-hover:border-[#14613f]',
+          ? 'border-white/60 bg-white text-primary'
+          : 'border-ink/70 text-ink group-hover:bg-primary group-hover:text-white group-hover:border-primary',
       )}
       aria-hidden="true"
     >
@@ -38,7 +38,7 @@ function Panel({ title, action, className, children }: { title: string; action?:
   return (
     <section className={cn('rounded-2xl bg-white p-5', className)}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-[#14301f]">{title}</h2>
+        <h2 className="text-base font-semibold text-ink">{title}</h2>
         {action}
       </div>
       {children}
@@ -61,7 +61,7 @@ function Gauge({ percent }: { percent: number }) {
         strokeWidth="26"
         strokeDasharray={`${filled} ${arc}`}
       />
-      <text x="90" y="84" textAnchor="middle" className="fill-[#14301f]" style={{ fontSize: 30, fontWeight: 700 }}>
+      <text x="90" y="84" textAnchor="middle" className="fill-ink" style={{ fontSize: 30, fontWeight: 700 }}>
         {percent}%
       </text>
     </svg>
@@ -113,8 +113,8 @@ export default async function AdminDashboard() {
   const topId = bars.reduce<string | null>((best, b) => (b.count > 0 && (!best || b.count > (bars.find((x) => x.id === best)?.count ?? 0)) ? b.id : best), null);
 
   const nextSteps = [
-    unplacedStudents > 0 && { text: `${unplacedStudents} student${unplacedStudents === 1 ? '' : 's'} not placed in a class`, href: '/admin/students', tone: 'bg-[#f59e0b]' },
-    withoutTeacher.length > 0 && { text: `${withoutTeacher.length} class${withoutTeacher.length === 1 ? '' : 'es'} without a class teacher`, href: '/admin/classes', tone: 'bg-[#14613f]' },
+    unplacedStudents > 0 && { text: `${unplacedStudents} student${unplacedStudents === 1 ? '' : 's'} not placed in a class`, href: '/admin/students', tone: 'bg-gold' },
+    withoutTeacher.length > 0 && { text: `${withoutTeacher.length} class${withoutTeacher.length === 1 ? '' : 'es'} without a class teacher`, href: '/admin/classes', tone: 'bg-primary' },
     withoutSubjects.length > 0 && { text: `${withoutSubjects.length} class${withoutSubjects.length === 1 ? '' : 'es'} with no subjects assigned${term ? ` for ${term}` : ''}`, href: '/admin/classes', tone: 'bg-[#6ec99a]' },
   ].filter(Boolean) as { text: string; href: string; tone: string }[];
 
@@ -127,18 +127,18 @@ export default async function AdminDashboard() {
 
   return (
     <div className="flex flex-col gap-4 pb-2">
-      <div className="mb-2 flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#14301f]">Dashboard</h1>
-          <p className="mt-1 text-sm text-[#6b7a70]">
+          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted">
             {term ? `${term}: ` : ''}who is enrolled, who teaches, and what still needs setting up.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link href="/admin/users" className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[#14613f] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4d32] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14613f]/40 focus-visible:ring-offset-2">
+          <Link href="/admin/users" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2">
             <span aria-hidden="true" className="text-lg leading-none">+</span> Add user
           </Link>
-          <Link href="/admin/students" className="inline-flex min-h-[44px] items-center rounded-full border border-[#14613f] bg-white px-5 text-sm font-semibold text-[#14613f] transition-colors hover:bg-[#eef4ef] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14613f]/40 focus-visible:ring-offset-2">
+          <Link href="/admin/students" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-primary bg-white px-5 text-sm font-semibold text-primary transition-colors hover:bg-tint focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2">
             Import students
           </Link>
         </div>
@@ -151,17 +151,17 @@ export default async function AdminDashboard() {
             key={s.label}
             href={s.href}
             className={cn(
-              'group flex min-h-[148px] flex-col justify-between rounded-2xl p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14613f]/50 focus-visible:ring-offset-2',
-              s.hero ? 'term-card text-white' : 'bg-white text-[#14301f]',
+              'group flex min-h-[148px] flex-col justify-between rounded-2xl p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2',
+              s.hero ? 'term-card text-white' : 'bg-white text-ink',
             )}
           >
             <div className="relative flex items-start justify-between">
-              <p className={cn('text-sm font-semibold', s.hero ? 'text-white' : 'text-[#14301f]')}>{s.label}</p>
+              <p className={cn('text-sm font-semibold', s.hero ? 'text-white' : 'text-ink')}>{s.label}</p>
               <ArrowButton light={s.hero} />
             </div>
             <div className="relative">
               <p className="text-5xl font-semibold tabular-nums leading-none tracking-tight">{s.value}</p>
-              <p className={cn('mt-3 text-xs', s.hero ? 'text-emerald-100/90' : 'text-[#6b7a70]')}>{s.note}</p>
+              <p className={cn('mt-3 text-xs', s.hero ? 'text-emerald-100/90' : 'text-muted')}>{s.note}</p>
             </div>
           </Link>
         ))}
@@ -171,7 +171,7 @@ export default async function AdminDashboard() {
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr]">
         <Panel title="Students per class" className="lg:col-span-2 xl:col-span-1">
           {bars.length === 0 ? (
-            <p className="py-10 text-sm text-[#6b7a70]">No classes yet. Add a class to start enrolling students.</p>
+            <p className="py-10 text-sm text-muted">No classes yet. Add a class to start enrolling students.</p>
           ) : (
             <div className="flex h-[190px] items-end justify-between gap-2 sm:gap-3" role="list">
               {bars.map((b) => {
@@ -179,19 +179,19 @@ export default async function AdminDashboard() {
                 const h = b.count === 0 ? 8 : Math.max(18, (b.count / maxCount) * 100);
                 return (
                   <div key={b.id} role="listitem" className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5" title={`${b.name}: ${b.count} students`}>
-                    <span className={cn('text-xs font-semibold tabular-nums', isTop ? 'text-[#14301f]' : 'text-[#6b7a70]')}>{b.count}</span>
+                    <span className={cn('text-xs font-semibold tabular-nums', isTop ? 'text-ink' : 'text-muted')}>{b.count}</span>
                     <div
-                      className={cn('w-full max-w-[52px] rounded-full', isTop ? 'bg-[#0b3a25]' : b.count === 0 ? 'bg-[#e3e9e4]' : 'hatch')}
+                      className={cn('w-full max-w-[52px] rounded-full', isTop ? 'bg-[#0b3a25]' : b.count === 0 ? 'bg-line' : 'hatch')}
                       style={{ height: `${h}%` }}
                     />
-                    <span className="w-full truncate text-center text-xs text-[#6b7a70]">{b.name}</span>
+                    <span className="w-full truncate text-center text-xs text-muted">{b.name}</span>
                   </div>
                 );
               })}
             </div>
           )}
           {classes.length > bars.length && (
-            <Link href="/admin/classes" className="mt-3 inline-block text-xs font-medium text-[#14613f] underline-offset-2 hover:underline">
+            <Link href="/admin/classes" className="mt-3 inline-block text-xs font-medium text-primary underline-offset-2 hover:underline">
               Show all {classes.length} classes
             </Link>
           )}
@@ -199,16 +199,16 @@ export default async function AdminDashboard() {
 
         <Panel title="Subject setup">
           {totalClasses === 0 ? (
-            <p className="py-10 text-sm text-[#6b7a70]">Add classes to track subject setup.</p>
+            <p className="py-10 text-sm text-muted">Add classes to track subject setup.</p>
           ) : (
             <>
               <Gauge percent={setupPercent} />
-              <p className="mt-2 text-center text-xs text-[#6b7a70]">
+              <p className="mt-2 text-center text-xs text-muted">
                 of classes have subjects assigned{term ? ` for ${term}` : ''}
               </p>
-              <ul className="mt-4 flex justify-center gap-4 text-xs text-[#6b7a70]">
-                <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#14613f]" aria-hidden="true" />Assigned</li>
-                <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#e3e9e4]" aria-hidden="true" />Not yet</li>
+              <ul className="mt-4 flex justify-center gap-4 text-xs text-muted">
+                <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-primary" aria-hidden="true" />Assigned</li>
+                <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-line" aria-hidden="true" />Not yet</li>
               </ul>
             </>
           )}
@@ -216,14 +216,14 @@ export default async function AdminDashboard() {
 
         <Panel title="Still to do">
           {nextSteps.length === 0 ? (
-            <p className="py-6 text-sm text-[#6b7a70]">Nothing outstanding. Every student is in a class and every class has a teacher and subjects.</p>
+            <p className="py-6 text-sm text-muted">Nothing outstanding. Every student is in a class and every class has a teacher and subjects.</p>
           ) : (
             <ul className="flex flex-col gap-1">
               {nextSteps.map((n) => (
                 <li key={n.text}>
-                  <Link href={n.href} className="flex items-start gap-3 rounded-2xl px-2 py-2.5 transition-colors hover:bg-[#f4f6f4] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14613f]/40">
+                  <Link href={n.href} className="flex items-start gap-3 rounded-2xl px-2 py-2.5 transition-colors hover:bg-rowhover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                     <span className={cn('mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full', n.tone)} aria-hidden="true" />
-                    <span className="text-sm leading-snug text-[#14301f]">{n.text}</span>
+                    <span className="text-sm leading-snug text-ink">{n.text}</span>
                   </Link>
                 </li>
               ))}
@@ -236,23 +236,23 @@ export default async function AdminDashboard() {
       <Panel
         title="Recently added users"
         action={
-          <Link href="/admin/users" className="inline-flex min-h-[36px] items-center rounded-full border border-[#14613f] px-4 text-xs font-semibold text-[#14613f] transition-colors hover:bg-[#eef4ef] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14613f]/40">
+          <Link href="/admin/users" className="inline-flex min-h-[36px] items-center rounded-full border border-primary px-4 text-xs font-semibold text-primary transition-colors hover:bg-tint focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             Manage users
           </Link>
         }
       >
         {recentUsers.length === 0 ? (
-          <p className="text-sm text-[#6b7a70]">No users yet. Add a teacher, bursar or head to get started.</p>
+          <p className="text-sm text-muted">No users yet. Add a teacher, bursar or head to get started.</p>
         ) : (
           <ul className="grid gap-x-8 md:grid-cols-2">
             {recentUsers.map((u) => (
               <li key={u.id} className="flex items-center gap-3 py-2.5">
-                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#e3efe7] text-sm font-semibold text-[#14613f]" aria-hidden="true">
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-tint text-sm font-semibold text-primary" aria-hidden="true">
                   {u.fullName.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('')}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-[#14301f]">{u.fullName}</p>
-                  <p className="truncate text-xs text-[#6b7a70]">{u.email}</p>
+                  <p className="truncate text-sm font-semibold text-ink">{u.fullName}</p>
+                  <p className="truncate text-xs text-muted">{u.email}</p>
                 </div>
                 <Badge variant={u.active ? ROLE_BADGE[u.role as UserRole] : 'neutral'} label={u.active ? ROLE_LABELS[u.role as UserRole] : 'Inactive'} />
               </li>

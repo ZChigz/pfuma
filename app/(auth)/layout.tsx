@@ -1,6 +1,6 @@
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#e4e7e5] md:p-5">
+    <div className="min-h-screen bg-frame md:p-5">
       <div className="flex min-h-screen flex-col gap-3 bg-white p-3 md:min-h-[calc(100vh-40px)] md:flex-row md:rounded-[28px] md:shadow-[0_24px_60px_-24px_rgba(20,48,31,0.35)]">
         {/* Brand panel */}
         <div className="term-card relative flex flex-col justify-between overflow-hidden rounded-2xl p-8 text-white md:w-[44%] md:p-12">
@@ -25,7 +25,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         {/* Form panel */}
-        <div className="flex flex-1 flex-col items-center justify-center rounded-2xl bg-[#f4f6f4] px-6 py-14 md:px-10">
+        <div className="flex flex-1 flex-col items-center justify-center rounded-2xl bg-canvas px-6 py-14 md:px-10">
           <div className="w-full max-w-md rounded-2xl bg-white p-8 md:p-10">{children}</div>
         </div>
       </div>

@@ -11,10 +11,10 @@ import { TERMS } from '@/lib/results';
 import type { SessionUser, AssignmentMarkStatus } from '@/types';
 
 const STATUS_DISPLAY: Record<AssignmentMarkStatus, { icon: string; label: string; className: string }> = {
-  NOT_STARTED: { icon: '✗', label: 'NOT STARTED', className: 'text-[#6b7a70]' },
-  IN_PROGRESS: { icon: '⏳', label: 'IN PROGRESS', className: 'text-amber-700' },
-  VERIFIED:    { icon: '✓', label: 'VERIFIED',     className: 'text-emerald-700' },
-  PUBLISHED:   { icon: '✓', label: 'PUBLISHED',    className: 'text-emerald-700' },
+  NOT_STARTED: { icon: '✗', label: 'NOT STARTED', className: 'text-muted' },
+  IN_PROGRESS: { icon: '⏳', label: 'IN PROGRESS', className: 'text-warn' },
+  VERIFIED:    { icon: '✓', label: 'VERIFIED',     className: 'text-primary' },
+  PUBLISHED:   { icon: '✓', label: 'PUBLISHED',    className: 'text-primary' },
 };
 
 export default async function HeadResultsPage({
@@ -107,14 +107,14 @@ export default async function HeadResultsPage({
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#14301f]">Results</h1>
-          <p className="mt-0.5 text-sm text-[#6b7a70]">Mark verification &amp; publishing</p>
+          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Results</h1>
+          <p className="mt-1 text-sm text-muted">Mark verification &amp; publishing</p>
         </div>
         {selectedClass && (
           <div className="flex items-center gap-3">
             <TermSelect classId={selectedClass.id} term={selectedTerm} />
             {isPublished && (
-              <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-800">
+              <span className="inline-flex items-center rounded-full bg-success-bg px-3 py-1 text-sm font-medium text-primary">
                 ✓ Published
               </span>
             )}
@@ -124,7 +124,7 @@ export default async function HeadResultsPage({
       </div>
 
       {/* Class selector */}
-      <div className="flex flex-wrap gap-2 border-b border-[#e3e9e4]">
+      <div className="flex flex-wrap gap-2 border-b border-line">
         {classes.map((c) => (
           <Link
             key={c.id}
@@ -132,8 +132,8 @@ export default async function HeadResultsPage({
             className={cn(
               'min-h-[44px] border-b-2 px-4 py-2 text-sm font-medium transition-colors',
               selectedClassId === c.id
-                ? 'border-[#14613f] text-[#14613f]'
-                : 'border-transparent text-[#6b7a70] hover:text-[#14301f]',
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted hover:text-ink',
             )}
           >
             {c.name}
@@ -142,34 +142,34 @@ export default async function HeadResultsPage({
       </div>
 
       {!selectedClass ? (
-        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-[#6b7a70]">
+        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
           No classes set up yet.
         </p>
       ) : assignments.length === 0 ? (
-        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-[#6b7a70]">
+        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
           No subjects assigned to {selectedClass.name} for {selectedTerm}.
         </p>
       ) : (
         <>
           {/* Class overview */}
           <div className="overflow-hidden rounded-2xl bg-white">
-            <table className="w-full text-left text-sm text-[#14301f]">
-              <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-line bg-white">
                 <tr>
                   {['Subject', 'Teacher', 'Status', ''].map((h) => (
-                    <th key={h} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
+                    <th key={h} className="px-4 py-3.5 text-xs font-medium text-subtle">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e3e9e4]">
+              <tbody className="divide-y divide-line">
                 {assignments.map((a) => {
                   const status = STATUS_DISPLAY[a.marksStatus];
                   return (
                     <tr key={a.id}>
                       <td className="px-4 py-3 font-medium">{a.subject.name}</td>
-                      <td className="px-4 py-3 text-[#6b7a70]">{a.teacher.fullName}</td>
+                      <td className="px-4 py-3 text-muted">{a.teacher.fullName}</td>
                       <td className={cn('px-4 py-3 font-medium', status.className)}>
                         {status.icon} {status.label}
                       </td>
@@ -190,12 +190,12 @@ export default async function HeadResultsPage({
             </table>
           </div>
 
-          <p className="text-sm font-medium text-[#14301f]">
+          <p className="text-sm font-medium text-ink">
             {verifiedCount} of {assignments.length} subjects verified
           </p>
 
           {!allVerified && (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            <p className="rounded-xl border border-transparent bg-warn-bg px-4 py-3 text-sm font-medium text-warn">
               ⚠ Cannot publish until all subjects are verified
             </p>
           )}
@@ -211,22 +211,22 @@ export default async function HeadResultsPage({
 
           {/* Results table */}
           {isPublished && resultRows.length > 0 && (
-            <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
-              <table className="w-full text-left text-sm text-[#14301f]">
-                <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
+            <div className="overflow-x-auto rounded-2xl bg-white">
+              <table className="w-full text-left text-sm text-ink">
+                <thead className="border-b border-line bg-white">
                   <tr>
-                    <th className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">Position</th>
-                    <th className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">Name</th>
+                    <th className="px-4 py-3.5 text-xs font-medium text-subtle">Position</th>
+                    <th className="px-4 py-3.5 text-xs font-medium text-subtle">Name</th>
                     {assignments.map((a) => (
-                      <th key={a.subjectId} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
+                      <th key={a.subjectId} className="px-4 py-3.5 text-xs font-medium text-subtle">
                         {a.subject.name}
                       </th>
                     ))}
-                    <th className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">Total</th>
-                    <th className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">%</th>
+                    <th className="px-4 py-3.5 text-xs font-medium text-subtle">Total</th>
+                    <th className="px-4 py-3.5 text-xs font-medium text-subtle">%</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#e3e9e4] bg-white">
+                <tbody className="divide-y divide-line bg-white">
                   {resultRows.map((r) => (
                     <tr key={r.studentId}>
                       <td className="px-4 py-3 font-bold tabular-nums">{r.position ?? '—'}</td>

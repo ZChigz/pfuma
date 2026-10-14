@@ -50,7 +50,7 @@ export function Sidebar({ currentTerm }: { currentTerm?: string }) {
     <>
       {isMobileExpanded && (
         <div
-          className="fixed inset-0 z-40 bg-stone-900/40 md:hidden"
+          className="fixed inset-0 z-40 bg-ink/40 md:hidden"
           onClick={close}
           aria-hidden="true"
         />
@@ -58,7 +58,7 @@ export function Sidebar({ currentTerm }: { currentTerm?: string }) {
 
       <aside
         className={cn(
-          'z-50 flex flex-col rounded-2xl bg-[#f4f6f4] p-4 transition-transform duration-200',
+          'z-50 flex flex-col rounded-2xl bg-canvas p-4 transition-transform duration-200',
           // Desktop: sits in the frame. Mobile: slide-in drawer.
           'fixed inset-y-3 left-3 w-64 md:static md:inset-auto md:w-60 md:flex-shrink-0 md:translate-x-0',
           isMobileExpanded ? 'translate-x-0' : '-translate-x-[120%]',
@@ -67,15 +67,15 @@ export function Sidebar({ currentTerm }: { currentTerm?: string }) {
         <div className="flex items-center gap-2.5 px-1 pb-6 pt-1">
           <Logo />
           <div className="min-w-0">
-            <p className="text-lg font-bold leading-none tracking-tight text-[#14301f]">Pfuma</p>
-            <p className="mt-1 truncate text-xs text-[#6b7a70]">{nav?.header ?? 'School management'}</p>
+            <p className="text-lg font-bold leading-none tracking-tight text-ink">Pfuma</p>
+            <p className="mt-1 truncate text-xs text-muted">{nav?.header ?? 'School management'}</p>
           </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto" aria-label="Main navigation">
           {nav?.sections.map((section) => (
             <div key={section.title} className="mb-5">
-              <p className="mb-1.5 px-3 text-xs font-medium text-[#8a968e]">{section.title}</p>
+              <p className="mb-1.5 px-3 text-xs font-medium text-subtle">{section.title}</p>
               {section.items.map((item) => {
                 const active = isActive(item.href);
                 return (
@@ -85,17 +85,17 @@ export function Sidebar({ currentTerm }: { currentTerm?: string }) {
                     onClick={() => close()}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 text-sm transition-colors',
-                      'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14613f]/40',
+                      'relative flex min-h-[44px] items-center gap-3 rounded-xl px-3 text-sm transition-colors',
+                      'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                       active
-                        ? 'font-semibold text-[#14301f]'
-                        : 'font-medium text-[#8a968e] hover:bg-white/70 hover:text-[#14301f]',
+                        ? 'font-semibold text-ink'
+                        : 'font-medium text-subtle hover:bg-white/70 hover:text-ink',
                     )}
                   >
                     {active && (
-                      <span className="absolute -left-4 bottom-2 top-2 w-1 rounded-r-full bg-[#14613f]" aria-hidden="true" />
+                      <span className="absolute -left-4 bottom-2 top-2 w-1 rounded-r-full bg-primary" aria-hidden="true" />
                     )}
-                    <Icon path={icons[item.icon]} className={active ? 'text-[#14613f]' : ''} />
+                    <Icon path={icons[item.icon]} className={active ? 'text-primary' : ''} />
                     <span className="truncate">{item.label}</span>
                   </Link>
                 );
@@ -104,10 +104,10 @@ export function Sidebar({ currentTerm }: { currentTerm?: string }) {
           ))}
 
           <div className="mb-5">
-            <p className="mb-1.5 px-3 text-xs font-medium text-[#8a968e]">Account</p>
+            <p className="mb-1.5 px-3 text-xs font-medium text-subtle">Account</p>
             <button
               onClick={() => signOut({ callbackUrl: '/login' })}
-              className="flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-[#8a968e] transition-colors hover:bg-white/70 hover:text-[#14301f] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14613f]/40"
+              className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-subtle transition-colors hover:bg-white/70 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               <Icon path={icons.signout} />
               Sign out

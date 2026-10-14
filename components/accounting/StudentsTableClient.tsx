@@ -37,7 +37,7 @@ export function StudentsTableClient({ students, canManage }: Props) {
       key: 'balanceUSD',
       label: 'USD Balance',
       render: (row) => (
-        <span className={`tabular-nums font-medium ${row.balanceUSD > 0 ? 'text-[#b91c1c]' : 'text-[#15803d]'}`}>
+        <span className={`tabular-nums font-medium ${row.balanceUSD > 0 ? 'text-danger' : 'text-success'}`}>
           {formatUSD(row.balanceUSD)}
         </span>
       ),
@@ -46,7 +46,7 @@ export function StudentsTableClient({ students, canManage }: Props) {
       key: 'balanceZiG',
       label: 'ZiG Balance',
       render: (row) => (
-        <span className={`tabular-nums font-medium ${row.balanceZiG > 0 ? 'text-[#b91c1c]' : 'text-[#15803d]'}`}>
+        <span className={`tabular-nums font-medium ${row.balanceZiG > 0 ? 'text-danger' : 'text-success'}`}>
           {formatZiG(row.balanceZiG)}
         </span>
       ),
@@ -56,9 +56,9 @@ export function StudentsTableClient({ students, canManage }: Props) {
       label: 'Overdue',
       render: (row) =>
         row.overdueDays > 0 ? (
-          <span className="font-medium text-[#b91c1c]">{row.overdueDays}d</span>
+          <span className="font-medium text-danger">{row.overdueDays}d</span>
         ) : (
-          <span className="text-[#6b7a70]">—</span>
+          <span className="text-muted">—</span>
         ),
     },
     {
@@ -69,14 +69,14 @@ export function StudentsTableClient({ students, canManage }: Props) {
           {canManage && (
             <button
               onClick={() => setPaymentStudent(row)}
-              className="min-h-[36px] rounded-xl bg-[#14613f] px-2.5 text-xs font-medium text-white transition-colors hover:bg-[#0f4d32] focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
+              className="min-h-[36px] rounded-xl bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
               Record Payment
             </button>
           )}
           <button
             onClick={() => router.push(`/accounting/students/${row.id}`)}
-            className="rounded px-2 py-1 text-xs font-medium text-[#14613f] hover:underline focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
+            className="rounded px-2 py-1 text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
             View →
           </button>

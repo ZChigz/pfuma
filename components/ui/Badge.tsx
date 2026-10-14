@@ -11,11 +11,11 @@ interface BadgeProps {
 }
 
 const variants: Record<BadgeVariant, string> = {
-  success: 'bg-[#dcfce7] text-[#15803d]',
-  warning: 'bg-[#fef9c3] text-[#b45309]',
-  danger:  'bg-[#fee2e2] text-[#b91c1c]',
-  neutral: 'bg-[#f4f6f4] text-[#6b7a70]',
-  gold:    'bg-[#fef3c7] text-[#b45309]',
+  success: 'bg-success-bg text-success',
+  warning: 'bg-warn-bg text-warn',
+  danger:  'bg-danger-bg text-danger',
+  neutral: 'bg-canvas text-muted',
+  gold:    'bg-warn-bg text-warn',
   info:    'bg-[#dbeafe] text-[#1d4ed8]',
 };
 
