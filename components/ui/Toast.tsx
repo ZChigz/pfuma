@@ -38,9 +38,9 @@ export function useToast() {
 }
 
 const typeStyles: Record<ToastType, string> = {
-  success: 'bg-[#065f46]',
+  success: 'bg-[#14613f]',
   error:   'bg-[#b91c1c]',
-  info:    'bg-[#292524]',
+  info:    'bg-[#14301f]',
 };
 
 function ToastItemComponent({

@@ -70,8 +70,8 @@ export default async function AdminSubjectsPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-2xl font-bold text-[#292524]">Subjects &amp; Class Assignments</h1>
-        <p className="mt-0.5 text-sm text-[#78716c]">
+        <h1 className="text-2xl font-bold text-[#14301f]">Subjects &amp; Class Assignments</h1>
+        <p className="mt-0.5 text-sm text-[#6b7a70]">
           Manage the school&apos;s subject pool and assign teachers to classes
         </p>
       </div>
@@ -80,32 +80,32 @@ export default async function AdminSubjectsPage() {
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-[#292524]">School subjects</h2>
-            <p className="text-sm text-[#78716c]">All subjects offered at this school</p>
+            <h2 className="text-lg font-semibold text-[#14301f]">School subjects</h2>
+            <p className="text-sm text-[#6b7a70]">All subjects offered at this school</p>
           </div>
           <AddSubjectModal />
         </div>
 
         {subjects.length === 0 ? (
-          <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-12 text-center text-sm text-[#78716c]">
+          <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-[#6b7a70]">
             No subjects yet. Click &ldquo;+ Add Subject&rdquo; to create one.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-            <table className="w-full text-left text-sm text-[#292524]">
-              <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+          <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
+            <table className="w-full text-left text-sm text-[#14301f]">
+              <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
                 <tr>
                   {['Code', 'Name', 'Max Mark', 'Type', 'Active', ''].map((h) => (
-                    <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                    <th key={h} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e7e5e4] bg-white">
+              <tbody className="divide-y divide-[#e3e9e4] bg-white">
                 {subjects.map((s) => (
                   <tr key={s.id} className={s.active ? '' : 'opacity-60'}>
-                    <td className="px-4 py-3 font-mono text-xs text-[#78716c]">{s.code}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-[#6b7a70]">{s.code}</td>
                     <td className="px-4 py-3 font-medium">{s.name}</td>
                     <td className="px-4 py-3 tabular-nums">{s.maxMark}</td>
                     <td className="px-4 py-3">
@@ -128,14 +128,14 @@ export default async function AdminSubjectsPage() {
       {/* Section 2 — Class assignments */}
       <section className="flex flex-col gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[#292524]">
+          <h2 className="text-lg font-semibold text-[#14301f]">
             Class assignments — {currentTerm || 'current term'}
           </h2>
-          <p className="text-sm text-[#78716c]">Assign subjects and teachers to each class</p>
+          <p className="text-sm text-[#6b7a70]">Assign subjects and teachers to each class</p>
         </div>
 
         {classes.length === 0 ? (
-          <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-12 text-center text-sm text-[#78716c]">
+          <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-[#6b7a70]">
             No classes yet. Add classes under Admin → Classes first.
           </p>
         ) : (
@@ -146,9 +146,9 @@ export default async function AdminSubjectsPage() {
               const availableSubjects = subjects.filter((s) => s.active && !assignedSubjectIds.has(s.id));
 
               return (
-                <div key={c.id} className="rounded-xl border border-[#e7e5e4] bg-white p-4">
+                <div key={c.id} className="rounded-2xl bg-white p-4">
                   <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-base font-semibold text-[#292524]">{c.name}</h3>
+                    <h3 className="text-base font-semibold text-[#14301f]">{c.name}</h3>
                     <AssignSubjectModal
                       classId={c.id}
                       className={c.name}
@@ -159,22 +159,22 @@ export default async function AdminSubjectsPage() {
                   </div>
 
                   {classAssignments.length === 0 ? (
-                    <p className="rounded-lg border border-[#e7e5e4] bg-[#fafaf9] px-4 py-6 text-center text-sm text-[#78716c]">
+                    <p className="rounded-lg border border-[#e3e9e4] bg-[#fafaf9] px-4 py-6 text-center text-sm text-[#6b7a70]">
                       No subjects assigned to {c.name} yet.
                     </p>
                   ) : (
-                    <div className="overflow-x-auto rounded-lg border border-[#e7e5e4]">
-                      <table className="w-full text-left text-sm text-[#292524]">
-                        <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+                    <div className="overflow-x-auto rounded-lg border border-[#e3e9e4]">
+                      <table className="w-full text-left text-sm text-[#14301f]">
+                        <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
                           <tr>
                             {['Subject', 'Teacher assigned', ''].map((h) => (
-                              <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                              <th key={h} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
                                 {h}
                               </th>
                             ))}
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#e7e5e4] bg-white">
+                        <tbody className="divide-y divide-[#e3e9e4] bg-white">
                           {classAssignments.map((a) => (
                             <tr key={a.id}>
                               <td className="px-4 py-3 font-medium">{a.subject.name} ({a.subject.code})</td>
@@ -196,7 +196,7 @@ export default async function AdminSubjectsPage() {
       </section>
 
       {/* Section 3 — Grade boundaries */}
-      <section className="rounded-xl border border-[#e7e5e4] bg-white p-4">
+      <section className="rounded-2xl bg-white p-4">
         <GradeBoundariesManager />
       </section>
     </div>

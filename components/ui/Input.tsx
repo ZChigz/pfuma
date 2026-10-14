@@ -19,7 +19,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, hint, id, required, disabled, ...props }, ref) => (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label htmlFor={id} className="text-sm font-medium text-[#292524]">
+        <label htmlFor={id} className="text-sm font-medium text-[#14301f]">
           {label}
           {required && <span className="ml-0.5 text-[#b91c1c]" aria-hidden="true">*</span>}
         </label>
@@ -32,8 +32,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         aria-invalid={!!error}
         aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
         className={cn(
-          'min-h-[44px] rounded-md border border-[#e7e5e4] bg-white px-3 py-2 text-sm text-[#292524]',
-          'placeholder:text-[#78716c] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30',
+          'min-h-[44px] rounded-xl border border-[#e3e9e4] bg-white px-3 py-2 text-sm text-[#14301f]',
+          'placeholder:text-[#6b7a70] focus:outline-none focus:ring-2 focus:ring-[#14613f]/30',
           'disabled:cursor-not-allowed disabled:bg-stone-50 disabled:opacity-60',
           error && 'border-[#b91c1c] focus:ring-[#b91c1c]/30',
           className,
@@ -41,7 +41,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {...props}
       />
       {hint && !error && (
-        <p id={`${id}-hint`} className="text-xs text-[#78716c]">{hint}</p>
+        <p id={`${id}-hint`} className="text-xs text-[#6b7a70]">{hint}</p>
       )}
       {error && (
         <p id={`${id}-error`} role="alert" className="flex items-center text-xs text-[#b91c1c]">

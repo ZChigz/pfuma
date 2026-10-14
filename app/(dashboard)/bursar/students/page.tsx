@@ -50,8 +50,8 @@ export default async function BursarStudentsPage({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#292524]">Record a payment</h1>
-        <p className="mt-0.5 text-sm text-[#78716c]">Search for a student to record a fee payment</p>
+        <h1 className="text-2xl font-bold text-[#14301f]">Record a payment</h1>
+        <p className="mt-0.5 text-sm text-[#6b7a70]">Search for a student to record a fee payment</p>
       </div>
 
       <form method="get" className="flex gap-2">
@@ -60,11 +60,11 @@ export default async function BursarStudentsPage({
           name="q"
           defaultValue={q}
           placeholder="Search student by name"
-          className="min-h-[44px] w-full max-w-sm rounded-md border border-[#e7e5e4] bg-white px-3 text-sm text-[#292524] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+          className="min-h-[44px] w-full max-w-sm rounded-xl border border-[#e3e9e4] bg-white px-3 text-sm text-[#14301f] focus:outline-none focus:ring-2 focus:ring-[#14613f]/30"
         />
         <button
           type="submit"
-          className="min-h-[44px] rounded-md border border-[#e7e5e4] bg-white px-4 text-sm font-medium text-[#292524] hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+          className="min-h-[44px] rounded-xl border border-[#e3e9e4] bg-white px-4 text-sm font-medium text-[#14301f] hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
         >
           Search
         </button>

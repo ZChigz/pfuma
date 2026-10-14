@@ -7,7 +7,7 @@ import { ASSIGNMENT_STATUS_LABELS } from '@/lib/results';
 import type { SessionUser, AssignmentMarkStatus } from '@/types';
 
 const STATUS_BADGE: Record<AssignmentMarkStatus, string> = {
-  NOT_STARTED: 'bg-stone-100 text-[#78716c]',
+  NOT_STARTED: 'bg-stone-100 text-[#6b7a70]',
   IN_PROGRESS: 'bg-amber-50 text-amber-800',
   VERIFIED:    'bg-emerald-50 text-emerald-800',
   PUBLISHED:   'bg-emerald-50 text-emerald-800',
@@ -58,23 +58,23 @@ export default async function TeacherMarksPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#292524]">My teaching assignments — {currentTerm || 'current term'}</h1>
-        <p className="mt-0.5 text-sm text-[#78716c]">Select an assignment to enter marks</p>
+        <h1 className="text-2xl font-bold text-[#14301f]">My teaching assignments — {currentTerm || 'current term'}</h1>
+        <p className="mt-0.5 text-sm text-[#6b7a70]">Select an assignment to enter marks</p>
       </div>
 
       {rows.length === 0 ? (
-        <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-12 text-center text-sm text-[#78716c]">
+        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-[#6b7a70]">
           No subjects are assigned to you for {currentTerm || 'this term'}. Ask your administrator.
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((a) => (
-            <div key={a.id} className="flex flex-col gap-3 rounded-xl border border-[#e7e5e4] bg-white p-4 shadow-sm">
+            <div key={a.id} className="flex flex-col gap-3 rounded-2xl bg-white p-4">
               <div>
-                <p className="text-base font-bold text-[#292524]">{a.class.name} — {a.subject.name}</p>
-                <p className="mt-0.5 text-xs text-[#78716c]">{a.subject.code} &middot; out of {a.subject.maxMark}</p>
+                <p className="text-base font-bold text-[#14301f]">{a.class.name} — {a.subject.name}</p>
+                <p className="mt-0.5 text-xs text-[#6b7a70]">{a.subject.code} &middot; out of {a.subject.maxMark}</p>
               </div>
-              <p className="text-sm text-[#78716c]">
+              <p className="text-sm text-[#6b7a70]">
                 {a.totalStudents} student{a.totalStudents !== 1 ? 's' : ''} &middot; {a.marksEntered} mark{a.marksEntered !== 1 ? 's' : ''} entered
               </p>
               <span className={cn('inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', STATUS_BADGE[a.marksStatus])}>
@@ -83,10 +83,10 @@ export default async function TeacherMarksPage() {
               <Link
                 href={`/teacher/marks/${a.id}`}
                 className={cn(
-                  'mt-1 inline-flex min-h-[44px] items-center justify-center rounded-md px-4 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#065f46]/40',
+                  'mt-1 inline-flex min-h-[44px] items-center justify-center rounded-xl px-4 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#14613f]/40',
                   a.marksStatus === 'VERIFIED' || a.marksStatus === 'PUBLISHED'
-                    ? 'border border-[#e7e5e4] bg-white text-[#78716c] hover:bg-stone-50'
-                    : 'bg-[#065f46] text-white hover:bg-[#047857]',
+                    ? 'border border-[#e3e9e4] bg-white text-[#6b7a70] hover:bg-stone-50'
+                    : 'bg-[#14613f] text-white hover:bg-[#0f4d32]',
                 )}
               >
                 {ACTION_LABEL[a.marksStatus]}

@@ -66,21 +66,21 @@ export default async function HeadExpensesPage({
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#292524]">Expenses</h1>
-          <p className="mt-0.5 text-sm text-[#78716c]">Track and manage school expenditure</p>
+          <h1 className="text-2xl font-bold text-[#14301f]">Expenses</h1>
+          <p className="mt-0.5 text-sm text-[#6b7a70]">Track and manage school expenditure</p>
         </div>
         <LogExpenseModal />
       </div>
 
       {/* Summary cards */}
       <div className="mb-6 grid grid-cols-2 gap-4">
-        <div className="rounded-xl border border-[#e7e5e4] bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#78716c]">Total USD (active)</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-[#292524]">{formatUSD(totalUSD)}</p>
+        <div className="rounded-2xl bg-white p-4">
+          <p className="text-xs font-medium   text-[#6b7a70]">Total USD (active)</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-[#14301f]">{formatUSD(totalUSD)}</p>
         </div>
-        <div className="rounded-xl border border-[#e7e5e4] bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#78716c]">Total ZiG (active)</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-[#292524]">{formatZiG(totalZiG)}</p>
+        <div className="rounded-2xl bg-white p-4">
+          <p className="text-xs font-medium   text-[#6b7a70]">Total ZiG (active)</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-[#14301f]">{formatZiG(totalZiG)}</p>
         </div>
       </div>
 
@@ -96,19 +96,19 @@ export default async function HeadExpensesPage({
 
       {/* Table */}
       {expenses.length === 0 ? (
-        <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-12 text-center text-sm text-[#78716c]">
+        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-[#6b7a70]">
           No expenses recorded yet.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-          <table className="w-full text-left text-sm text-[#292524]">
-            <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+        <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
+          <table className="w-full text-left text-sm text-[#14301f]">
+            <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
               <tr>
                 {['Date', 'Category', 'Note', 'Currency', 'Amount', 'Recorded By', 'Status', ...(canVoid ? [''] : [])].map(
                   (h, i) => (
                     <th
                       key={i}
-                      className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]"
+                      className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]"
                     >
                       {h}
                     </th>
@@ -116,22 +116,22 @@ export default async function HeadExpensesPage({
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e7e5e4] bg-white">
+            <tbody className="divide-y divide-[#e3e9e4] bg-white">
               {expenses.map((e) => {
                 const amount  = e.amount.toNumber();
                 const isVoided = e.status === 'VOIDED';
                 return (
                   <tr key={e.id} className={isVoided ? 'opacity-50' : ''}>
-                    <td className="whitespace-nowrap px-4 py-3 text-[#78716c]">
+                    <td className="whitespace-nowrap px-4 py-3 text-[#6b7a70]">
                       {formatDate(e.spentOn)}
                     </td>
                     <td className="px-4 py-3 font-medium">{e.category}</td>
-                    <td className="px-4 py-3 text-[#78716c]">{e.note ?? '—'}</td>
+                    <td className="px-4 py-3 text-[#6b7a70]">{e.note ?? '—'}</td>
                     <td className="px-4 py-3">{e.currency}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">
                       {e.currency === 'USD' ? formatUSD(amount) : formatZiG(amount)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-[#78716c]">
+                    <td className="px-4 py-3 text-xs text-[#6b7a70]">
                       {e.recorder.fullName}
                     </td>
                     <td className="px-4 py-3">

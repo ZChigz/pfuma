@@ -34,28 +34,28 @@ export default async function AdminClassesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#292524]">Classes</h1>
-          <p className="mt-0.5 text-sm text-[#78716c]">School class register</p>
+          <h1 className="text-2xl font-bold text-[#14301f]">Classes</h1>
+          <p className="mt-0.5 text-sm text-[#6b7a70]">School class register</p>
         </div>
         <AddClassModal teachers={teachers} />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-        <table className="w-full text-left text-sm text-[#292524]">
-          <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+      <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
+        <table className="w-full text-left text-sm text-[#14301f]">
+          <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
             <tr>
               {['Class Name', 'Grade/Stream', 'Section', 'Class Teacher', 'Students', 'Active'].map((h, i) => (
-                <th key={i} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                <th key={i} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#e7e5e4] bg-white">
+          <tbody className="divide-y divide-[#e3e9e4] bg-white">
             {classes.map((c) => (
               <tr key={c.id} className="cursor-pointer hover:bg-[#fafaf9]">
                 <td className="px-4 py-3 font-medium">
-                  <Link href={`/admin/classes/${c.id}`} className="text-[#065f46] hover:underline">
+                  <Link href={`/admin/classes/${c.id}`} className="text-[#14613f] hover:underline">
                     {c.name}
                   </Link>
                 </td>
@@ -70,7 +70,7 @@ export default async function AdminClassesPage() {
             ))}
             {classes.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-[#78716c]">
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-[#6b7a70]">
                   No classes yet.
                 </td>
               </tr>

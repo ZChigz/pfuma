@@ -43,12 +43,12 @@ export default async function HeadRequestsPage({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#292524]">Expense Requests</h1>
-        <p className="mt-0.5 text-sm text-[#78716c]">Review and approve staff expense requests</p>
+        <h1 className="text-2xl font-bold text-[#14301f]">Expense Requests</h1>
+        <p className="mt-0.5 text-sm text-[#6b7a70]">Review and approve staff expense requests</p>
       </div>
 
       {/* Tabs */}
-      <div className="mb-4 flex gap-2 border-b border-[#e7e5e4]">
+      <div className="mb-4 flex gap-2 border-b border-[#e3e9e4]">
         {tabs.map((t) => (
           <Link
             key={t.key}
@@ -56,8 +56,8 @@ export default async function HeadRequestsPage({
             className={cn(
               'flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
               tab === t.key
-                ? 'border-[#065f46] text-[#065f46]'
-                : 'border-transparent text-[#78716c] hover:text-[#292524]',
+                ? 'border-[#14613f] text-[#14613f]'
+                : 'border-transparent text-[#6b7a70] hover:text-[#14301f]',
             )}
           >
             {t.key === 'pending' ? 'Pending approval' : t.label}
@@ -69,22 +69,22 @@ export default async function HeadRequestsPage({
       </div>
 
       {activeRows.length === 0 ? (
-        <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-12 text-center text-sm text-[#78716c]">
+        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-[#6b7a70]">
           No requests in this category.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-          <table className="w-full text-left text-sm text-[#292524]">
-            <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+        <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
+          <table className="w-full text-left text-sm text-[#14301f]">
+            <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
               <tr>
                 {['Request #', 'Title', 'Department', 'Requested By', 'Amount', 'Date', tab === 'pending' ? '' : 'Status'].map((h, i) => (
-                  <th key={i} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                  <th key={i} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e7e5e4] bg-white">
+            <tbody className="divide-y divide-[#e3e9e4] bg-white">
               {activeRows.map((r) => {
                 const status = REQUEST_STATUS_BADGE[r.status];
                 return (
@@ -92,14 +92,14 @@ export default async function HeadRequestsPage({
                     <td className="px-4 py-3 font-medium">{r.requestNumber}</td>
                     <td className="px-4 py-3">
                       {r.title}
-                      <span className="block text-xs text-[#78716c]">{REQUEST_TYPE_LABELS[r.type]}</span>
+                      <span className="block text-xs text-[#6b7a70]">{REQUEST_TYPE_LABELS[r.type]}</span>
                     </td>
-                    <td className="px-4 py-3 text-[#78716c]">{r.department}</td>
-                    <td className="px-4 py-3 text-[#78716c]">{r.requestedBy.fullName}</td>
+                    <td className="px-4 py-3 text-[#6b7a70]">{r.department}</td>
+                    <td className="px-4 py-3 text-[#6b7a70]">{r.requestedBy.fullName}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">
                       {r.currency === 'USD' ? formatUSD(r.estimatedTotal) : formatZiG(r.estimatedTotal)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-[#78716c]">{formatDate(r.requestedAt)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-[#6b7a70]">{formatDate(r.requestedAt)}</td>
                     <td className="px-4 py-3">
                       {tab === 'pending' ? (
                         <RequestReviewModal request={r} />
