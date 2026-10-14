@@ -15,6 +15,8 @@ interface ClassOption {
 
 interface StudentRow {
   id: string;
+  studentNumber: string | null;
+  status: string;
   fullName: string;
   parentName: string;
   parentPhone: string;
@@ -110,7 +112,7 @@ export function StudentsTable({ students, classes }: Props) {
                   className="h-4 w-4 rounded border-[#e7e5e4] text-[#065f46] focus:ring-[#065f46]/30"
                 />
               </th>
-              {['Name', 'Parent', 'Phone', 'Class', 'Active'].map((h, i) => (
+              {['Student ID', 'Name', 'Guardian', 'Phone', 'Class', 'Status'].map((h, i) => (
                 <th key={i} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
                   {h}
                 </th>
@@ -129,18 +131,22 @@ export function StudentsTable({ students, classes }: Props) {
                     className="h-4 w-4 rounded border-[#e7e5e4] text-[#065f46] focus:ring-[#065f46]/30"
                   />
                 </td>
+                <td className="px-4 py-3 font-mono text-xs text-[#78716c]">{s.studentNumber ?? '—'}</td>
                 <td className="px-4 py-3 font-medium">{s.fullName}</td>
                 <td className="px-4 py-3">{s.parentName}</td>
                 <td className="px-4 py-3 font-mono text-xs text-[#78716c]">{s.parentPhone}</td>
                 <td className="px-4 py-3">{s.class?.name ?? '—'}</td>
                 <td className="px-4 py-3">
-                  <Badge label={s.active ? 'Active' : 'Inactive'} variant={s.active ? 'success' : 'danger'} />
+                  <Badge
+                    label={s.status.charAt(0) + s.status.slice(1).toLowerCase()}
+                    variant={s.active ? 'success' : 'danger'}
+                  />
                 </td>
               </tr>
             ))}
             {students.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-[#78716c]">
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-[#78716c]">
                   No students found.
                 </td>
               </tr>

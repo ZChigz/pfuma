@@ -24,6 +24,14 @@ const fileRouter = {
     })
     .onUploadComplete(() => {}),
 
+  studentPhoto: f({ image: { maxFileSize: '4MB', maxFileCount: 1 } })
+    .middleware(async () => {
+      const session = await auth();
+      if (!session?.user) throw new Error('Unauthorized');
+      return { userId: session.user.id };
+    })
+    .onUploadComplete(() => {}),
+
   bookCover: f({ image: { maxFileSize: '4MB', maxFileCount: 1 } })
     .middleware(async () => {
       const session = await auth();

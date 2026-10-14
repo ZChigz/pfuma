@@ -19,11 +19,14 @@ export const UpdateClassSchema = z.object({
   active:         z.boolean().optional(),
 });
 
-export const CreateAdminStudentSchema = z.object({
-  fullName:    z.string().min(1, 'Full name is required'),
-  classId:     z.string().min(1, 'Class is required'),
-  parentName:  z.string().min(1, 'Parent/guardian name is required'),
-  parentPhone: z.string().min(1, 'Parent phone is required'),
+// Student registration rules live in lib/students/registration.ts.
+
+export const UpdateSchoolSettingsSchema = z.object({
+  maxClassSize: z
+    .number({ error: 'Class size limit must be a number' })
+    .int('Class size limit must be a whole number')
+    .min(1, 'Class size limit must be at least 1')
+    .max(200, 'Class size limit must be 200 or fewer'),
 });
 
 export const MoveStudentsSchema = z.object({

@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
+import { ClassSizeSetting } from '@/components/admin/ClassSizeSetting';
 import Link from 'next/link';
 import type { SessionUser } from '@/types';
 
@@ -17,7 +18,7 @@ export default async function AdminDashboard() {
     prisma.schoolClass.count({ where: { schoolId: user.schoolId } }),
     prisma.student.count({ where: { schoolId: user.schoolId, active: true } }),
     prisma.subject.count({ where: { schoolId: user.schoolId } }),
-    prisma.school.findUnique({ where: { id: user.schoolId }, select: { currentTerm: true } }),
+    prisma.school.findUnique({ where: { id: user.schoolId }, select: { currentTerm: true, maxClassSize: true } }),
   ]);
 
   const cards = [
@@ -51,6 +52,11 @@ export default async function AdminDashboard() {
             </Card>
           </Link>
         ))}
+      </div>
+
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-[#292524]">Settings</h2>
+        <ClassSizeSetting initial={school?.maxClassSize ?? 45} />
       </div>
     </div>
   );

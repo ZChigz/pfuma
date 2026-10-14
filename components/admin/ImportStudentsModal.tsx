@@ -5,11 +5,56 @@ import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
+import { CSV_COLUMNS, csvTemplate } from '@/lib/students/csv';
+
+interface RowReport {
+  row: number;
+  name: string;
+  messages: string[];
+  studentNumber?: string;
+}
 
 interface ImportResult {
+  totalRows: number;
   imported: number;
-  skipped: number;
-  errors: string[];
+  failed: RowReport[];
+  warnings: RowReport[];
+}
+
+function ReportTable({ title, tone, rows }: { title: string; tone: 'error' | 'warn'; rows: RowReport[] }) {
+  const color = tone === 'error' ? 'text-[#b91c1c]' : 'text-amber-800';
+  return (
+    <div>
+      <h3 className={`mb-2 text-sm font-semibold ${color}`}>{title} ({rows.length})</h3>
+      <div className="max-h-64 overflow-y-auto rounded-lg border border-[#e7e5e4]">
+        <table className="w-full text-left text-xs">
+          <thead className="sticky top-0 bg-[#f5f5f4] text-[#78716c]">
+            <tr>
+              <th className="px-3 py-2 font-semibold">Row</th>
+              <th className="px-3 py-2 font-semibold">Student</th>
+              <th className="px-3 py-2 font-semibold">Why</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#e7e5e4] bg-white">
+            {rows.map((r) => (
+              <tr key={r.row} className="align-top">
+                <td className="px-3 py-2 tabular-nums">{r.row}</td>
+                <td className="px-3 py-2">
+                  {r.name}
+                  {r.studentNumber && <span className="block font-mono text-[#78716c]">{r.studentNumber}</span>}
+                </td>
+                <td className={`px-3 py-2 ${color}`}>
+                  <ul className="list-disc pl-4">
+                    {r.messages.map((m, i) => <li key={i}>{m}</li>)}
+                  </ul>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 export function ImportStudentsModal() {
@@ -24,6 +69,15 @@ export function ImportStudentsModal() {
     setOpen(false);
     setResult(null);
     if (inputRef.current) inputRef.current.value = '';
+  }
+
+  function downloadTemplate() {
+    const url = URL.createObjectURL(new Blob([csvTemplate()], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'student-import-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function handleFile(file: File) {
@@ -46,10 +100,16 @@ export function ImportStudentsModal() {
         toast.success(`Imported ${data.data.imported} student(s)`);
         router.refresh();
       }
+    } catch {
+      toast.error('Network error. Please try again.');
     } finally {
       setBusy(false);
+      if (inputRef.current) inputRef.current.value = '';
     }
   }
+
+  const required = CSV_COLUMNS.filter((c) => c.required).map((c) => c.key);
+  const optional = CSV_COLUMNS.filter((c) => !c.required).map((c) => c.key);
 
   return (
     <>
@@ -59,13 +119,20 @@ export function ImportStudentsModal() {
         open={open}
         onClose={handleClose}
         title="Import Students from CSV"
+        size="lg"
         footer={<Button onClick={handleClose}>Done</Button>}
       >
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-[#78716c]">
-            Upload a CSV file with the columns: <code className="font-mono text-xs">fullName, parentName, parentPhone, class</code>.
-            The <code className="font-mono text-xs">class</code> value must match an existing class name exactly (e.g. &quot;Form 4A&quot;).
-          </p>
+        <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto pr-1">
+          <div className="flex flex-col gap-2 text-sm text-[#78716c]">
+            <p>Every row is checked with the same rules as the Register Student form. Rows with errors or likely duplicates are skipped; the rest are imported and given a Student ID.</p>
+            <p><span className="font-medium text-[#292524]">Required columns:</span> <code className="font-mono text-xs">{required.join(', ')}</code></p>
+            <p><span className="font-medium text-[#292524]">Optional columns:</span> <code className="font-mono text-xs">{optional.join(', ')}</code></p>
+            <p>Dates can be YYYY-MM-DD or DD/MM/YYYY. Gender can be M, F, Male or Female. Form can be &quot;Form 2&quot; or just &quot;2&quot;.</p>
+            <div>
+              <Button size="sm" variant="ghost" onClick={downloadTemplate}>Download template</Button>
+            </div>
+          </div>
+
           <input
             ref={inputRef}
             type="file"
@@ -77,19 +144,21 @@ export function ImportStudentsModal() {
             }}
             className="block w-full text-sm text-[#292524] file:mr-4 file:min-h-[44px] file:rounded-md file:border-0 file:bg-[#065f46] file:px-4 file:text-sm file:font-medium file:text-white hover:file:bg-[#047857]"
           />
-          {busy && <p className="text-sm text-[#78716c]">Importing…</p>}
+          {busy && <p className="text-sm text-[#78716c]">Checking and importing…</p>}
+
           {result && (
-            <div className="rounded-lg border border-[#e7e5e4] bg-[#fafaf9] p-4 text-sm">
-              <p className="font-medium text-[#292524]">
-                Imported {result.imported} student(s), skipped {result.skipped}.
-              </p>
-              {result.errors.length > 0 && (
-                <ul className="mt-2 list-disc pl-5 text-xs text-[#b91c1c]">
-                  {result.errors.map((err, i) => (
-                    <li key={i}>{err}</li>
-                  ))}
-                </ul>
-              )}
+            <div className="flex flex-col gap-4">
+              <div className="rounded-lg border border-[#e7e5e4] bg-[#fafaf9] p-4 text-sm text-[#292524]">
+                <p className="font-medium">
+                  {result.imported} of {result.totalRows} student(s) imported
+                  {result.failed.length > 0 && `, ${result.failed.length} row(s) not imported`}.
+                </p>
+                {result.failed.length > 0 && (
+                  <p className="mt-1 text-xs text-[#78716c]">Fix the rows below and import just those rows again.</p>
+                )}
+              </div>
+              {result.failed.length > 0 && <ReportTable title="Not imported" tone="error" rows={result.failed} />}
+              {result.warnings.length > 0 && <ReportTable title="Imported with warnings — please check" tone="warn" rows={result.warnings} />}
             </div>
           )}
         </div>

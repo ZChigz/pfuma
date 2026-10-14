@@ -21,7 +21,7 @@ export default async function AdminStudentsPage({ searchParams }: Props) {
 
   const classId = searchParams.classId ?? '';
 
-  const [students, classes] = await Promise.all([
+  const [students, classes, school] = await Promise.all([
     prisma.student.findMany({
       where: {
         schoolId: user.schoolId,
@@ -34,10 +34,25 @@ export default async function AdminStudentsPage({ searchParams }: Props) {
     }),
     prisma.schoolClass.findMany({
       where: { schoolId: user.schoolId },
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        grade: true,
+        section: true,
+        _count: { select: { students: { where: { active: true } } } },
+      },
       orderBy: [{ grade: 'asc' }, { section: 'asc' }],
     }),
+    prisma.school.findUnique({ where: { id: user.schoolId }, select: { maxClassSize: true } }),
   ]);
+
+  const classOptions = classes.map((c) => ({
+    id: c.id,
+    name: c.name,
+    grade: c.grade,
+    section: c.section,
+    studentCount: c._count.students,
+  }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,13 +63,13 @@ export default async function AdminStudentsPage({ searchParams }: Props) {
         </div>
         <div className="flex items-center gap-2">
           <ImportStudentsModal />
-          <AddStudentModal classes={classes} defaultClassId={classId || undefined} />
+          <AddStudentModal classes={classOptions} maxClassSize={school?.maxClassSize ?? 45} />
         </div>
       </div>
 
-      <ClassFilter classes={classes} value={classId} />
+      <ClassFilter classes={classOptions} value={classId} />
 
-      <StudentsTable students={students} classes={classes} />
+      <StudentsTable students={students} classes={classOptions} />
     </div>
   );
 }

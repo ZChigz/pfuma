@@ -56,13 +56,20 @@ async function _PATCH(
 
   const existing = await prisma.student.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
-    select: { id: true },
+    select: { id: true, status: true },
   });
   if (!existing) return apiNotFound('Student');
 
+  // Keep status in step with the active flag (active == status ACTIVE).
+  const { active } = parsed.data;
+  const status =
+    active === true ? 'ACTIVE'
+    : active === false && existing.status === 'ACTIVE' ? 'WITHDRAWN'
+    : undefined;
+
   const student = await prisma.student.update({
     where: { id: params.id },
-    data: parsed.data,
+    data: { ...parsed.data, ...(status ? { status } : {}) },
   });
 
   await logAudit({

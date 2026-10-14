@@ -10,6 +10,7 @@ type Endpoint = keyof OurFileRouter;
 const ENDPOINT_ACCEPT: Record<Endpoint, string> = {
   proofOfPayment: 'image/jpeg,image/png,image/webp,application/pdf',
   assetImage:     'image/jpeg,image/png,image/webp',
+  studentPhoto:   'image/jpeg,image/png,image/webp',
   bookCover:      'image/jpeg,image/png,image/webp',
 };
 

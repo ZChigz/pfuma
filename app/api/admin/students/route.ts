@@ -1,9 +1,23 @@
+import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { apiSuccess, apiUnauthorized, apiError, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canManageStudents } from '@/lib/permissions';
-import { CreateAdminStudentSchema } from '@/lib/validations/admin';
+import {
+  fieldErrors,
+  RegisterStudentRequestSchema,
+  RegisterStudentSchema,
+} from '@/lib/students/registration';
+import {
+  checkRegistration,
+  findOrCreateClass,
+  nextSequences,
+  StudentNumberExhaustedError,
+  studentRecord,
+  takeStudentNumber,
+  withStudentNumberRetry,
+} from '@/lib/students/server';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -38,40 +52,60 @@ async function _POST(req: NextRequest) {
 
   try { await canManageStudents(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
-  const parsed = await parseBody(req, CreateAdminStudentSchema);
-  if ('error' in parsed) return parsed.error;
-  const { fullName, classId, parentName, parentPhone } = parsed.data;
+  const body = await parseBody(req, RegisterStudentRequestSchema);
+  if ('error' in body) return body.error;
 
-  const schoolClass = await prisma.schoolClass.findUnique({ where: { id: classId } });
-  if (!schoolClass || schoolClass.schoolId !== user.schoolId) return apiError('Class not found', 404);
-
-  const student = await prisma.$transaction(async (tx) => {
-    const s = await tx.student.create({
-      data: {
-        schoolId: user.schoolId,
-        fullName,
-        grade: schoolClass.grade,
-        classId: schoolClass.id,
-        parentName,
-        parentPhone,
-        portalToken: crypto.randomUUID(),
-      },
-    });
-    await logAudit(
-      {
-        schoolId:   user.schoolId,
-        actorId:    user.id,
-        action:     'CREATE_STUDENT',
-        entityType: 'Student',
-        entityId:   s.id,
-        detail:     `${fullName} — ${schoolClass.name}`,
-      },
-      tx,
+  const parsed = RegisterStudentSchema.safeParse(body.data.student);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { success: false, message: 'Please fix the highlighted fields', errors: fieldErrors(parsed.error) },
+      { status: 422 },
     );
-    return s;
-  });
+  }
+  const data = parsed.data;
 
-  return apiSuccess({ student }, 201);
+  // Soft rules: the admin must have seen and accepted every warning.
+  const check = await checkRegistration(user.schoolId, data);
+  const acknowledged = new Set(body.data.acknowledgedWarnings);
+  const unacknowledged = check.warnings.filter((w) => !acknowledged.has(w.code));
+  if (unacknowledged.length > 0) {
+    return NextResponse.json(
+      { success: false, message: 'Please review the warnings before saving', warnings: check.warnings },
+      { status: 409 },
+    );
+  }
+
+  try {
+    const student = await withStudentNumberRetry(() =>
+      prisma.$transaction(async (tx) => {
+        const schoolClass = await findOrCreateClass(tx, user.schoolId, user.id, data.form, data.stream);
+        const sequences = await nextSequences(tx, user.schoolId, [data.enrollmentYear]);
+        const studentNumber = takeStudentNumber(sequences, data.enrollmentYear);
+
+        const s = await tx.student.create({
+          data: studentRecord(user.schoolId, schoolClass.id, studentNumber, data),
+          include: { class: { select: { id: true, name: true } } },
+        });
+        await logAudit(
+          {
+            schoolId:   user.schoolId,
+            actorId:    user.id,
+            action:     'CREATE_STUDENT',
+            entityType: 'Student',
+            entityId:   s.id,
+            detail:     `${studentNumber} ${data.fullName} — ${schoolClass.name}`
+              + (check.warnings.length ? ` (accepted warnings: ${check.warnings.map((w) => w.code).join(', ')})` : ''),
+          },
+          tx,
+        );
+        return s;
+      }),
+    );
+    return apiSuccess({ student }, 201);
+  } catch (e) {
+    if (e instanceof StudentNumberExhaustedError) return apiError(e.message, 409);
+    throw e;
+  }
 }
 
 type H = (req: Request, ctx?: unknown) => Promise<Response>;

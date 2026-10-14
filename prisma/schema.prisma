@@ -58,6 +58,19 @@ enum ExpenseRequestType {
   OTHER
 }
 
+enum Gender {
+  M
+  F
+}
+
+enum StudentStatus {
+  ACTIVE
+  TRANSFERRED
+  SUSPENDED
+  GRADUATED
+  WITHDRAWN
+}
+
 enum SubjectType {
   CORE
   ELECTIVE
@@ -141,6 +154,7 @@ enum AuditAction {
   APPROVE_EXPENSE_REQUEST
   REJECT_EXPENSE_REQUEST
   DISBURSE_EXPENSE_REQUEST
+  UPDATE_SCHOOL_SETTINGS
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
@@ -150,6 +164,8 @@ model School {
   name        String
   location    String?
   currentTerm String?
+  // Soft limit — registering beyond it shows a warning the admin can override.
+  maxClassSize Int     @default(45)
   createdAt   DateTime @default(now())
 
   users              User[]
@@ -242,14 +258,34 @@ model SchoolClass {
 model Student {
   id          String   @id @default(cuid())
   schoolId    String
-  fullName    String
-  grade       String
+  fullName    String   // firstName + surname for registered students
+  grade       String   // the form, e.g. "Form 2"
   classId     String?
-  parentName  String
-  parentPhone String
-  active      Boolean  @default(true)
+  parentName  String   // guardian name
+  parentPhone String   // guardian phone, +263XXXXXXXXX for registered students
+  active      Boolean  @default(true) // kept equal to (status == ACTIVE)
   portalToken String   @unique @default(cuid())
   createdAt   DateTime @default(now())
+
+  // Registration details. Nullable because students created before the
+  // registration form existed do not have them.
+  studentNumber          String?        // STU + enrollment year + 4-digit sequence
+  firstName              String?
+  surname                String?
+  gender                 Gender?
+  dateOfBirth            DateTime?      @db.Date
+  enrollmentYear         Int?
+  guardianRelationship   String?
+  houseNumber            String?
+  suburb                 String?
+  city                   String?
+  address                String?        // houseNumber, suburb, city combined
+  status                 StudentStatus  @default(ACTIVE)
+  birthCertificateNumber String?
+  previousSchool         String?
+  secondGuardianPhone    String?
+  medicalNotes           String?
+  photoUrl               String?
 
   school      School       @relation(fields: [schoolId], references: [id])
   class       SchoolClass? @relation(fields: [classId], references: [id])
@@ -258,8 +294,10 @@ model Student {
   marks       Mark[]
   termResults TermResult[]
 
+  @@unique([schoolId, studentNumber])
   @@index([schoolId])
   @@index([schoolId, classId])
+  @@index([schoolId, surname, firstName])
 }
 
 model FeeStructure {
