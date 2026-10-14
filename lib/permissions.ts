@@ -8,7 +8,8 @@ export const Permission = {
   manageStudents:     ['ADMIN', 'DIRECTOR', 'HEAD']                    as UserRole[],
   applyCharge:        ['ADMIN', 'DIRECTOR', 'HEAD']                    as UserRole[],
   bulkApplyFees:      ['ADMIN', 'DIRECTOR', 'HEAD']                    as UserRole[],
-  verifyPayment:      ['BURSAR', 'HEAD', 'DIRECTOR']                   as UserRole[],
+  // The bursar records payments; someone else verifies them.
+  verifyPayment:      ['HEAD', 'DIRECTOR']                             as UserRole[],
   voidPayment:        ['DIRECTOR']                                     as UserRole[],
   recordPayment:      ['BURSAR', 'HEAD', 'DIRECTOR', 'ADMIN']          as UserRole[],
   recordExpense:      ['BURSAR', 'HEAD', 'DIRECTOR']                   as UserRole[],
