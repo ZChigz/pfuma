@@ -216,7 +216,7 @@ export function PaymentModal({ open, student, onSuccess, onClose }: Props) {
 
         {/* Currency toggle */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-[#292524]">Currency</span>
+          <span className="text-sm font-medium text-ink">Currency</span>
           <div className="flex gap-2">
             {(['USD', 'ZIG'] as const).map((c) => (
               <button
@@ -227,10 +227,10 @@ export function PaymentModal({ open, student, onSuccess, onClose }: Props) {
                   setValue('currency', c, { shouldValidate: true });
                 }}
                 disabled={paidInZig && c === 'ZIG'}
-                className={`min-h-[44px] flex-1 rounded-md border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#065f46]/40 ${
+                className={`min-h-[44px] flex-1 rounded-xl border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 ${
                   currency === c
-                    ? 'border-[#065f46] bg-[#065f46] text-white'
-                    : 'border-[#e7e5e4] bg-white text-[#78716c] hover:border-[#065f46]/50 hover:bg-stone-50'
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-line bg-white text-muted hover:border-primary/50 hover:bg-rowhover'
                 } ${paidInZig && c === 'ZIG' ? 'cursor-not-allowed opacity-40' : ''}`}
               >
                 {c === 'USD' ? 'USD' : 'ZiG'}
@@ -238,7 +238,7 @@ export function PaymentModal({ open, student, onSuccess, onClose }: Props) {
             ))}
           </div>
           {exchangeRate && (
-            <p className="rounded bg-[#f5f5f4] px-3 py-1 text-xs text-[#78716c]">
+            <p className="rounded bg-canvas px-3 py-1 text-xs text-muted">
               Current rate: 1 USD = ZiG {exchangeRate.usdToZig.toFixed(2)}
               {exchangeRate.createdAt && ` (updated ${formatDate(new Date(exchangeRate.createdAt))})`}
             </p>
@@ -252,9 +252,9 @@ export function PaymentModal({ open, student, onSuccess, onClose }: Props) {
               type="checkbox"
               checked={paidInZig}
               onChange={handleZigToggle}
-              className="h-4 w-4 rounded border-[#e7e5e4] accent-[#065f46]"
+              className="h-4 w-4 rounded border-line accent-primary"
             />
-            <span className="text-sm font-medium text-[#292524]">Parent is paying in ZiG</span>
+            <span className="text-sm font-medium text-ink">Parent is paying in ZiG</span>
           </label>
         )}
 
@@ -262,14 +262,14 @@ export function PaymentModal({ open, student, onSuccess, onClose }: Props) {
         {paidInZig ? (
           <div className="flex flex-col gap-2">
             {!exchangeRate ? (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+              <div className="rounded-xl border border-transparent bg-danger-bg px-3 py-2.5 text-sm text-danger">
                 No rate set. Go to Settings → Exchange Rate to set today&apos;s rate.
               </div>
             ) : (
               <>
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="zig-amount" className="text-sm font-medium text-[#292524]">
-                    ZiG Amount Received <span className="text-red-500">*</span>
+                  <label htmlFor="zig-amount" className="text-sm font-medium text-ink">
+                    ZiG Amount Received <span className="text-danger">*</span>
                   </label>
                   <input
                     id="zig-amount"
@@ -281,18 +281,18 @@ export function PaymentModal({ open, student, onSuccess, onClose }: Props) {
                       handleZigInput(e.target.value ? Number(e.target.value) : undefined)
                     }
                     placeholder="e.g. 8000"
-                    className="block min-h-[44px] w-full rounded-md border border-[#e7e5e4] bg-white px-3 py-2 text-sm text-[#292524] placeholder-[#a8a29e] focus:border-[#065f46] focus:outline-none focus:ring-2 focus:ring-[#065f46]/20"
+                    className="block min-h-[44px] w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder-subtle focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
-                  <p className="text-xs text-[#78716c]">Outstanding: {formatUSD(student.balanceUSD)}</p>
+                  <p className="text-xs text-muted">Outstanding: {formatUSD(student.balanceUSD)}</p>
                 </div>
 
                 {zigAmountInput && zigAmountInput > 0 && (
-                  <div className="rounded-md border border-[#15803d] bg-[#f0fdf4] px-3 py-2.5">
-                    <p className="mb-1 text-xs font-semibold text-[#15803d]">Conversion</p>
+                  <div className="rounded-xl border border-success bg-success-bg px-3 py-2.5">
+                    <p className="mb-1 text-xs font-semibold text-success">Conversion</p>
                     <div className="flex items-center justify-between gap-2 text-sm">
-                      <span className="text-[#292524]">{formatZiG(zigAmountInput)}</span>
-                      <span className="text-[#78716c]">÷ {exchangeRate.usdToZig.toFixed(2)}</span>
-                      <span className="font-bold text-[#065f46]">
+                      <span className="text-ink">{formatZiG(zigAmountInput)}</span>
+                      <span className="text-muted">÷ {exchangeRate.usdToZig.toFixed(2)}</span>
+                      <span className="font-bold text-primary">
                         = {formatUSD(Math.round((zigAmountInput / exchangeRate.usdToZig) * 100) / 100)}
                       </span>
                     </div>
@@ -316,7 +316,7 @@ export function PaymentModal({ open, student, onSuccess, onClose }: Props) {
               {...register('amount', { valueAsNumber: true })}
             />
             {currency === 'ZIG' && student.balanceUSD > 0 && amount > 0 && exchangeRate && (
-              <p className="text-xs text-[#78716c]">
+              <p className="text-xs text-muted">
                 {formatZiG(amount)} = approx. {formatUSD(amount / exchangeRate.usdToZig)} at current rate
               </p>
             )}
@@ -325,17 +325,17 @@ export function PaymentModal({ open, student, onSuccess, onClose }: Props) {
 
         {/* Method toggle */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-[#292524]">Payment Method</span>
+          <span className="text-sm font-medium text-ink">Payment Method</span>
           <div className="grid grid-cols-4 gap-2">
             {METHODS.map((m) => (
               <button
                 key={m.value}
                 type="button"
                 onClick={() => setValue('method', m.value, { shouldValidate: true })}
-                className={`min-h-[44px] rounded-md border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#065f46]/40 ${
+                className={`min-h-[44px] rounded-xl border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 ${
                   method === m.value
-                    ? 'border-[#065f46] bg-[#065f46] text-white'
-                    : 'border-[#e7e5e4] bg-white text-[#78716c] hover:border-[#065f46]/50 hover:bg-stone-50'
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-line bg-white text-muted hover:border-primary/50 hover:bg-rowhover'
                 }`}
               >
                 {m.label}
@@ -357,7 +357,7 @@ export function PaymentModal({ open, student, onSuccess, onClose }: Props) {
         {/* Non-cash extras */}
         {isNonCash && (
           <>
-            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+            <div className="flex items-start gap-2 rounded-xl border border-transparent bg-warn-bg px-3 py-2.5 text-sm text-warn">
               <svg
                 className="mt-0.5 h-4 w-4 flex-shrink-0"
                 viewBox="0 0 20 20"

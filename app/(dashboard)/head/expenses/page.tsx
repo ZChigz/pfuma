@@ -1,3 +1,4 @@
+import { StatCard } from '@/components/ui/StatCard';
 import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -64,24 +65,18 @@ export default async function HeadExpensesPage({
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#292524]">Expenses</h1>
-          <p className="mt-0.5 text-sm text-[#78716c]">Track and manage school expenditure</p>
+          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Expenses</h1>
+          <p className="mt-1 text-sm text-muted">Track and manage school expenditure</p>
         </div>
         <LogExpenseModal />
       </div>
 
       {/* Summary cards */}
-      <div className="mb-6 grid grid-cols-2 gap-4">
-        <div className="rounded-xl border border-[#e7e5e4] bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#78716c]">Total USD (active)</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-[#292524]">{formatUSD(totalUSD)}</p>
-        </div>
-        <div className="rounded-xl border border-[#e7e5e4] bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#78716c]">Total ZiG (active)</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-[#292524]">{formatZiG(totalZiG)}</p>
-        </div>
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+        <StatCard hero label="Total spent (USD, active)" value={formatUSD(totalUSD)} />
+        <StatCard label="Total spent (ZiG, active)" value={formatZiG(totalZiG)} />
       </div>
 
       {/* Filters */}
@@ -96,19 +91,19 @@ export default async function HeadExpensesPage({
 
       {/* Table */}
       {expenses.length === 0 ? (
-        <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-12 text-center text-sm text-[#78716c]">
+        <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
           No expenses recorded yet.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-          <table className="w-full text-left text-sm text-[#292524]">
-            <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+        <div className="overflow-x-auto rounded-2xl bg-white">
+          <table className="w-full text-left text-sm text-ink">
+            <thead className="border-b border-line bg-white">
               <tr>
                 {['Date', 'Category', 'Note', 'Currency', 'Amount', 'Recorded By', 'Status', ...(canVoid ? [''] : [])].map(
                   (h, i) => (
                     <th
                       key={i}
-                      className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]"
+                      className="px-4 py-3.5 text-xs font-medium text-subtle"
                     >
                       {h}
                     </th>
@@ -116,22 +111,22 @@ export default async function HeadExpensesPage({
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e7e5e4] bg-white">
+            <tbody className="divide-y divide-line bg-white">
               {expenses.map((e) => {
                 const amount  = e.amount.toNumber();
                 const isVoided = e.status === 'VOIDED';
                 return (
                   <tr key={e.id} className={isVoided ? 'opacity-50' : ''}>
-                    <td className="whitespace-nowrap px-4 py-3 text-[#78716c]">
+                    <td className="whitespace-nowrap px-4 py-3 text-muted">
                       {formatDate(e.spentOn)}
                     </td>
                     <td className="px-4 py-3 font-medium">{e.category}</td>
-                    <td className="px-4 py-3 text-[#78716c]">{e.note ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted">{e.note ?? '—'}</td>
                     <td className="px-4 py-3">{e.currency}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">
                       {e.currency === 'USD' ? formatUSD(amount) : formatZiG(amount)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-[#78716c]">
+                    <td className="px-4 py-3 text-xs text-muted">
                       {e.recorder.fullName}
                     </td>
                     <td className="px-4 py-3">

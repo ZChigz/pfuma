@@ -114,32 +114,32 @@ export function RequestReviewModal({ request }: { request: ReviewableRequest }) 
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">Type</p>
-              <p className="mt-0.5 text-[#292524]">{REQUEST_TYPE_LABELS[request.type]}</p>
+              <p className="text-xs font-medium text-muted">Type</p>
+              <p className="mt-0.5 text-ink">{REQUEST_TYPE_LABELS[request.type]}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">Department</p>
-              <p className="mt-0.5 text-[#292524]">{request.department}</p>
+              <p className="text-xs font-medium text-muted">Department</p>
+              <p className="mt-0.5 text-ink">{request.department}</p>
             </div>
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">Justification</p>
-            <p className="mt-0.5 text-sm text-[#292524]">{request.justification}</p>
+            <p className="text-xs font-medium text-muted">Justification</p>
+            <p className="mt-0.5 text-sm text-ink">{request.justification}</p>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-            <table className="w-full text-left text-sm text-[#292524]">
-              <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+          <div className="overflow-x-auto rounded-2xl bg-white">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-line bg-white">
                 <tr>
                   {['Description', 'Qty', 'Unit Price', 'Total'].map((h) => (
-                    <th key={h} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                    <th key={h} className="px-4 py-3.5 text-xs font-medium text-subtle">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e7e5e4] bg-white">
+              <tbody className="divide-y divide-line bg-white">
                 {request.items.map((item) => (
                   <tr key={item.id}>
                     <td className="px-4 py-2">{item.description}</td>
@@ -150,28 +150,28 @@ export function RequestReviewModal({ request }: { request: ReviewableRequest }) 
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-[#e7e5e4] bg-[#f5f5f4]">
-                  <td colSpan={3} className="px-4 py-2 text-right text-sm font-semibold text-[#292524]">Estimated total</td>
-                  <td className="px-4 py-2 text-sm font-bold tabular-nums text-[#292524]">{formatAmount(request.estimatedTotal)}</td>
+                <tr className="border-t border-line bg-canvas">
+                  <td colSpan={3} className="px-4 py-2 text-right text-sm font-semibold text-ink">Estimated total</td>
+                  <td className="px-4 py-2 text-sm font-bold tabular-nums text-ink">{formatAmount(request.estimatedTotal)}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
 
-          <p className="text-xs text-[#78716c]">
+          <p className="text-xs text-muted">
             Requested by {request.requestedBy.fullName} on {formatDate(request.requestedAt)}
           </p>
 
           {rejecting && (
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="rejection-reason" className="text-sm font-medium text-[#292524]">
-                Reason for rejection<span className="ml-0.5 text-[#b91c1c]" aria-hidden="true">*</span>
+              <label htmlFor="rejection-reason" className="text-sm font-medium text-ink">
+                Reason for rejection<span className="ml-0.5 text-danger" aria-hidden="true">*</span>
               </label>
               <textarea
                 id="rejection-reason"
                 rows={3}
                 placeholder="Explain why this request is being rejected (min. 10 characters)"
-                className="rounded-md border border-[#e7e5e4] bg-white px-3 py-2 text-sm text-[#292524] placeholder:text-[#78716c] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+                className="rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />

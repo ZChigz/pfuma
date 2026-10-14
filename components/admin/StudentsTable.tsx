@@ -91,17 +91,17 @@ export function StudentsTable({ students, classes }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {selected.size > 0 && (
-        <div className="flex items-center justify-between rounded-lg border border-[#e7e5e4] bg-[#fafaf9] px-4 py-2">
-          <p className="text-sm text-[#292524]">{selected.size} student(s) selected</p>
+        <div className="flex items-center justify-between rounded-xl border border-line bg-rowhover px-4 py-2">
+          <p className="text-sm text-ink">{selected.size} student(s) selected</p>
           <Button size="sm" variant="secondary" onClick={openMoveModal}>
             Move to Class
           </Button>
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-        <table className="w-full text-left text-sm text-[#292524]">
-          <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+      <div className="overflow-x-auto rounded-2xl bg-white">
+        <table className="w-full text-left text-sm text-ink">
+          <thead className="border-b border-line bg-white">
             <tr>
               <th className="w-10 px-4 py-3">
                 <input
@@ -109,17 +109,17 @@ export function StudentsTable({ students, classes }: Props) {
                   checked={allSelected}
                   onChange={toggleAll}
                   aria-label="Select all students"
-                  className="h-4 w-4 rounded border-[#e7e5e4] text-[#065f46] focus:ring-[#065f46]/30"
+                  className="h-4 w-4 rounded border-line text-primary focus:ring-primary/30"
                 />
               </th>
               {['Student ID', 'Name', 'Guardian', 'Phone', 'Class', 'Status'].map((h, i) => (
-                <th key={i} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                <th key={i} className="px-4 py-3.5 text-xs font-medium text-subtle">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#e7e5e4] bg-white">
+          <tbody className="divide-y divide-line bg-white">
             {students.map((s) => (
               <tr key={s.id}>
                 <td className="px-4 py-3">
@@ -128,25 +128,22 @@ export function StudentsTable({ students, classes }: Props) {
                     checked={selected.has(s.id)}
                     onChange={() => toggleOne(s.id)}
                     aria-label={`Select ${s.fullName}`}
-                    className="h-4 w-4 rounded border-[#e7e5e4] text-[#065f46] focus:ring-[#065f46]/30"
+                    className="h-4 w-4 rounded border-line text-primary focus:ring-primary/30"
                   />
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-[#78716c]">{s.studentNumber ?? '—'}</td>
+                <td className="px-4 py-3 font-mono text-xs text-muted">{s.studentNumber ?? '—'}</td>
                 <td className="px-4 py-3 font-medium">{s.fullName}</td>
                 <td className="px-4 py-3">{s.parentName}</td>
-                <td className="px-4 py-3 font-mono text-xs text-[#78716c]">{s.parentPhone}</td>
+                <td className="px-4 py-3 font-mono text-xs text-muted">{s.parentPhone}</td>
                 <td className="px-4 py-3">{s.class?.name ?? '—'}</td>
                 <td className="px-4 py-3">
-                  <Badge
-                    label={s.status.charAt(0) + s.status.slice(1).toLowerCase()}
-                    variant={s.active ? 'success' : 'danger'}
-                  />
+                  <Badge label={s.status.charAt(0) + s.status.slice(1).toLowerCase()} variant={s.active ? 'success' : 'danger'} />
                 </td>
               </tr>
             ))}
             {students.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-sm text-[#78716c]">
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted">
                   No students found.
                 </td>
               </tr>
@@ -171,7 +168,7 @@ export function StudentsTable({ students, classes }: Props) {
         }
       >
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-[#78716c]">
+          <p className="text-sm text-muted">
             Move {selected.size} selected student(s) to a different class. Their grade will be updated to match the new class.
           </p>
           <Select

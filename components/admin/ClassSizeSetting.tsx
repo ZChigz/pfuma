@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 
@@ -43,23 +42,21 @@ export function ClassSizeSetting({ initial }: { initial: number }) {
   }
 
   return (
-    <Card>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="sm:w-56">
-          <Input
-            id="maxClassSize"
-            label="Class size limit"
-            type="number"
-            min={1}
-            max={200}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            error={error}
-            hint="Registering beyond this shows a warning"
-          />
-        </div>
-        <Button onClick={save} loading={saving} disabled={value === String(initial)}>Save</Button>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+      <div className="sm:w-56">
+        <Input
+          id="maxClassSize"
+          label="Class size limit"
+          type="number"
+          min={1}
+          max={200}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          error={error}
+          hint="Registering beyond this shows a warning"
+        />
       </div>
-    </Card>
+      <Button onClick={save} loading={saving} disabled={value === String(initial)}>Save</Button>
+    </div>
   );
 }

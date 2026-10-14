@@ -31,30 +31,30 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#292524]">Users</h1>
-          <p className="mt-0.5 text-sm text-[#78716c]">Manage staff accounts and access</p>
+          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Users</h1>
+          <p className="mt-1 text-sm text-muted">Manage staff accounts and access</p>
         </div>
         <AddUserModal />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-        <table className="w-full text-left text-sm text-[#292524]">
-          <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+      <div className="overflow-x-auto rounded-2xl bg-white">
+        <table className="w-full text-left text-sm text-ink">
+          <thead className="border-b border-line bg-white">
             <tr>
               {['Name', 'Email', 'Role', 'Active', 'Actions'].map((h, i) => (
-                <th key={i} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                <th key={i} className="px-4 py-3.5 text-xs font-medium text-subtle">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#e7e5e4] bg-white">
+          <tbody className="divide-y divide-line bg-white">
             {users.map((u) => (
               <tr key={u.id}>
                 <td className="px-4 py-3 font-medium">{u.fullName}</td>
-                <td className="px-4 py-3 font-mono text-xs text-[#78716c]">{u.email}</td>
+                <td className="px-4 py-3 font-mono text-xs text-muted">{u.email}</td>
                 <td className="px-4 py-3">
                   <Badge label={ROLE_LABELS[u.role] ?? u.role} variant="neutral" />
                 </td>
@@ -71,7 +71,7 @@ export default async function AdminUsersPage() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-sm text-[#78716c]">
+                <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
                   No users yet.
                 </td>
               </tr>

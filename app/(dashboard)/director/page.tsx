@@ -170,12 +170,12 @@ export default async function DirectorDashboard({
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#292524]">Profitability</h1>
-          <p className="mt-0.5 text-sm text-[#78716c]">School-wide financial position — read only</p>
+          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Profitability</h1>
+          <p className="mt-1 text-sm text-muted">School-wide financial position — read only</p>
         </div>
         <Link
           href="/director/voids"
-          className="inline-flex min-h-[44px] items-center rounded-md bg-[#065f46] px-4 text-sm font-medium text-white transition-colors hover:bg-[#047857] focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
         >
           Void an entry
         </Link>
@@ -183,17 +183,17 @@ export default async function DirectorDashboard({
 
       {/* ── Net position cards ───────────────────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-[#e7e5e4] bg-[#065f46] p-6 text-white">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200">USD Net Position</p>
+        <div className="term-card rounded-2xl p-6 text-white">
+          <p className="text-sm font-semibold text-emerald-100">USD net position</p>
           <p className="mt-2 text-4xl font-bold tabular-nums">{formatUSD(netUSD)}</p>
-          <p className="mt-2 text-xs text-emerald-200">
+          <p className="relative mt-2 text-xs text-emerald-100/90">
             Collected {formatUSD(collectedUSD)} · Spent {formatUSD(spentUSD)}
           </p>
         </div>
-        <div className="rounded-xl border border-[#f59e0b] bg-amber-50 p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">ZiG Net Position</p>
-          <p className="mt-2 text-4xl font-bold tabular-nums text-amber-900">{formatZiG(netZiG)}</p>
-          <p className="mt-2 text-xs text-amber-700">
+        <div className="rounded-2xl bg-white p-5">
+          <p className="text-xs font-medium text-muted">ZiG net position</p>
+          <p className="mt-2 text-4xl font-bold tabular-nums text-ink">{formatZiG(netZiG)}</p>
+          <p className="mt-2 text-xs text-muted">
             Collected {formatZiG(collectedZiG)} · Spent {formatZiG(spentZiG)}
           </p>
         </div>
@@ -202,18 +202,18 @@ export default async function DirectorDashboard({
       {/* ── Collected vs Outstanding vs Spent per currency ───────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div
-          className="rounded-xl border border-[#e7e5e4] bg-white p-5"
-          style={{ borderLeftColor: '#065f46', borderLeftWidth: '4px' }}
+          className="rounded-2xl bg-white p-5"
+          style={{ borderLeftColor: '#14613f', borderLeftWidth: '4px' }}
         >
-          <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-[#78716c]">USD</p>
+          <p className="mb-4 text-xs font-medium text-muted">USD</p>
           <div className="grid grid-cols-3 gap-2 text-center">
             {[
-              { label: 'Collected',   value: formatUSD(collectedUSD), color: '#065f46' },
+              { label: 'Collected',   value: formatUSD(collectedUSD), color: '#14613f' },
               { label: 'Outstanding', value: formatUSD(outstandingUSD), color: '#b91c1c' },
-              { label: 'Spent',       value: formatUSD(spentUSD),     color: '#78716c' },
+              { label: 'Spent',       value: formatUSD(spentUSD),     color: '#6b7a70' },
             ].map(({ label, value, color }) => (
               <div key={label}>
-                <p className="text-xs text-[#78716c]">{label}</p>
+                <p className="text-xs text-muted">{label}</p>
                 <p className="mt-1 text-base font-bold tabular-nums" style={{ color }}>{value}</p>
               </div>
             ))}
@@ -221,18 +221,18 @@ export default async function DirectorDashboard({
         </div>
 
         <div
-          className="rounded-xl border border-[#e7e5e4] bg-white p-5"
+          className="rounded-2xl bg-white p-5"
           style={{ borderLeftColor: '#f59e0b', borderLeftWidth: '4px' }}
         >
-          <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-[#78716c]">ZiG</p>
+          <p className="mb-4 text-xs font-medium text-muted">ZiG</p>
           <div className="grid grid-cols-3 gap-2 text-center">
             {[
-              { label: 'Collected',   value: formatZiG(collectedZiG), color: '#065f46' },
+              { label: 'Collected',   value: formatZiG(collectedZiG), color: '#14613f' },
               { label: 'Outstanding', value: formatZiG(outstandingZiG), color: '#b91c1c' },
-              { label: 'Spent',       value: formatZiG(spentZiG),     color: '#78716c' },
+              { label: 'Spent',       value: formatZiG(spentZiG),     color: '#6b7a70' },
             ].map(({ label, value, color }) => (
               <div key={label}>
-                <p className="text-xs text-[#78716c]">{label}</p>
+                <p className="text-xs text-muted">{label}</p>
                 <p className="mt-1 text-base font-bold tabular-nums" style={{ color }}>{value}</p>
               </div>
             ))}
@@ -245,17 +245,17 @@ export default async function DirectorDashboard({
         <CurrencyToggle current={currency} />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-[#e7e5e4] bg-white p-5">
-          <h2 className="mb-4 text-sm font-semibold text-[#292524]">
+        <div className="rounded-2xl bg-white p-5">
+          <h2 className="mb-3 text-base font-semibold text-ink">
             Expenses by Category{' '}
-            <span className="font-normal text-[#78716c]">({currency})</span>
+            <span className="font-normal text-muted">({currency})</span>
           </h2>
           <ExpensePieChart data={expensesByCategory} currency={currency} />
         </div>
-        <div className="rounded-xl border border-[#e7e5e4] bg-white p-5">
-          <h2 className="mb-4 text-sm font-semibold text-[#292524]">
+        <div className="rounded-2xl bg-white p-5">
+          <h2 className="mb-3 text-base font-semibold text-ink">
             Weekly Collection Trend{' '}
-            <span className="font-normal text-[#78716c]">({currency})</span>
+            <span className="font-normal text-muted">({currency})</span>
           </h2>
           <CollectionTrendChart data={weeklyTrend} currency={currency} />
         </div>
@@ -263,16 +263,16 @@ export default async function DirectorDashboard({
 
       {/* ── Payment methods ───────────────────────────────────────────────────── */}
       <div>
-        <h2 className="mb-3 text-sm font-semibold text-[#292524]">
+        <h2 className="mb-3 text-base font-semibold text-ink">
           Payment Methods{' '}
-          <span className="font-normal text-[#78716c]">({currency}, verified only)</span>
+          <span className="font-normal text-muted">({currency}, verified only)</span>
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {paymentsByMethod.map(({ method, total, count }) => (
-            <div key={method} className="rounded-xl border border-[#e7e5e4] bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">{method}</p>
-              <p className="mt-1.5 text-xl font-bold tabular-nums text-[#292524]">{fmt(total)}</p>
-              <p className="mt-0.5 text-xs text-[#78716c]">
+            <div key={method} className="rounded-2xl bg-white p-5">
+              <p className="text-xs font-medium text-muted">{method}</p>
+              <p className="mt-1.5 text-xl font-bold tabular-nums text-ink">{fmt(total)}</p>
+              <p className="mt-0.5 text-xs text-muted">
                 {count}&nbsp;{count === 1 ? 'payment' : 'payments'}
               </p>
             </div>
@@ -281,21 +281,21 @@ export default async function DirectorDashboard({
       </div>
 
       {/* ── Student status ────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 rounded-xl border border-[#e7e5e4] bg-white p-5 sm:flex-row sm:items-center sm:gap-8">
+      <div className="flex flex-col gap-4 rounded-2xl bg-white p-5 sm:flex-row sm:items-center sm:gap-8">
         <div className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">Students cleared this term</p>
-          <p className="mt-1 text-4xl font-bold text-[#15803d]">{clearedCount}</p>
+          <p className="text-xs font-medium text-muted">Students cleared this term</p>
+          <p className="mt-1 text-4xl font-bold text-success">{clearedCount}</p>
         </div>
-        <div className="hidden h-12 w-px bg-[#e7e5e4] sm:block" />
+        <div className="hidden h-12 w-px bg-line sm:block" />
         <div className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">Students owing</p>
-          <p className="mt-1 text-4xl font-bold text-[#b91c1c]">{owingCount}</p>
+          <p className="text-xs font-medium text-muted">Students owing</p>
+          <p className="mt-1 text-4xl font-bold text-danger">{owingCount}</p>
         </div>
-        <div className="hidden h-12 w-px bg-[#e7e5e4] sm:block" />
+        <div className="hidden h-12 w-px bg-line sm:block" />
         <div className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">Outstanding fees</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-[#292524]">{formatUSD(outstandingUSD)}</p>
-          <p className="text-xs text-[#78716c]">{formatZiG(outstandingZiG)}</p>
+          <p className="text-xs font-medium text-muted">Outstanding fees</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{formatUSD(outstandingUSD)}</p>
+          <p className="text-xs text-muted">{formatZiG(outstandingZiG)}</p>
         </div>
       </div>
 
@@ -303,37 +303,37 @@ export default async function DirectorDashboard({
       {pendingApprovals.length > 0 && (
         <div>
           <div className="mb-3 flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-[#292524]">Pending approvals</h2>
+            <h2 className="text-base font-semibold text-ink">Pending approvals</h2>
             <Badge label={String(pendingApprovals.length)} variant="danger" />
           </div>
-          <p className="mb-3 text-sm text-[#78716c]">
+          <p className="mb-3 text-sm text-muted">
             These requests have been awaiting Head approval for more than 2 days. You can approve or reject them directly.
           </p>
-          <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-            <table className="w-full text-left text-sm text-[#292524]">
-              <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+          <div className="overflow-x-auto rounded-2xl bg-white">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-line bg-white">
                 <tr>
                   {['Request #', 'Title', 'Department', 'Requested By', 'Amount', 'Date', ''].map((h) => (
-                    <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                    <th key={h} className="px-4 py-3.5 text-xs font-medium text-subtle">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e7e5e4] bg-white">
+              <tbody className="divide-y divide-line bg-white">
                 {pendingApprovals.map((r) => (
                   <tr key={r.id}>
                     <td className="px-4 py-3 font-medium">{r.requestNumber}</td>
                     <td className="px-4 py-3">
                       {r.title}
-                      <span className="block text-xs text-[#78716c]">{REQUEST_TYPE_LABELS[r.type]}</span>
+                      <span className="block text-xs text-muted">{REQUEST_TYPE_LABELS[r.type]}</span>
                     </td>
-                    <td className="px-4 py-3 text-[#78716c]">{r.department}</td>
-                    <td className="px-4 py-3 text-[#78716c]">{r.requestedBy.fullName}</td>
+                    <td className="px-4 py-3 text-muted">{r.department}</td>
+                    <td className="px-4 py-3 text-muted">{r.requestedBy.fullName}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">
                       {r.currency === 'USD' ? formatUSD(r.estimatedTotal) : formatZiG(r.estimatedTotal)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-[#78716c]">{formatDate(r.requestedAt)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-muted">{formatDate(r.requestedAt)}</td>
                     <td className="px-4 py-3">
                       <RequestReviewModal request={r} />
                     </td>

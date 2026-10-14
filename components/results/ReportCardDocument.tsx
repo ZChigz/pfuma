@@ -24,30 +24,30 @@ const S = StyleSheet.create({
     paddingTop: 36,
     paddingBottom: 52,
     paddingHorizontal: 40,
-    color: '#292524',
+    color: '#14301f',
   },
 
   // ── Header
   header: { alignItems: 'center', marginBottom: 20 },
-  schoolName: { fontSize: 22, fontFamily: 'Helvetica-Bold', color: '#065f46', marginBottom: 3 },
-  reportTitle: { fontSize: 11, color: '#78716c', letterSpacing: 1.5 },
+  schoolName: { fontSize: 22, fontFamily: 'Helvetica-Bold', color: '#14613f', marginBottom: 3 },
+  reportTitle: { fontSize: 11, color: '#6b7a70', letterSpacing: 1.5 },
 
-  divider: { borderBottomWidth: 1, borderBottomColor: '#e7e5e4', borderBottomStyle: 'solid', marginVertical: 10 },
+  divider: { borderBottomWidth: 1, borderBottomColor: '#e3e9e4', borderBottomStyle: 'solid', marginVertical: 10 },
 
   // ── Info grid
   infoGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 },
   infoCell: { width: '50%', paddingVertical: 4, paddingRight: 8 },
-  infoLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#78716c', textTransform: 'uppercase', marginBottom: 2, letterSpacing: 0.8 },
+  infoLabel: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#6b7a70', textTransform: 'uppercase', marginBottom: 2, letterSpacing: 0.8 },
   infoValue: { fontSize: 11 },
 
   // ── Section heading
-  sectionHead: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#065f46', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 },
+  sectionHead: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#14613f', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 },
 
   // ── Marks table
-  tableHead: { flexDirection: 'row', backgroundColor: '#065f46', paddingVertical: 6, paddingHorizontal: 8 },
+  tableHead: { flexDirection: 'row', backgroundColor: '#14613f', paddingVertical: 6, paddingHorizontal: 8 },
   tableHeadCell: { color: 'white', fontFamily: 'Helvetica-Bold', fontSize: 8 },
-  row: { flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 8, borderBottomWidth: 0.5, borderBottomColor: '#e7e5e4', borderBottomStyle: 'solid' },
-  rowAlt: { backgroundColor: '#f5f5f4' },
+  row: { flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 8, borderBottomWidth: 0.5, borderBottomColor: '#e3e9e4', borderBottomStyle: 'solid' },
+  rowAlt: { backgroundColor: '#f4f6f4' },
 
   colSubject: { width: '42%', paddingRight: 6 },
   colMark:    { width: '14%', textAlign: 'right' },
@@ -56,8 +56,8 @@ const S = StyleSheet.create({
   colGrade:   { width: '15%', textAlign: 'center' },
 
   // ── Remark
-  remarkBox: { marginTop: 16, padding: 10, borderWidth: 1, borderColor: '#e7e5e4', borderStyle: 'solid', borderRadius: 4 },
-  remarkLabel: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#78716c', marginBottom: 4 },
+  remarkBox: { marginTop: 16, padding: 10, borderWidth: 1, borderColor: '#e3e9e4', borderStyle: 'solid', borderRadius: 4 },
+  remarkLabel: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#6b7a70', marginBottom: 4 },
   remarkText: { fontSize: 10, lineHeight: 1.5 },
 
   // ── Footer
@@ -68,9 +68,9 @@ const S = StyleSheet.create({
     right: 40,
     textAlign: 'center',
     fontSize: 8,
-    color: '#78716c',
+    color: '#6b7a70',
     borderTopWidth: 0.5,
-    borderTopColor: '#e7e5e4',
+    borderTopColor: '#e3e9e4',
     borderTopStyle: 'solid',
     paddingTop: 6,
   },
@@ -135,7 +135,7 @@ export function ReportCardDocument({ data }: Props) {
 
         {marks.length === 0 && (
           <View style={S.row}>
-            <Text style={{ color: '#78716c', fontSize: 9 }}>No marks recorded for this term.</Text>
+            <Text style={{ color: '#6b7a70', fontSize: 9 }}>No marks recorded for this term.</Text>
           </View>
         )}
 

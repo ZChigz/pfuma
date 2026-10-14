@@ -26,12 +26,12 @@ export default async function VoidsPage({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#292524]">Void Entries</h1>
-        <p className="mt-0.5 text-sm text-[#78716c]">Void verified payments or expenses</p>
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Void Entries</h1>
+        <p className="mt-1 text-sm text-muted">Void verified payments or expenses</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-[#e7e5e4]">
+      <div className="flex gap-2 border-b border-line">
         {(['payments', 'expenses'] as const).map((t) => (
           <Link
             key={t}
@@ -39,8 +39,8 @@ export default async function VoidsPage({
             className={cn(
               'min-h-[44px] border-b-2 px-4 py-2 text-sm font-medium capitalize transition-colors',
               tab === t
-                ? 'border-[#065f46] text-[#065f46]'
-                : 'border-transparent text-[#78716c] hover:text-[#292524]',
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted hover:text-ink',
             )}
           >
             {t}
@@ -56,11 +56,11 @@ export default async function VoidsPage({
           name="q"
           defaultValue={q}
           placeholder={tab === 'payments' ? 'Search by student or fee label…' : 'Search by category or note…'}
-          className="min-h-[44px] w-full max-w-sm rounded-md border border-[#e7e5e4] bg-white px-3 text-sm text-[#292524] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+          className="min-h-[44px] w-full max-w-sm rounded-xl border border-line bg-white px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
         <button
           type="submit"
-          className="min-h-[44px] rounded-md border border-[#e7e5e4] bg-white px-4 text-sm font-medium text-[#292524] hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+          className="min-h-[44px] rounded-xl border border-line bg-white px-4 text-sm font-medium text-ink hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-primary/40"
         >
           Search
         </button>
@@ -102,39 +102,39 @@ async function PaymentsTabContent({ schoolId, q }: { schoolId: string; q: string
   ]);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <section>
-        <h2 className="mb-3 text-base font-semibold text-[#292524]">Verified Payments</h2>
+        <h2 className="mb-3 text-base font-semibold text-ink">Verified Payments</h2>
         {verified.length === 0 ? (
-          <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-8 text-center text-sm text-[#78716c]">
+          <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
             No verified payments found.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-            <table className="w-full text-left text-sm text-[#292524]">
-              <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+          <div className="overflow-x-auto rounded-2xl bg-white">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-line bg-white">
                 <tr>
                   {['Student', 'Fee Label', 'Method', 'Reference', 'Amount', 'Date', ''].map((h, i) => (
-                    <th key={i} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">{h}</th>
+                    <th key={i} className="px-4 py-3.5 text-xs font-medium text-subtle">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e7e5e4] bg-white">
+              <tbody className="divide-y divide-line bg-white">
                 {verified.map((p) => (
                   <tr key={p.id}>
                     <td className="px-4 py-3">
                       <p className="font-medium">{p.student.fullName}</p>
-                      <p className="text-xs text-[#78716c]">{p.student.grade}</p>
+                      <p className="text-xs text-muted">{p.student.grade}</p>
                     </td>
                     <td className="px-4 py-3">{p.feeLabel}</td>
                     <td className="px-4 py-3">
                       <Badge label={p.method} variant={p.method === 'CASH' ? 'success' : 'neutral'} />
                     </td>
-                    <td className="px-4 py-3 text-[#78716c]">{p.reference ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted">{p.reference ?? '—'}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">
                       {p.currency === 'USD' ? formatUSD(p.amount.toNumber()) : formatZiG(p.amount.toNumber())}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-[#78716c]">{formatDateTime(p.recordedAt)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted">{formatDateTime(p.recordedAt)}</td>
                     <td className="px-4 py-3">
                       <PaymentActionButton paymentId={p.id} action="void" />
                     </td>
@@ -147,38 +147,38 @@ async function PaymentsTabContent({ schoolId, q }: { schoolId: string; q: string
       </section>
 
       <section>
-        <h2 className="mb-3 text-base font-semibold text-[#292524]">Voided Payments</h2>
+        <h2 className="mb-3 text-base font-semibold text-ink">Voided Payments</h2>
         {voided.length === 0 ? (
-          <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-8 text-center text-sm text-[#78716c]">
+          <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
             No voided payments.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-[#e7e5e4] opacity-60">
-            <table className="w-full text-left text-sm text-[#292524]">
-              <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+          <div className="overflow-x-auto rounded-2xl bg-white opacity-60">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-line bg-white">
                 <tr>
                   {['Student', 'Fee Label', 'Method', 'Reference', 'Amount', 'Date', 'Voided By'].map((h, i) => (
-                    <th key={i} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">{h}</th>
+                    <th key={i} className="px-4 py-3.5 text-xs font-medium text-subtle">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e7e5e4] bg-white">
+              <tbody className="divide-y divide-line bg-white">
                 {voided.map((p) => (
                   <tr key={p.id}>
                     <td className="px-4 py-3">
                       <p className="font-medium">{p.student.fullName}</p>
-                      <p className="text-xs text-[#78716c]">{p.student.grade}</p>
+                      <p className="text-xs text-muted">{p.student.grade}</p>
                     </td>
                     <td className="px-4 py-3">{p.feeLabel}</td>
                     <td className="px-4 py-3">
                       <Badge label={p.method} variant="neutral" />
                     </td>
-                    <td className="px-4 py-3 text-[#78716c]">{p.reference ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted">{p.reference ?? '—'}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">
                       {p.currency === 'USD' ? formatUSD(p.amount.toNumber()) : formatZiG(p.amount.toNumber())}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-[#78716c]">{formatDateTime(p.recordedAt)}</td>
-                    <td className="px-4 py-3 text-xs text-[#78716c]">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted">{formatDateTime(p.recordedAt)}</td>
+                    <td className="px-4 py-3 text-xs text-muted">
                       {p.voider?.fullName ?? '—'}
                       {p.voidedAt ? ` · ${formatDateTime(p.voidedAt)}` : ''}
                     </td>
@@ -224,33 +224,33 @@ async function ExpensesTabContent({ schoolId, q }: { schoolId: string; q: string
   ]);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <section>
-        <h2 className="mb-3 text-base font-semibold text-[#292524]">Active Expenses</h2>
+        <h2 className="mb-3 text-base font-semibold text-ink">Active Expenses</h2>
         {active.length === 0 ? (
-          <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-8 text-center text-sm text-[#78716c]">
+          <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
             No active expenses found.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-            <table className="w-full text-left text-sm text-[#292524]">
-              <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+          <div className="overflow-x-auto rounded-2xl bg-white">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-line bg-white">
                 <tr>
                   {['Date', 'Category', 'Note', 'Amount', 'Recorded By', ''].map((h, i) => (
-                    <th key={i} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">{h}</th>
+                    <th key={i} className="px-4 py-3.5 text-xs font-medium text-subtle">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e7e5e4] bg-white">
+              <tbody className="divide-y divide-line bg-white">
                 {active.map((e) => (
                   <tr key={e.id}>
-                    <td className="whitespace-nowrap px-4 py-3 text-[#78716c]">{formatDate(e.spentOn)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-muted">{formatDate(e.spentOn)}</td>
                     <td className="px-4 py-3 font-medium">{e.category}</td>
-                    <td className="px-4 py-3 text-[#78716c]">{e.note ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted">{e.note ?? '—'}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">
                       {e.currency === 'USD' ? formatUSD(e.amount.toNumber()) : formatZiG(e.amount.toNumber())}
                     </td>
-                    <td className="px-4 py-3 text-xs text-[#78716c]">{e.recorder.fullName}</td>
+                    <td className="px-4 py-3 text-xs text-muted">{e.recorder.fullName}</td>
                     <td className="px-4 py-3">
                       <ExpenseVoidButton expenseId={e.id} />
                     </td>
@@ -263,32 +263,32 @@ async function ExpensesTabContent({ schoolId, q }: { schoolId: string; q: string
       </section>
 
       <section>
-        <h2 className="mb-3 text-base font-semibold text-[#292524]">Voided Expenses</h2>
+        <h2 className="mb-3 text-base font-semibold text-ink">Voided Expenses</h2>
         {voided.length === 0 ? (
-          <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-8 text-center text-sm text-[#78716c]">
+          <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
             No voided expenses.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-[#e7e5e4] opacity-60">
-            <table className="w-full text-left text-sm text-[#292524]">
-              <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+          <div className="overflow-x-auto rounded-2xl bg-white opacity-60">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-line bg-white">
                 <tr>
                   {['Date', 'Category', 'Note', 'Amount', 'Recorded By', 'Voided By'].map((h, i) => (
-                    <th key={i} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">{h}</th>
+                    <th key={i} className="px-4 py-3.5 text-xs font-medium text-subtle">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e7e5e4] bg-white">
+              <tbody className="divide-y divide-line bg-white">
                 {voided.map((e) => (
                   <tr key={e.id}>
-                    <td className="whitespace-nowrap px-4 py-3 text-[#78716c]">{formatDate(e.spentOn)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-muted">{formatDate(e.spentOn)}</td>
                     <td className="px-4 py-3 font-medium">{e.category}</td>
-                    <td className="px-4 py-3 text-[#78716c]">{e.note ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted">{e.note ?? '—'}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">
                       {e.currency === 'USD' ? formatUSD(e.amount.toNumber()) : formatZiG(e.amount.toNumber())}
                     </td>
-                    <td className="px-4 py-3 text-xs text-[#78716c]">{e.recorder.fullName}</td>
-                    <td className="px-4 py-3 text-xs text-[#78716c]">{e.voider?.fullName ?? '—'}</td>
+                    <td className="px-4 py-3 text-xs text-muted">{e.recorder.fullName}</td>
+                    <td className="px-4 py-3 text-xs text-muted">{e.voider?.fullName ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

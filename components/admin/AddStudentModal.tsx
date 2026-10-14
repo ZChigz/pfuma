@@ -60,7 +60,7 @@ const toOptions = (list: readonly string[]) => list.map((v) => ({ value: v, labe
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <fieldset className="flex flex-col gap-4">
-      <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#78716c]">{title}</legend>
+      <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">{title}</legend>
       {children}
     </fieldset>
   );
@@ -68,8 +68,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function Notice({ tone, children }: { tone: 'warn' | 'info'; children: ReactNode }) {
   const cls = tone === 'warn'
-    ? 'border-amber-200 bg-amber-50 text-amber-800'
-    : 'border-[#e7e5e4] bg-[#fafaf9] text-[#57534e]';
+    ? 'border-warn-line bg-warn-bg text-warn'
+    : 'border-line bg-rowhover text-muted';
   return <p className={`rounded-md border px-3 py-2 text-xs ${cls}`}>{children}</p>;
 }
 
@@ -260,7 +260,7 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
                     error={errors.enrollmentYear?.message} {...register('enrollmentYear')} />
                 </div>
                 <Input id="className" label="Class" readOnly value={liveClassName}
-                  placeholder="Filled in from form and stream" className="bg-stone-50"
+                  placeholder="Filled in from form and stream" className="bg-canvas"
                   hint={liveClassName
                     ? `${liveCount} of ${maxClassSize} places taken${selectedClass ? '' : ' — this class will be created when you save'}`
                     : undefined} />
@@ -307,8 +307,8 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
                 )}
               </Section>
 
-              <details className="group rounded-lg border border-[#e7e5e4] px-4 py-3">
-                <summary className="cursor-pointer text-sm font-medium text-[#292524]">Optional details</summary>
+              <details className="group rounded-lg border border-line px-4 py-3">
+                <summary className="cursor-pointer text-sm font-medium text-ink">Optional details</summary>
                 <div className="mt-4 flex flex-col gap-4">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Input id="birthCertificateNumber" label="Birth certificate number"
@@ -320,16 +320,16 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
                       error={errors.secondGuardianPhone?.message} {...register('secondGuardianPhone')} />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="medicalNotes" className="text-sm font-medium text-[#292524]">Medical conditions / allergies</label>
+                    <label htmlFor="medicalNotes" className="text-sm font-medium text-ink">Medical conditions / allergies</label>
                     <textarea id="medicalNotes" rows={3} placeholder="e.g. Asthma — carries an inhaler"
                       aria-invalid={!!errors.medicalNotes}
-                      className="rounded-md border border-[#e7e5e4] bg-white px-3 py-2 text-sm text-[#292524] placeholder:text-[#78716c] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+                      className="rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
                       {...register('medicalNotes')} />
-                    {errors.medicalNotes && <p role="alert" className="text-xs text-[#b91c1c]">{errors.medicalNotes.message}</p>}
+                    {errors.medicalNotes && <p role="alert" className="text-xs text-danger">{errors.medicalNotes.message}</p>}
                   </div>
                   <FileUpload key={uploadKey} endpoint="studentPhoto" label="Student photo"
                     onUpload={(url) => setValue('photoUrl', url, { shouldValidate: true })} />
-                  {errors.photoUrl && <p role="alert" className="text-xs text-[#b91c1c]">{errors.photoUrl.message}</p>}
+                  {errors.photoUrl && <p role="alert" className="text-xs text-danger">{errors.photoUrl.message}</p>}
                 </div>
               </details>
             </form>
@@ -351,11 +351,11 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
           {/* ── Step 3: saved ──────────────────────────────────────────── */}
           {step === 'saved' && saved && (
             <div className="flex flex-col gap-4">
-              <p className="text-sm text-[#292524]">
+              <p className="text-sm text-ink">
                 <span className="font-medium">{saved.fullName}</span> has been registered in {saved.className}.
               </p>
               <Input id="studentNumber" label="Student ID" readOnly value={saved.studentNumber}
-                className="bg-stone-50 font-mono text-base"
+                className="bg-canvas font-mono text-base"
                 hint="Generated automatically and cannot be changed." />
             </div>
           )}
@@ -403,18 +403,18 @@ function ReviewDetails({
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-sm text-[#78716c]">Check everything below. Names, phone numbers and the address are shown exactly as they will be saved.</p>
+      <p className="text-sm text-muted">Check everything below. Names, phone numbers and the address are shown exactly as they will be saved.</p>
 
       {review.warnings.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-900">Please confirm before saving</p>
+        <div className="flex flex-col gap-2 rounded-lg border border-warn-line bg-warn-bg p-4">
+          <p className="text-sm font-semibold text-warn">Please confirm before saving</p>
           {review.warnings.map((w) => (
-            <label key={w.code} className="flex items-start gap-2 text-sm text-amber-900">
+            <label key={w.code} className="flex items-start gap-2 text-sm text-warn">
               <input
                 type="checkbox"
                 checked={accepted.has(w.code)}
                 onChange={() => onToggle(w.code)}
-                className="mt-0.5 h-4 w-4 rounded border-amber-300 text-[#065f46] focus:ring-[#065f46]/30"
+                className="mt-0.5 h-4 w-4 rounded border-warn-line text-primary focus:ring-primary/30"
               />
               <span>{w.message} <span className="font-medium">I have checked this — save anyway.</span></span>
             </label>
@@ -424,12 +424,12 @@ function ReviewDetails({
 
       {groups.map((g) => (
         <div key={g.title}>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#78716c]">{g.title}</h3>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{g.title}</h3>
           <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-[180px_1fr]">
             {g.rows.map(([label, value]) => (
               <div key={label} className="contents">
-                <dt className="text-[#78716c]">{label}</dt>
-                <dd className="break-words text-[#292524]">{value === null || value === '' ? '—' : value}</dd>
+                <dt className="text-muted">{label}</dt>
+                <dd className="break-words text-ink">{value === null || value === '' ? '—' : value}</dd>
               </div>
             ))}
           </dl>

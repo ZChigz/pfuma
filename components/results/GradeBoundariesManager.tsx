@@ -113,16 +113,16 @@ export function GradeBoundariesManager() {
 
   if (loading) {
     return (
-      <p className="py-4 text-center text-sm text-[#78716c]">Loading grade boundaries…</p>
+      <p className="py-4 text-center text-sm text-muted">Loading grade boundaries…</p>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[#292524]">Grade Boundaries</h2>
-          <p className="text-sm text-[#78716c]">
+          <h2 className="text-base font-semibold text-ink">Grade Boundaries</h2>
+          <p className="text-sm text-muted">
             Define the percentage ranges that map to letter grades. Must cover 0–100 with no gaps or overlaps.
           </p>
         </div>
@@ -130,7 +130,7 @@ export function GradeBoundariesManager() {
           <button
             type="button"
             onClick={addRow}
-            className="rounded-lg border border-[#e7e5e4] bg-white px-3 py-2 text-sm font-medium text-[#292524] transition hover:bg-[#f5f5f4]"
+            className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-medium text-ink transition hover:bg-rowhover"
           >
             + Add Row
           </button>
@@ -138,7 +138,7 @@ export function GradeBoundariesManager() {
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="rounded-lg bg-[#065f46] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#047857] disabled:opacity-60"
+            className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:opacity-60"
           >
             {saving ? 'Saving…' : 'Save All'}
           </button>
@@ -146,23 +146,23 @@ export function GradeBoundariesManager() {
       </div>
 
       {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+        <p className="rounded-xl border border-transparent bg-danger-bg px-4 py-2 text-sm text-danger">
           {error}
         </p>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-        <table className="w-full text-left text-sm text-[#292524]">
-          <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+      <div className="overflow-x-auto rounded-2xl bg-white">
+        <table className="w-full text-left text-sm text-ink">
+          <thead className="border-b border-line bg-white">
             <tr>
               {['Min %', 'Max %', 'Letter Grade', ''].map((h, i) => (
-                <th key={i} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                <th key={i} className="px-4 py-3.5 text-xs font-medium text-subtle">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#e7e5e4] bg-white">
+          <tbody className="divide-y divide-line bg-white">
             {rows.map((row, idx) => (
               <tr key={idx}>
                 <td className="px-4 py-2">
@@ -172,7 +172,7 @@ export function GradeBoundariesManager() {
                     max={100}
                     value={row.minPercent}
                     onChange={(e) => updateRow(idx, 'minPercent', e.target.value)}
-                    className="w-20 rounded-md border border-[#e7e5e4] px-2 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+                    className="w-20 rounded-xl border border-line px-2 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </td>
                 <td className="px-4 py-2">
@@ -182,7 +182,7 @@ export function GradeBoundariesManager() {
                     max={100}
                     value={row.maxPercent}
                     onChange={(e) => updateRow(idx, 'maxPercent', e.target.value)}
-                    className="w-20 rounded-md border border-[#e7e5e4] px-2 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+                    className="w-20 rounded-xl border border-line px-2 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </td>
                 <td className="px-4 py-2">
@@ -191,14 +191,14 @@ export function GradeBoundariesManager() {
                     maxLength={5}
                     value={row.letterGrade}
                     onChange={(e) => updateRow(idx, 'letterGrade', e.target.value)}
-                    className="w-20 rounded-md border border-[#e7e5e4] px-2 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+                    className="w-20 rounded-xl border border-line px-2 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </td>
                 <td className="px-4 py-2">
                   <button
                     type="button"
                     onClick={() => removeRow(idx)}
-                    className="text-xs text-red-500 hover:text-red-700"
+                    className="text-xs text-danger hover:text-danger"
                     aria-label="Remove row"
                   >
                     Remove
@@ -208,7 +208,7 @@ export function GradeBoundariesManager() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-sm text-[#78716c]">
+                <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted">
                   No boundaries defined. Click &ldquo;+ Add Row&rdquo; to start.
                 </td>
               </tr>

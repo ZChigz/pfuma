@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
+import { StatCard } from '@/components/ui/StatCard';
 import Link from 'next/link';
 import { getDaysOverdue } from '@/lib/utils';
 import type { SessionUser } from '@/types';
@@ -80,53 +81,47 @@ export default async function HeadDashboard() {
     },
   ] as const;
 
-  const toneClasses: Record<string, string> = {
-    amber: 'border-amber-200 bg-amber-50 text-amber-800',
-    red:   'border-red-200 bg-red-50 text-red-800',
-  };
-
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#292524]">Head&apos;s Office</h1>
-        <p className="mt-0.5 text-sm text-[#78716c]">{currentTerm || 'Term not set'} — overview</p>
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Head&apos;s Office</h1>
+        <p className="mt-1 text-sm text-muted">{currentTerm || 'Term not set'} — overview</p>
       </div>
 
       {/* Summary row */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {summaryCards.map((c) => (
-          <Link
+        {summaryCards.map((c, i) => (
+          <StatCard
             key={c.label}
+            label={c.label}
+            value={c.value}
             href={c.href}
-            className={`rounded-xl border px-5 py-4 transition-shadow hover:shadow-md ${
-              c.value > 0 ? toneClasses[c.tone] : 'border-[#e7e5e4] bg-white text-[#292524]'
-            }`}
-          >
-            <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{c.label}</p>
-            <p className="mt-2 text-3xl font-bold tabular-nums">{c.value}</p>
-          </Link>
+            hero={i === 0 && c.value > 0}
+            tone={c.value === 0 ? 'default' : c.tone === 'red' ? 'danger' : 'warning'}
+            note={c.value === 0 ? 'Nothing waiting' : 'Needs your attention'}
+          />
         ))}
       </div>
 
       {/* Quick actions */}
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">Quick Actions</p>
+        <p className="mb-3 text-xs font-medium text-muted">Quick actions</p>
         <div className="flex flex-wrap gap-3">
           <Link
             href="/head/payments"
-            className="inline-flex min-h-[44px] items-center rounded-md bg-[#065f46] px-4 text-sm font-medium text-white transition-colors hover:bg-[#047857] focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
           >
             Verify pending payments
           </Link>
           <Link
             href="/head/fees"
-            className="inline-flex min-h-[44px] items-center rounded-md border border-[#e7e5e4] bg-white px-4 text-sm font-medium text-[#292524] transition-colors hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+            className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-medium text-ink transition-colors hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
             Apply fees to a grade
           </Link>
           <Link
             href="/head/results"
-            className="inline-flex min-h-[44px] items-center rounded-md border border-[#e7e5e4] bg-white px-4 text-sm font-medium text-[#292524] transition-colors hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+            className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-medium text-ink transition-colors hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
             Publish results
           </Link>

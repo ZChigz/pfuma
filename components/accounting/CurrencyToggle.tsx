@@ -10,7 +10,7 @@ export function CurrencyToggle({ current }: Props) {
   const router = useRouter();
 
   return (
-    <div className="flex gap-1 rounded-lg border border-[#e7e5e4] bg-white p-0.5">
+    <div className="flex gap-1 rounded-xl border border-line bg-white p-0.5">
       {(['USD', 'ZIG'] as const).map((c) => {
         const active = current === c;
         return (
@@ -18,10 +18,10 @@ export function CurrencyToggle({ current }: Props) {
             key={c}
             onClick={() => router.push(`/accounting?currency=${c}`)}
             aria-pressed={active}
-            className={`min-h-[36px] rounded-md px-4 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#065f46]/40 ${
+            className={`min-h-[36px] rounded-xl px-4 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 ${
               active
-                ? 'bg-[#065f46] text-white'
-                : 'text-[#78716c] hover:bg-stone-100 hover:text-[#292524]'
+                ? 'bg-primary text-white'
+                : 'text-muted hover:bg-tint hover:text-ink'
             }`}
           >
             {c === 'ZIG' ? 'ZiG' : 'USD'}

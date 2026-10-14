@@ -28,41 +28,41 @@ export default async function BursarExpensesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#292524]">Direct expenses (pre-approved)</h1>
-        <p className="mt-0.5 text-sm text-[#78716c]">Record routine, low-value expenses that don&apos;t need approval</p>
-        <p className="mt-1 text-xs text-[#78716c]">
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Direct expenses (pre-approved)</h1>
+        <p className="mt-1 text-sm text-muted">Record routine, low-value expenses that don&apos;t need approval</p>
+        <p className="mt-1 text-xs text-muted">
           For purchases above $50, use the Expense Request workflow under Disbursements.
         </p>
       </div>
 
-      <div className="max-w-md rounded-xl border border-[#e7e5e4] bg-white p-4">
+      <div className="max-w-md rounded-2xl bg-white p-4">
         <ExpenseForm />
       </div>
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold text-[#292524]">Today&apos;s expenses</h2>
+        <h2 className="mb-3 text-base font-semibold text-ink">Today&apos;s expenses</h2>
         {expenses.length === 0 ? (
-          <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-12 text-center text-sm text-[#78716c]">
+          <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
             No expenses logged today.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-            <table className="w-full text-left text-sm text-[#292524]">
-              <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+          <div className="overflow-x-auto rounded-2xl bg-white">
+            <table className="w-full text-left text-sm text-ink">
+              <thead className="border-b border-line bg-white">
                 <tr>
                   {['Date', 'Category', 'Note', 'Currency', 'Amount'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                    <th key={h} className="px-4 py-3.5 text-xs font-medium text-subtle">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e7e5e4] bg-white">
+              <tbody className="divide-y divide-line bg-white">
                 {expenses.map((e) => (
                   <tr key={e.id}>
-                    <td className="whitespace-nowrap px-4 py-3 text-[#78716c]">{formatDate(e.spentOn)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-muted">{formatDate(e.spentOn)}</td>
                     <td className="px-4 py-3 font-medium">{e.category}</td>
-                    <td className="px-4 py-3 text-[#78716c]">{e.note ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted">{e.note ?? '—'}</td>
                     <td className="px-4 py-3">{e.currency}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">
                       {e.currency === 'USD' ? formatUSD(e.amount.toNumber()) : formatZiG(e.amount.toNumber())}

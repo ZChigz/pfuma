@@ -116,7 +116,7 @@ export function DisposeModal({ assetId, assetName, open, onClose, onSuccess }: P
     >
       {step === 'form' ? (
         <form id="dispose-form" onSubmit={handleSubmit(onFormValid)} className="flex flex-col gap-4">
-          <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
+          <div className="rounded-xl border border-warn-line bg-warn-bg px-4 py-3 text-sm text-warn">
             This action is permanent. The asset will be marked as disposed and cannot be returned to service.
           </div>
 
@@ -170,11 +170,11 @@ export function DisposeModal({ assetId, assetName, open, onClose, onSuccess }: P
         </form>
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#991b1b]">
+          <div className="rounded-xl border border-danger-line bg-danger-bg px-4 py-3 text-sm text-danger">
             You are about to permanently dispose of <strong>{assetName}</strong>. This cannot be undone.
           </div>
 
-          <div className="divide-y divide-[#e7e5e4] rounded-lg border border-[#e7e5e4]">
+          <div className="divide-y divide-line rounded-xl border border-line">
             {[
               { label: 'Asset',    value: assetName },
               { label: 'Method',   value: formValues.method },
@@ -188,8 +188,8 @@ export function DisposeModal({ assetId, assetName, open, onClose, onSuccess }: P
               },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between px-4 py-2.5">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">{label}</span>
-                <span className="text-sm font-medium text-[#292524]">{value}</span>
+                <span className="text-xs font-medium text-muted">{label}</span>
+                <span className="text-sm font-medium text-ink">{value}</span>
               </div>
             ))}
           </div>

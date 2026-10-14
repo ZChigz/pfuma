@@ -22,26 +22,26 @@ interface ImportResult {
 }
 
 function ReportTable({ title, tone, rows }: { title: string; tone: 'error' | 'warn'; rows: RowReport[] }) {
-  const color = tone === 'error' ? 'text-[#b91c1c]' : 'text-amber-800';
+  const color = tone === 'error' ? 'text-danger' : 'text-warn';
   return (
     <div>
       <h3 className={`mb-2 text-sm font-semibold ${color}`}>{title} ({rows.length})</h3>
-      <div className="max-h-64 overflow-y-auto rounded-lg border border-[#e7e5e4]">
+      <div className="max-h-64 overflow-y-auto rounded-lg border border-line">
         <table className="w-full text-left text-xs">
-          <thead className="sticky top-0 bg-[#f5f5f4] text-[#78716c]">
+          <thead className="sticky top-0 bg-canvas text-muted">
             <tr>
               <th className="px-3 py-2 font-semibold">Row</th>
               <th className="px-3 py-2 font-semibold">Student</th>
               <th className="px-3 py-2 font-semibold">Why</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#e7e5e4] bg-white">
+          <tbody className="divide-y divide-line bg-white">
             {rows.map((r) => (
               <tr key={r.row} className="align-top">
                 <td className="px-3 py-2 tabular-nums">{r.row}</td>
                 <td className="px-3 py-2">
                   {r.name}
-                  {r.studentNumber && <span className="block font-mono text-[#78716c]">{r.studentNumber}</span>}
+                  {r.studentNumber && <span className="block font-mono text-muted">{r.studentNumber}</span>}
                 </td>
                 <td className={`px-3 py-2 ${color}`}>
                   <ul className="list-disc pl-4">
@@ -123,10 +123,10 @@ export function ImportStudentsModal() {
         footer={<Button onClick={handleClose}>Done</Button>}
       >
         <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto pr-1">
-          <div className="flex flex-col gap-2 text-sm text-[#78716c]">
+          <div className="flex flex-col gap-2 text-sm text-muted">
             <p>Every row is checked with the same rules as the Register Student form. Rows with errors or likely duplicates are skipped; the rest are imported and given a Student ID.</p>
-            <p><span className="font-medium text-[#292524]">Required columns:</span> <code className="font-mono text-xs">{required.join(', ')}</code></p>
-            <p><span className="font-medium text-[#292524]">Optional columns:</span> <code className="font-mono text-xs">{optional.join(', ')}</code></p>
+            <p><span className="font-medium text-ink">Required columns:</span> <code className="font-mono text-xs">{required.join(', ')}</code></p>
+            <p><span className="font-medium text-ink">Optional columns:</span> <code className="font-mono text-xs">{optional.join(', ')}</code></p>
             <p>Dates can be YYYY-MM-DD or DD/MM/YYYY. Gender can be M, F, Male or Female. Form can be &quot;Form 2&quot; or just &quot;2&quot;.</p>
             <div>
               <Button size="sm" variant="ghost" onClick={downloadTemplate}>Download template</Button>
@@ -142,19 +142,19 @@ export function ImportStudentsModal() {
               const file = e.target.files?.[0];
               if (file) handleFile(file);
             }}
-            className="block w-full text-sm text-[#292524] file:mr-4 file:min-h-[44px] file:rounded-md file:border-0 file:bg-[#065f46] file:px-4 file:text-sm file:font-medium file:text-white hover:file:bg-[#047857]"
+            className="block w-full text-sm text-ink file:mr-4 file:min-h-[44px] file:rounded-xl file:border-0 file:bg-primary file:px-4 file:text-sm file:font-medium file:text-white hover:file:bg-primary-hover"
           />
-          {busy && <p className="text-sm text-[#78716c]">Checking and importing…</p>}
+          {busy && <p className="text-sm text-muted">Checking and importing…</p>}
 
           {result && (
             <div className="flex flex-col gap-4">
-              <div className="rounded-lg border border-[#e7e5e4] bg-[#fafaf9] p-4 text-sm text-[#292524]">
+              <div className="rounded-lg border border-line bg-rowhover p-4 text-sm text-ink">
                 <p className="font-medium">
                   {result.imported} of {result.totalRows} student(s) imported
                   {result.failed.length > 0 && `, ${result.failed.length} row(s) not imported`}.
                 </p>
                 {result.failed.length > 0 && (
-                  <p className="mt-1 text-xs text-[#78716c]">Fix the rows below and import just those rows again.</p>
+                  <p className="mt-1 text-xs text-muted">Fix the rows below and import just those rows again.</p>
                 )}
               </div>
               {result.failed.length > 0 && <ReportTable title="Not imported" tone="error" rows={result.failed} />}

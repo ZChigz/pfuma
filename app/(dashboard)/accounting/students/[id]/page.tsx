@@ -68,7 +68,7 @@ export default async function StudentDetailPage({
       {/* Back navigation */}
       <Link
         href="/accounting/students"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-[#78716c] hover:text-[#292524]"
+        className="mb-4 inline-flex items-center gap-1 text-sm text-muted hover:text-ink"
       >
         <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path
@@ -82,12 +82,12 @@ export default async function StudentDetailPage({
 
       {/* Student heading */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#292524]">{student.fullName}</h1>
-        <p className="mt-0.5 text-sm text-[#78716c]">{student.grade}</p>
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">{student.fullName}</h1>
+        <p className="mt-1 text-sm text-muted">{student.grade}</p>
       </div>
 
       {/* Info card */}
-      <div className="mb-6 rounded-xl border border-[#e7e5e4] bg-white p-5">
+      <div className="mb-6 rounded-2xl bg-white p-5">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <InfoItem label="Grade"              value={student.grade}       />
           <InfoItem label="Parent / Guardian"  value={student.parentName}  />
@@ -111,8 +111,8 @@ export default async function StudentDetailPage({
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-[#78716c]">{label}</p>
-      <p className="mt-0.5 text-sm font-medium text-[#292524]">{value}</p>
+      <p className="text-xs font-medium   text-muted">{label}</p>
+      <p className="mt-0.5 text-sm font-medium text-ink">{value}</p>
     </div>
   );
 }

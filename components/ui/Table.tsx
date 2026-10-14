@@ -21,7 +21,7 @@ function SkeletonRow({ cols }: { cols: number }) {
     <tr aria-hidden="true">
       {Array.from({ length: cols }).map((_, i) => (
         <td key={i} className="px-4 py-3">
-          <div className="h-4 animate-pulse rounded bg-stone-200" />
+          <div className="h-4 animate-pulse rounded-full bg-line" />
         </td>
       ))}
     </tr>
@@ -39,25 +39,25 @@ export function Table<T extends Record<string, unknown>>({
   return (
     <div
       className={cn(
-        'w-full overflow-x-auto rounded-xl border border-[#e7e5e4]',
+        'w-full overflow-x-auto rounded-2xl bg-white',
         className,
       )}
     >
-      <table className="w-full text-left text-sm text-[#292524]">
-        <thead className="sticky top-0 border-b border-[#e7e5e4] bg-[#f5f5f4]">
+      <table className="w-full text-left text-sm text-ink">
+        <thead className="sticky top-0 border-b border-line bg-white">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
                 scope="col"
-                className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]"
+                className="px-4 py-3.5 text-xs font-medium text-subtle"
               >
                 {col.label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#e7e5e4] bg-white">
+        <tbody className="divide-y divide-line bg-white">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => (
               <SkeletonRow key={i} cols={columns.length} />
@@ -66,7 +66,7 @@ export function Table<T extends Record<string, unknown>>({
             <tr>
               <td
                 colSpan={columns.length}
-                className="px-4 py-12 text-center text-sm text-[#78716c]"
+                className="px-4 py-12 text-center text-sm text-muted"
               >
                 {emptyMessage}
               </td>
@@ -85,7 +85,7 @@ export function Table<T extends Record<string, unknown>>({
                 className={cn(
                   'transition-colors',
                   onRowClick &&
-                    'cursor-pointer hover:bg-[#f5f5f4] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#065f46]/30',
+                    'cursor-pointer hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary/30',
                 )}
               >
                 {columns.map((col) => (

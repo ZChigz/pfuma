@@ -127,10 +127,10 @@ export function EditClassModal({ schoolClass, teachers }: Props) {
             error={errors.classTeacherId?.message}
             {...register('classTeacherId')}
           />
-          <label className="flex items-center gap-2 text-sm font-medium text-[#292524]">
+          <label className="flex items-center gap-2 text-sm font-medium text-ink">
             <input
               type="checkbox"
-              className="h-4 w-4 rounded border-[#e7e5e4] text-[#065f46] focus:ring-[#065f46]/30"
+              className="h-4 w-4 rounded border-line text-primary focus:ring-primary/30"
               {...register('active')}
             />
             Active

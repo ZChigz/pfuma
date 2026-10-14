@@ -87,7 +87,7 @@ export default function BorrowingPage() {
       key: 'accession',
       label: 'Accession',
       render: (row: BorrowingRow) => (
-        <span className="font-mono text-xs text-[#78716c]">
+        <span className="font-mono text-xs text-muted">
           {(row.copy as BorrowingRow['copy']).accessionNumber}
         </span>
       ),
@@ -107,7 +107,7 @@ export default function BorrowingPage() {
         key: 'daysOverdue',
         label: 'Days Overdue',
         render: (row: BorrowingRow) => (
-          <span className="font-semibold text-[#b91c1c]">{row.daysOverdue}d</span>
+          <span className="font-semibold text-danger">{row.daysOverdue}d</span>
         ),
       },
       {
@@ -117,7 +117,7 @@ export default function BorrowingPage() {
           const rate = parseFloat(process.env.NEXT_PUBLIC_DAILY_FINE_RATE ?? '0');
           const fine = row.daysOverdue * rate;
           return fine > 0 ? (
-            <span className="font-medium text-[#b91c1c]">${fine.toFixed(2)}</span>
+            <span className="font-medium text-danger">${fine.toFixed(2)}</span>
           ) : '—';
         },
       },
@@ -136,7 +136,7 @@ export default function BorrowingPage() {
         label: 'Fine',
         render: (row: BorrowingRow) =>
           row.fineAmount > 0 ? (
-            <span className={row.fineSettled ? 'text-[#78716c] line-through' : 'font-medium text-[#b91c1c]'}>
+            <span className={row.fineSettled ? 'text-muted line-through' : 'font-medium text-danger'}>
               ${row.fineAmount.toFixed(2)}
             </span>
           ) : '—',
@@ -162,21 +162,21 @@ export default function BorrowingPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#292524]">Borrowing</h1>
-        <p className="mt-0.5 text-sm text-[#78716c]">Track book checkouts and returns</p>
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Borrowing</h1>
+        <p className="mt-1 text-sm text-muted">Track book checkouts and returns</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-lg border border-[#e7e5e4] bg-[#f5f5f4] p-1 self-start">
+      <div className="flex gap-1 rounded-xl border border-line bg-canvas p-1 self-start">
         {(['active', 'overdue', 'history'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => handleTabChange(t)}
             className={[
-              'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+              'rounded-xl px-4 py-1.5 text-sm font-medium transition-colors',
               tab === t
-                ? 'bg-white text-[#292524] shadow-sm'
-                : 'text-[#78716c] hover:text-[#292524]',
+                ? 'bg-white text-ink shadow-sm'
+                : 'text-muted hover:text-ink',
             ].join(' ')}
           >
             {t === 'active'  ? `Active (${active.length})` :
@@ -188,7 +188,7 @@ export default function BorrowingPage() {
 
       {/* Overdue warning */}
       {tab === 'overdue' && overdue.length > 0 && (
-        <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
+        <div className="rounded-xl border border-warn-line bg-warn-bg px-4 py-3 text-sm text-warn">
           {overdue.length} borrowing{overdue.length !== 1 ? 's are' : ' is'} past the due date.
           Contact members to arrange returns.
         </div>

@@ -34,17 +34,17 @@ export function StudentsFilters({ currentStatus, currentQ }: StudentsFiltersProp
   return (
     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       {/* Status tabs */}
-      <div className="flex gap-1 rounded-lg border border-[#e7e5e4] bg-white p-1">
+      <div className="flex gap-1 rounded-xl border border-line bg-white p-1">
         {TABS.map((tab) => {
           const active = (currentStatus ?? '') === tab.value;
           return (
             <button
               key={tab.value}
               onClick={() => updateParam('status', tab.value)}
-              className={`min-h-[36px] rounded-md px-3 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#065f46]/40 ${
+              className={`min-h-[36px] rounded-xl px-3 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 ${
                 active
-                  ? 'bg-[#065f46] text-white'
-                  : 'text-[#78716c] hover:bg-stone-100 hover:text-[#292524]'
+                  ? 'bg-primary text-white'
+                  : 'text-muted hover:bg-tint hover:text-ink'
               }`}
             >
               {tab.label}
@@ -56,7 +56,7 @@ export function StudentsFilters({ currentStatus, currentQ }: StudentsFiltersProp
       {/* Search */}
       <div className="relative">
         <svg
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]"
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -76,7 +76,7 @@ export function StudentsFilters({ currentStatus, currentQ }: StudentsFiltersProp
             const val = e.target.value;
             searchTimer.current = setTimeout(() => updateParam('q', val), 350);
           }}
-          className="min-h-[44px] w-full rounded-md border border-[#e7e5e4] bg-white pl-9 pr-3 text-sm text-[#292524] placeholder:text-[#78716c] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30 sm:w-64"
+          className="min-h-[44px] w-full rounded-xl border border-line bg-white pl-9 pr-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 sm:w-64"
         />
       </div>
     </div>

@@ -48,15 +48,15 @@ export function CollectionTrendChart({ data, currency }: Props) {
   return (
     <ResponsiveContainer width="100%" height={264}>
       <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
+        <CartesianGrid strokeDasharray="3 3" stroke="#e3e9e4" />
         <XAxis
           dataKey="week"
-          tick={{ fontSize: 11, fill: '#78716c' }}
+          tick={{ fontSize: 11, fill: '#6b7a70' }}
           tickLine={false}
-          axisLine={{ stroke: '#e7e5e4' }}
+          axisLine={{ stroke: '#e3e9e4' }}
         />
         <YAxis
-          tick={{ fontSize: 11, fill: '#78716c' }}
+          tick={{ fontSize: 11, fill: '#6b7a70' }}
           tickLine={false}
           axisLine={false}
           tickFormatter={fmtTick}
@@ -66,22 +66,22 @@ export function CollectionTrendChart({ data, currency }: Props) {
           formatter={(v: number, name: string) => [fmtTooltip(v), name === 'collected' ? 'Collected' : 'Projected']}
           contentStyle={{
             borderRadius: '8px',
-            border: '1px solid #e7e5e4',
+            border: '1px solid #e3e9e4',
             fontSize: '12px',
           }}
         />
         <Legend
           iconSize={10}
-          wrapperStyle={{ fontSize: '11px', color: '#78716c' }}
+          wrapperStyle={{ fontSize: '11px', color: '#6b7a70' }}
           formatter={(v) => (v === 'collected' ? 'Collected' : 'Projected')}
         />
         <Line
           type="monotone"
           dataKey="collected"
-          stroke="#065f46"
+          stroke="#14613f"
           strokeWidth={2}
-          dot={{ r: 3, fill: '#065f46', strokeWidth: 0 }}
-          activeDot={{ r: 5, fill: '#065f46' }}
+          dot={{ r: 3, fill: '#14613f', strokeWidth: 0 }}
+          activeDot={{ r: 5, fill: '#14613f' }}
           connectNulls={false}
         />
         <Line

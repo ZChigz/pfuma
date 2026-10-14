@@ -63,7 +63,7 @@ export function UserRowActions({ userId, active }: Props) {
         type="button"
         onClick={toggleActive}
         disabled={busy}
-        className="rounded px-2 py-1 text-xs font-medium text-[#065f46] hover:underline focus:outline-none focus:ring-2 focus:ring-[#065f46]/40 disabled:opacity-50"
+        className="rounded px-2 py-1 text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
       >
         {active ? 'Deactivate' : 'Reactivate'}
       </button>
@@ -71,7 +71,7 @@ export function UserRowActions({ userId, active }: Props) {
         type="button"
         onClick={resetPassword}
         disabled={busy}
-        className="rounded px-2 py-1 text-xs font-medium text-[#065f46] hover:underline focus:outline-none focus:ring-2 focus:ring-[#065f46]/40 disabled:opacity-50"
+        className="rounded px-2 py-1 text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
       >
         Reset Password
       </button>
@@ -84,12 +84,12 @@ export function UserRowActions({ userId, active }: Props) {
       >
         {tempPassword && (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-[#78716c]">
+            <p className="text-sm text-muted">
               Share this temporary password with the user. It will not be shown again.
             </p>
-            <div className="rounded-lg border border-[#e7e5e4] bg-[#fafaf9] p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">New Temporary Password</p>
-              <p className="mt-1 font-mono text-lg font-bold tracking-wide text-[#065f46]">{tempPassword}</p>
+            <div className="rounded-xl border border-line bg-rowhover p-4">
+              <p className="text-xs font-medium text-muted">New Temporary Password</p>
+              <p className="mt-1 font-mono text-lg font-bold  text-primary">{tempPassword}</p>
             </div>
           </div>
         )}

@@ -41,8 +41,8 @@ export function ExpenseFilters({
     <div className="mb-4 flex flex-wrap items-end gap-3">
       {/* Currency toggle */}
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#78716c]">Currency</span>
-        <div className="flex gap-1 rounded-lg border border-[#e7e5e4] bg-white p-0.5">
+        <span className="text-xs font-medium   text-muted">Currency</span>
+        <div className="flex gap-1 rounded-xl border border-line bg-white p-0.5">
           {[
             { value: '',    label: 'All' },
             { value: 'USD', label: 'USD' },
@@ -53,10 +53,10 @@ export function ExpenseFilters({
               <button
                 key={opt.value}
                 onClick={() => update('currency', opt.value)}
-                className={`min-h-[36px] rounded-md px-3 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#065f46]/40 ${
+                className={`min-h-[36px] rounded-xl px-3 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 ${
                   active
-                    ? 'bg-[#065f46] text-white'
-                    : 'text-[#78716c] hover:bg-stone-100 hover:text-[#292524]'
+                    ? 'bg-primary text-white'
+                    : 'text-muted hover:bg-tint hover:text-ink'
                 }`}
               >
                 {opt.label}
@@ -68,11 +68,11 @@ export function ExpenseFilters({
 
       {/* Category select */}
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#78716c]">Category</span>
+        <span className="text-xs font-medium   text-muted">Category</span>
         <select
           value={currentCategory ?? ''}
           onChange={(e) => update('category', e.target.value)}
-          className="min-h-[44px] rounded-md border border-[#e7e5e4] bg-white px-3 text-sm text-[#292524] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+          className="min-h-[44px] rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         >
           {CATEGORY_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -84,7 +84,7 @@ export function ExpenseFilters({
 
       {/* Date from */}
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#78716c]">From</span>
+        <span className="text-xs font-medium   text-muted">From</span>
         <input
           type="date"
           defaultValue={currentFrom}
@@ -93,13 +93,13 @@ export function ExpenseFilters({
             const val = e.target.value;
             debounceRef.current = setTimeout(() => update('from', val), 300);
           }}
-          className="min-h-[44px] rounded-md border border-[#e7e5e4] bg-white px-3 text-sm text-[#292524] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+          className="min-h-[44px] rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
       {/* Date to */}
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#78716c]">To</span>
+        <span className="text-xs font-medium   text-muted">To</span>
         <input
           type="date"
           defaultValue={currentTo}
@@ -108,7 +108,7 @@ export function ExpenseFilters({
             const val = e.target.value;
             debounceRef.current = setTimeout(() => update('to', val), 300);
           }}
-          className="min-h-[44px] rounded-md border border-[#e7e5e4] bg-white px-3 text-sm text-[#292524] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+          className="min-h-[44px] rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
     </div>

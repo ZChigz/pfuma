@@ -162,22 +162,22 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
         }
       >
         {result ? (
-          <div className="rounded-lg border border-[#e7e5e4] bg-[#fafaf9] p-4 text-sm">
-            <p className="font-medium text-[#15803d]">
+          <div className="rounded-xl border border-line bg-rowhover p-4 text-sm">
+            <p className="font-medium text-success">
               Applied to {result.applied} student(s).
             </p>
             {result.skipped > 0 && (
-              <p className="mt-1 text-[#78716c]">{result.skipped} student(s) already had this charge for {term}.</p>
+              <p className="mt-1 text-muted">{result.skipped} student(s) already had this charge for {term}.</p>
             )}
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             {/* Step indicator */}
-            <div className="flex items-center gap-2 text-xs font-medium text-[#78716c]">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted">
               {['Scope', 'Fee Structure', 'Term', 'Confirm'].map((label, i) => (
                 <span
                   key={label}
-                  className={i + 1 === step ? 'text-[#065f46]' : i + 1 < step ? 'text-[#15803d]' : ''}
+                  className={i + 1 === step ? 'text-primary' : i + 1 < step ? 'text-success' : ''}
                 >
                   {i + 1}. {label}{i < 3 ? ' →' : ''}
                 </span>
@@ -188,23 +188,23 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
             {step === 1 && (
               <div className="flex flex-col gap-4">
                 <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-sm font-medium text-[#292524]">
+                  <label className="flex items-center gap-2 text-sm font-medium text-ink">
                     <input
                       type="radio"
                       name="scope"
                       checked={scope === 'grade'}
                       onChange={() => { setScope('grade'); setFeeStructureId(''); }}
-                      className="h-4 w-4 text-[#065f46] focus:ring-[#065f46]/30"
+                      className="h-4 w-4 text-primary focus:ring-primary/30"
                     />
                     By Grade
                   </label>
-                  <label className="flex items-center gap-2 text-sm font-medium text-[#292524]">
+                  <label className="flex items-center gap-2 text-sm font-medium text-ink">
                     <input
                       type="radio"
                       name="scope"
                       checked={scope === 'class'}
                       onChange={() => { setScope('class'); setFeeStructureId(''); }}
-                      className="h-4 w-4 text-[#065f46] focus:ring-[#065f46]/30"
+                      className="h-4 w-4 text-primary focus:ring-primary/30"
                     />
                     By Class
                   </label>
@@ -270,28 +270,28 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
             {/* Step 4: Preview / confirm */}
             {step === 4 && (
               <div className="flex flex-col gap-3">
-                <div className="rounded-lg border border-[#e7e5e4] bg-[#fafaf9] p-4 text-sm">
+                <div className="rounded-xl border border-line bg-rowhover p-4 text-sm">
                   <p>
-                    <span className="font-medium text-[#292524]">Scope: </span>
+                    <span className="font-medium text-ink">Scope: </span>
                     {scope === 'class' ? classes.find((c) => c.id === classId)?.name : grade}
                   </p>
                   <p className="mt-1">
-                    <span className="font-medium text-[#292524]">Fee: </span>
+                    <span className="font-medium text-ink">Fee: </span>
                     {selectedFeeStructure?.label} —{' '}
                     {selectedFeeStructure && (selectedFeeStructure.currency === 'USD'
                       ? formatUSD(selectedFeeStructure.amount)
                       : formatZiG(selectedFeeStructure.amount))}
                   </p>
                   <p className="mt-1">
-                    <span className="font-medium text-[#292524]">Term: </span>
+                    <span className="font-medium text-ink">Term: </span>
                     {term}
                   </p>
                   <p className="mt-1">
-                    <span className="font-medium text-[#292524]">Students affected: </span>
+                    <span className="font-medium text-ink">Students affected: </span>
                     {previewCount ?? '—'}
                   </p>
                 </div>
-                <p className="text-xs text-[#78716c]">
+                <p className="text-xs text-muted">
                   Students who already have a &quot;{selectedFeeStructure?.label}&quot; charge for {term} will be skipped.
                 </p>
               </div>

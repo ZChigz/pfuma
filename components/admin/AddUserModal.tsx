@@ -107,7 +107,7 @@ export function AddUserModal() {
             error={errors.role?.message}
             {...register('role')}
           />
-          <p className="text-xs text-[#78716c]">
+          <p className="text-xs text-muted">
             A temporary password will be generated automatically and shown once after the user is created.
           </p>
         </form>
@@ -121,14 +121,14 @@ export function AddUserModal() {
       >
         {credentials && (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-[#78716c]">
+            <p className="text-sm text-muted">
               Share these credentials with the user. The password will not be shown again.
             </p>
-            <div className="rounded-lg border border-[#e7e5e4] bg-[#fafaf9] p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">Email</p>
-              <p className="mt-1 font-mono text-sm text-[#292524]">{credentials.email}</p>
-              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">Temporary Password</p>
-              <p className="mt-1 font-mono text-lg font-bold tracking-wide text-[#065f46]">{credentials.tempPassword}</p>
+            <div className="rounded-xl border border-line bg-rowhover p-4">
+              <p className="text-xs font-medium text-muted">Email</p>
+              <p className="mt-1 font-mono text-sm text-ink">{credentials.email}</p>
+              <p className="mt-3 text-xs font-medium text-muted">Temporary Password</p>
+              <p className="mt-1 font-mono text-lg font-bold  text-primary">{credentials.tempPassword}</p>
             </div>
           </div>
         )}

@@ -137,7 +137,7 @@ export function ReturnModal({ borrowing: propBorrowing, open, onClose, onSuccess
       {!activeBorrowing ? (
         /* ── Search step ─────────────────────────────────────────── */
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-[#78716c]">
+          <p className="text-sm text-muted">
             Enter the accession number printed on the book to look up the active borrowing.
           </p>
           <Input
@@ -149,14 +149,14 @@ export function ReturnModal({ borrowing: propBorrowing, open, onClose, onSuccess
             onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
           />
           {searchError && (
-            <p className="text-sm text-[#b91c1c]">{searchError}</p>
+            <p className="text-sm text-danger">{searchError}</p>
           )}
         </div>
       ) : (
         /* ── Return form ──────────────────────────────────────────── */
         <div className="flex flex-col gap-4">
           {/* Borrowing info */}
-          <div className="divide-y divide-[#e7e5e4] rounded-lg border border-[#e7e5e4]">
+          <div className="divide-y divide-line rounded-xl border border-line">
             {[
               { label: 'Book',        value: activeBorrowing.copy.book.title           },
               { label: 'Accession',   value: activeBorrowing.copy.accessionNumber      },
@@ -165,20 +165,20 @@ export function ReturnModal({ borrowing: propBorrowing, open, onClose, onSuccess
               { label: 'Due Date',    value: formatDate(activeBorrowing.dueDate)       },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between px-4 py-2.5">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">{label}</span>
-                <span className="text-sm text-[#292524]">{value}</span>
+                <span className="text-xs font-medium text-muted">{label}</span>
+                <span className="text-sm text-ink">{value}</span>
               </div>
             ))}
           </div>
 
           {/* Overdue banner */}
           {activeBorrowing.daysOverdue > 0 && (
-            <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3">
-              <p className="font-semibold text-[#92400e]">
+            <div className="rounded-xl border border-warn-line bg-warn-bg px-4 py-3">
+              <p className="font-semibold text-warn">
                 {activeBorrowing.daysOverdue} day{activeBorrowing.daysOverdue !== 1 ? 's' : ''} overdue
               </p>
               {estimatedFine > 0 && (
-                <p className="mt-0.5 text-sm text-[#92400e]">
+                <p className="mt-0.5 text-sm text-warn">
                   Estimated fine: <span className="font-bold">${estimatedFine.toFixed(2)}</span>
                 </p>
               )}
@@ -202,9 +202,9 @@ export function ReturnModal({ borrowing: propBorrowing, open, onClose, onSuccess
                 type="checkbox"
                 checked={fineSettled}
                 onChange={(e) => setFineSettled(e.target.checked)}
-                className="h-4 w-4 rounded border-[#e7e5e4] accent-[#065f46]"
+                className="h-4 w-4 rounded border-line accent-primary"
               />
-              <span className="text-sm text-[#292524]">Fine of ${estimatedFine.toFixed(2)} has been settled</span>
+              <span className="text-sm text-ink">Fine of ${estimatedFine.toFixed(2)} has been settled</span>
             </label>
           )}
         </div>

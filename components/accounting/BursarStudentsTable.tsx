@@ -33,7 +33,7 @@ export function BursarStudentsTable({ students }: Props) {
       key: 'balanceUSD',
       label: 'USD Balance',
       render: (row) => (
-        <span className={`tabular-nums font-medium ${row.balanceUSD > 0 ? 'text-[#b91c1c]' : 'text-[#15803d]'}`}>
+        <span className={`tabular-nums font-medium ${row.balanceUSD > 0 ? 'text-danger' : 'text-success'}`}>
           {formatUSD(row.balanceUSD)}
         </span>
       ),
@@ -42,7 +42,7 @@ export function BursarStudentsTable({ students }: Props) {
       key: 'balanceZiG',
       label: 'ZiG Balance',
       render: (row) => (
-        <span className={`tabular-nums font-medium ${row.balanceZiG > 0 ? 'text-[#b91c1c]' : 'text-[#15803d]'}`}>
+        <span className={`tabular-nums font-medium ${row.balanceZiG > 0 ? 'text-danger' : 'text-success'}`}>
           {formatZiG(row.balanceZiG)}
         </span>
       ),
@@ -53,7 +53,7 @@ export function BursarStudentsTable({ students }: Props) {
       render: (row) => (
         <button
           onClick={() => setPaymentStudent(row)}
-          className="min-h-[36px] rounded-md bg-[#065f46] px-2.5 text-xs font-medium text-white transition-colors hover:bg-[#047857] focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+          className="min-h-[36px] rounded-xl bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/40"
         >
           Record Payment
         </button>

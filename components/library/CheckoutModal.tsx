@@ -143,21 +143,21 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
       <div className="flex flex-col gap-5">
         {/* Member search */}
         <div className="relative flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-[#292524]">
-            Member <span className="text-[#b91c1c]">*</span>
+          <label className="text-sm font-medium text-ink">
+            Member <span className="text-danger">*</span>
           </label>
           {selectedMember ? (
-            <div className="flex items-center justify-between rounded-md border border-[#065f46] bg-[#f0fdf4] px-3 py-2">
+            <div className="flex items-center justify-between rounded-xl border border-primary bg-success-bg px-3 py-2">
               <div>
-                <p className="text-sm font-medium text-[#292524]">{selectedMember.user.fullName}</p>
-                <p className="text-xs text-[#78716c]">
+                <p className="text-sm font-medium text-ink">{selectedMember.user.fullName}</p>
+                <p className="text-xs text-muted">
                   {selectedMember._count.borrowings} active borrowing{selectedMember._count.borrowings !== 1 ? 's' : ''}
                   {selectedMember.borrowingSuspended && ' · ⚠ Suspended'}
                 </p>
               </div>
               <button
                 onClick={() => { setSelectedMember(null); setMemberQ(''); setMemberResults([]); }}
-                className="text-xs text-[#78716c] hover:text-[#292524]"
+                className="text-xs text-muted hover:text-ink"
               >
                 Change
               </button>
@@ -171,18 +171,18 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
                 onChange={(e) => setMemberQ(e.target.value)}
               />
               {(memberResults.length > 0 || memberLoading) && (
-                <div className="absolute top-full z-10 mt-1 w-full rounded-lg border border-[#e7e5e4] bg-white shadow-lg">
+                <div className="absolute top-full z-10 mt-1 w-full rounded-xl border border-line bg-white shadow-lg">
                   {memberLoading ? (
-                    <p className="px-4 py-3 text-sm text-[#78716c]">Searching…</p>
+                    <p className="px-4 py-3 text-sm text-muted">Searching…</p>
                   ) : (
                     memberResults.map((m) => (
                       <button
                         key={m.id}
                         onClick={() => { setSelectedMember(m); setMemberResults([]); }}
-                        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-stone-50"
+                        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-rowhover"
                       >
-                        <span className="font-medium text-[#292524]">{m.user.fullName}</span>
-                        <span className="text-xs text-[#78716c]">{m.user.role}</span>
+                        <span className="font-medium text-ink">{m.user.fullName}</span>
+                        <span className="text-xs text-muted">{m.user.role}</span>
                       </button>
                     ))
                   )}
@@ -194,20 +194,20 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
 
         {/* Book search */}
         <div className="relative flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-[#292524]">
-            Book <span className="text-[#b91c1c]">*</span>
+          <label className="text-sm font-medium text-ink">
+            Book <span className="text-danger">*</span>
           </label>
           {selectedBook ? (
-            <div className="flex items-center justify-between rounded-md border border-[#065f46] bg-[#f0fdf4] px-3 py-2">
+            <div className="flex items-center justify-between rounded-xl border border-primary bg-success-bg px-3 py-2">
               <div>
-                <p className="text-sm font-medium text-[#292524]">{selectedBook.title}</p>
-                <p className="text-xs text-[#78716c]">
+                <p className="text-sm font-medium text-ink">{selectedBook.title}</p>
+                <p className="text-xs text-muted">
                   {selectedBook.availableCopiesCount} available cop{selectedBook.availableCopiesCount !== 1 ? 'ies' : 'y'}
                 </p>
               </div>
               <button
                 onClick={() => { setSelectedBook(null); setBookQ(''); setBookResults([]); setSelectedCopyId(''); }}
-                className="text-xs text-[#78716c] hover:text-[#292524]"
+                className="text-xs text-muted hover:text-ink"
               >
                 Change
               </button>
@@ -221,20 +221,20 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
                 onChange={(e) => setBookQ(e.target.value)}
               />
               {(bookResults.length > 0 || bookLoading) && (
-                <div className="absolute top-full z-10 mt-1 w-full rounded-lg border border-[#e7e5e4] bg-white shadow-lg">
+                <div className="absolute top-full z-10 mt-1 w-full rounded-xl border border-line bg-white shadow-lg">
                   {bookLoading ? (
-                    <p className="px-4 py-3 text-sm text-[#78716c]">Searching…</p>
+                    <p className="px-4 py-3 text-sm text-muted">Searching…</p>
                   ) : bookResults.length === 0 ? (
-                    <p className="px-4 py-3 text-sm text-[#78716c]">No available books found.</p>
+                    <p className="px-4 py-3 text-sm text-muted">No available books found.</p>
                   ) : (
                     bookResults.map((b) => (
                       <button
                         key={b.id}
                         onClick={() => { setSelectedBook(b); setBookResults([]); }}
-                        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-stone-50"
+                        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-rowhover"
                       >
-                        <span className="font-medium text-[#292524]">{b.title}</span>
-                        <span className="text-xs text-[#78716c]">{b.availableCopiesCount} available</span>
+                        <span className="font-medium text-ink">{b.title}</span>
+                        <span className="text-xs text-muted">{b.availableCopiesCount} available</span>
                       </button>
                     ))
                   )}

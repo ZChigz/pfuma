@@ -26,11 +26,11 @@ export function ResultsFilters({ currentGrade, currentTerm }: Props) {
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#78716c]">Grade</span>
+        <span className="text-xs font-medium   text-muted">Grade</span>
         <select
           defaultValue={currentGrade}
           onChange={(e) => navigate(e.target.value, currentTerm)}
-          className="min-h-[44px] rounded-md border border-[#e7e5e4] bg-white px-3 text-sm text-[#292524] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+          className="min-h-[44px] rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         >
           <option value="">— Select grade —</option>
           {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
@@ -38,11 +38,11 @@ export function ResultsFilters({ currentGrade, currentTerm }: Props) {
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#78716c]">Term</span>
+        <span className="text-xs font-medium   text-muted">Term</span>
         <select
           defaultValue={currentTerm}
           onChange={(e) => navigate(currentGrade, e.target.value)}
-          className="min-h-[44px] rounded-md border border-[#e7e5e4] bg-white px-3 text-sm text-[#292524] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+          className="min-h-[44px] rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         >
           <option value="">— Select term —</option>
           {TERMS.map((t) => <option key={t} value={t}>{t}</option>)}

@@ -13,15 +13,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants: Record<Variant, string> = {
-  primary:   'bg-[#065f46] text-white hover:bg-[#047857]',
-  secondary: 'border border-[#065f46] bg-white text-[#065f46] hover:bg-stone-50',
-  danger:    'bg-[#b91c1c] text-white hover:opacity-90',
-  ghost:     'bg-transparent text-[#292524] hover:bg-stone-100',
+  primary:   'bg-primary text-white hover:bg-primary-hover',
+  secondary: 'border border-primary bg-white text-primary hover:bg-tint',
+  danger:    'bg-danger text-white hover:opacity-90',
+  ghost:     'bg-transparent text-ink hover:bg-tint',
 };
 
 const sizes: Record<Size, string> = {
-  sm: 'min-h-[44px] px-3 text-sm',
-  md: 'min-h-[44px] px-4 text-sm',
+  sm: 'min-h-[44px] px-4 text-sm',
+  md: 'min-h-[44px] px-5 text-sm',
   lg: 'min-h-[44px] px-6 text-base',
 };
 
@@ -45,8 +45,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ref={ref}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center rounded-md font-medium transition-colors',
-        'focus:outline-none focus:ring-2 focus:ring-[#065f46]/40 focus:ring-offset-2',
+        'inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2',
         'disabled:cursor-not-allowed disabled:opacity-50',
         variants[variant],
         sizes[size],
