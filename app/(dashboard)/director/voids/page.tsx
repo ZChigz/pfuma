@@ -75,7 +75,7 @@ export default async function VoidsPage({
 
 async function PaymentsTabContent({ schoolId, q }: { schoolId: string; q: string }) {
   const include = {
-    student: { select: { fullName: true, grade: true } },
+    student: { select: { fullName: true, currentClass: { select: { name: true } } } },
     voider:  { select: { fullName: true } },
   } as const;
 
@@ -124,7 +124,7 @@ async function PaymentsTabContent({ schoolId, q }: { schoolId: string; q: string
                   <tr key={p.id}>
                     <td className="px-4 py-3">
                       <p className="font-medium">{p.student.fullName}</p>
-                      <p className="text-xs text-muted">{p.student.grade}</p>
+                      <p className="text-xs text-muted">{p.student.currentClass?.name ?? ''}</p>
                     </td>
                     <td className="px-4 py-3">{p.feeLabel}</td>
                     <td className="px-4 py-3">
@@ -167,7 +167,7 @@ async function PaymentsTabContent({ schoolId, q }: { schoolId: string; q: string
                   <tr key={p.id}>
                     <td className="px-4 py-3">
                       <p className="font-medium">{p.student.fullName}</p>
-                      <p className="text-xs text-muted">{p.student.grade}</p>
+                      <p className="text-xs text-muted">{p.student.currentClass?.name ?? ''}</p>
                     </td>
                     <td className="px-4 py-3">{p.feeLabel}</td>
                     <td className="px-4 py-3">

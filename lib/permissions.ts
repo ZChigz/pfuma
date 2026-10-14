@@ -26,6 +26,9 @@ export const Permission = {
   createExpenseRequest: ['TEACHER', 'BURSAR', 'HEAD', 'DIRECTOR', 'ADMIN'] as UserRole[],
   approveRequest:     ['HEAD', 'DIRECTOR']                             as UserRole[],
   disburseRequest:    ['BURSAR', 'HEAD', 'DIRECTOR']                   as UserRole[],
+  manageAcademicCalendar: ['ADMIN', 'HEAD', 'DIRECTOR']                as UserRole[],
+  manageEnrollment:   ['ADMIN', 'HEAD', 'DIRECTOR']                    as UserRole[],
+  manageGuardians:    ['ADMIN', 'HEAD', 'DIRECTOR']                    as UserRole[],
 } satisfies Record<string, UserRole[]>;
 
 const forbidden = () =>
@@ -64,6 +67,10 @@ export async function canDisposeAsset(role: UserRole): Promise<void>    { await 
 export async function canCreateExpenseRequest(role: UserRole): Promise<void> { await guard(role, Permission.createExpenseRequest); }
 export async function canApproveRequest(role: UserRole): Promise<void>  { await guard(role, Permission.approveRequest);  }
 export async function canDisburseRequest(role: UserRole): Promise<void> { await guard(role, Permission.disburseRequest); }
+export async function canManageAcademicCalendar(role: UserRole): Promise<void> { await guard(role, Permission.manageAcademicCalendar); }
+// Admit, transfer class, promote, repeat, transfer out, withdraw, graduate.
+export async function canManageEnrollment(role: UserRole): Promise<void> { await guard(role, Permission.manageEnrollment); }
+export async function canManageGuardians(role: UserRole): Promise<void> { await guard(role, Permission.manageGuardians); }
 
 export function canEnterMarksSync(role: UserRole): void {
   guardSync(role, Permission.enterMarks);

@@ -9,11 +9,12 @@ import { useToast } from '@/components/ui/Toast';
 interface Props {
   classId:    string;
   className:  string;
-  term:       string;
+  termId:     string;
+  termName:   string;
   disabled:   boolean;
 }
 
-export function PublishResultsButton({ classId, className, term, disabled }: Props) {
+export function PublishResultsButton({ classId, className, termId, termName, disabled }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [loading,    setLoading]    = useState(false);
   const router = useRouter();
@@ -25,7 +26,7 @@ export function PublishResultsButton({ classId, className, term, disabled }: Pro
       const res  = await fetch('/api/results/publish', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ classId, term }),
+        body:    JSON.stringify({ classId, termId }),
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.message ?? 'Publish failed'); return; }
@@ -46,7 +47,7 @@ export function PublishResultsButton({ classId, className, term, disabled }: Pro
         onClick={() => setConfirming(true)}
         className="w-full"
       >
-        Publish results for {className} — {term}
+        Publish results for {className} — {termName}
       </Button>
 
       <Modal
@@ -63,7 +64,7 @@ export function PublishResultsButton({ classId, className, term, disabled }: Pro
         }
       >
         <p className="text-sm text-ink">
-          Are you sure you want to publish results for <strong>{className}</strong> — <strong>{term}</strong>?
+          Are you sure you want to publish results for <strong>{className}</strong> — <strong>{termName}</strong>?
         </p>
         <p className="mt-2 text-sm text-muted">
           This will calculate totals and class positions, lock all marks, and make results visible on student portals.

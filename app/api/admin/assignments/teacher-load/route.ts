@@ -11,11 +11,11 @@ async function _GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const teacherId = searchParams.get('teacherId');
-  const term      = searchParams.get('term');
-  if (!teacherId || !term) return apiError('teacherId and term are required', 400);
+  const termId    = searchParams.get('termId');
+  if (!teacherId || !termId) return apiError('teacherId and termId are required', 400);
 
   const assignments = await prisma.subjectAssignment.findMany({
-    where: { schoolId: user.schoolId, teacherId, term },
+    where: { schoolId: user.schoolId, teacherId, termId },
     include: {
       subject: { select: { id: true, name: true, code: true } },
       class:   { select: { id: true, name: true } },

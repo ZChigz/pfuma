@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { SessionUser } from '@/types';
 
 const SetExchangeRateSchema = z.object({
-  usdToZig: z.number({ invalid_type_error: 'Please enter a rate' }).positive('Rate must be positive'),
+  usdToZig: z.number({ error: 'Please enter a rate' }).positive('Rate must be positive'),
   note: z.string().optional(),
 });
 

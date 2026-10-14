@@ -4,6 +4,7 @@ import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/
 import { logAudit } from '@/lib/audit';
 import { canManageStudents } from '@/lib/permissions';
 import { UpdateStudentSchema } from '@/lib/validations/accounting';
+import { normalizeName } from '@/lib/students/registration';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -56,28 +57,23 @@ async function _PATCH(
 
   const existing = await prisma.student.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
-    select: { id: true, status: true },
+    select: { id: true, firstName: true, surname: true },
   });
   if (!existing) return apiNotFound('Student');
 
-  // Keep status in step with the active flag (active == status ACTIVE).
-  const { active } = parsed.data;
-  const status =
-    active === true ? 'ACTIVE'
-    : active === false && existing.status === 'ACTIVE' ? 'WITHDRAWN'
-    : undefined;
+  const firstName = parsed.data.firstName ? normalizeName(parsed.data.firstName) : existing.firstName;
+  const surname = parsed.data.surname ? normalizeName(parsed.data.surname) : existing.surname;
 
-  const student = await prisma.student.update({
-    where: { id: params.id },
-    data: { ...parsed.data, ...(status ? { status } : {}) },
-  });
-
-  await logAudit({
-    schoolId: user.schoolId,
-    actorId: user.id,
-    action: 'UPDATE_STUDENT',
-    entityType: 'Student',
-    entityId: student.id,
+  const student = await prisma.$transaction(async (tx) => {
+    const s = await tx.student.update({
+      where: { id: params.id },
+      data: { ...parsed.data, firstName, surname, fullName: `${firstName} ${surname}`.trim() },
+    });
+    await logAudit(
+      { schoolId: user.schoolId, actorId: user.id, action: 'UPDATE_STUDENT', entityType: 'Student', entityId: s.id, detail: s.fullName },
+      tx,
+    );
+    return s;
   });
 
   return apiSuccess({ student });

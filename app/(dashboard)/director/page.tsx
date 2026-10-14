@@ -53,7 +53,7 @@ export default async function DirectorDashboard({
       _count: { id: true },
     }),
     prisma.student.findMany({
-      where: { schoolId, active: true },
+      where: { schoolId, status: 'ACTIVE' },
       select: {
         id: true,
         charges: { select: { currency: true, amount: true } },

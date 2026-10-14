@@ -33,6 +33,17 @@ export function apiValidationError(errors: ZodError): NextResponse {
   );
 }
 
+// ─── Service errors ──────────────────────────────────────────────────────────
+// Thrown by the service layer (lib/academic, lib/students…) when a business
+// rule is broken. withApi turns it into a JSON error with the given status.
+
+export class ServiceError extends Error {
+  constructor(message: string, public readonly status = 400) {
+    super(message);
+    this.name = 'ServiceError';
+  }
+}
+
 // ─── Route error wrapper ─────────────────────────────────────────────────────
 // Catches any unhandled error thrown inside a route handler, logs it with
 // structured context, and returns a clean 500 response instead of bubbling
@@ -45,6 +56,8 @@ export function withApi(label: string, handler: NextHandler): NextHandler {
     try {
       return await handler(req, ctx);
     } catch (err) {
+      if (err instanceof ServiceError) return apiError(err.message, err.status);
+      if (err instanceof Response) return err;
       logger.error(`Unhandled route error: ${label}`, err, { url: req.url });
       return NextResponse.json(
         { success: false, message: 'Internal server error' },

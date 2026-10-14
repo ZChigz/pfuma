@@ -7,7 +7,8 @@ import { TermSelect } from '@/components/results/TermSelect';
 import { PublishResultsButton } from '@/components/results/PublishResultsButton';
 import { ExportResultsButton } from '@/components/results/ExportResultsButton';
 import { UnlockSubjectLink } from '@/components/results/UnlockSubjectLink';
-import { TERMS } from '@/lib/results';
+import { listTerms } from '@/lib/academic/terms';
+import { classRosterIds } from '@/lib/academic/roster';
 import type { SessionUser, AssignmentMarkStatus } from '@/types';
 
 const STATUS_DISPLAY: Record<AssignmentMarkStatus, { icon: string; label: string; className: string }> = {
@@ -20,7 +21,7 @@ const STATUS_DISPLAY: Record<AssignmentMarkStatus, { icon: string; label: string
 export default async function HeadResultsPage({
   searchParams,
 }: {
-  searchParams: { classId?: string; term?: string };
+  searchParams: { classId?: string; termId?: string };
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
@@ -29,15 +30,17 @@ export default async function HeadResultsPage({
 
   const { schoolId } = user;
 
-  const [school, classes] = await Promise.all([
-    prisma.school.findUnique({ where: { id: schoolId }, select: { currentTerm: true } }),
+  const [terms, classes] = await Promise.all([
+    listTerms(schoolId),
     prisma.schoolClass.findMany({
       where: { schoolId, active: true },
-      orderBy: [{ grade: 'asc' }, { section: 'asc' }],
+      orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }],
     }),
   ]);
 
-  const selectedTerm = searchParams.term || school?.currentTerm || TERMS[0];
+  const term = terms.find((t) => t.id === searchParams.termId) ?? terms.find((t) => t.status === 'OPEN') ?? terms[0];
+  const selectedTermId = term?.id ?? '';
+  const selectedTerm = term?.name ?? 'No terms yet';
   const selectedClassId = searchParams.classId || classes[0]?.id || '';
   const selectedClass = classes.find((c) => c.id === selectedClassId);
 
@@ -59,9 +62,9 @@ export default async function HeadResultsPage({
     position: number | null;
   }> = [];
 
-  if (selectedClass) {
+  if (selectedClass && term) {
     assignments = await prisma.subjectAssignment.findMany({
-      where: { schoolId, classId: selectedClass.id, term: selectedTerm, subject: { active: true } },
+      where: { schoolId, classId: selectedClass.id, termId: selectedTermId, subject: { active: true } },
       include: {
         subject: { select: { id: true, name: true, maxMark: true } },
         teacher: { select: { fullName: true } },
@@ -74,16 +77,18 @@ export default async function HeadResultsPage({
   const allVerified = assignments.length > 0 && verifiedCount === assignments.length;
   const isPublished = assignments.length > 0 && assignments.every((a) => a.marksStatus === 'PUBLISHED');
 
-  if (selectedClass && isPublished) {
+  if (selectedClass && term && isPublished) {
     const subjectIds = assignments.map((a) => a.subjectId);
+    // The class list for that term comes from Enrollment.
+    const studentIds = await classRosterIds(selectedClass.id, selectedTermId);
     const [termResults, marks] = await Promise.all([
       prisma.termResult.findMany({
-        where: { schoolId, term: selectedTerm, student: { classId: selectedClass.id } },
+        where: { schoolId, termId: selectedTermId, studentId: { in: studentIds } },
         include: { student: { select: { id: true, fullName: true } } },
         orderBy: { classPosition: 'asc' },
       }),
       prisma.mark.findMany({
-        where: { schoolId, subjectId: { in: subjectIds }, term: selectedTerm, status: 'PUBLISHED', student: { classId: selectedClass.id } },
+        where: { schoolId, subjectId: { in: subjectIds }, termId: selectedTermId, status: 'PUBLISHED', studentId: { in: studentIds } },
       }),
     ]);
 
@@ -112,13 +117,13 @@ export default async function HeadResultsPage({
         </div>
         {selectedClass && (
           <div className="flex items-center gap-3">
-            <TermSelect classId={selectedClass.id} term={selectedTerm} />
+            <TermSelect classId={selectedClass.id} termId={selectedTermId} terms={terms.map((t) => ({ id: t.id, name: t.name }))} />
             {isPublished && (
               <span className="inline-flex items-center rounded-full bg-success-bg px-3 py-1 text-sm font-medium text-primary">
                 ✓ Published
               </span>
             )}
-            {isPublished && <ExportResultsButton classId={selectedClass.id} className={selectedClass.name} term={selectedTerm} />}
+            {isPublished && <ExportResultsButton classId={selectedClass.id} className={selectedClass.name} termId={selectedTermId} termName={selectedTerm} />}
           </div>
         )}
       </div>
@@ -128,7 +133,7 @@ export default async function HeadResultsPage({
         {classes.map((c) => (
           <Link
             key={c.id}
-            href={`/head/results?classId=${c.id}&term=${encodeURIComponent(selectedTerm)}`}
+            href={`/head/results?classId=${c.id}&termId=${selectedTermId}`}
             className={cn(
               'min-h-[44px] border-b-2 px-4 py-2 text-sm font-medium transition-colors',
               selectedClassId === c.id
@@ -204,7 +209,8 @@ export default async function HeadResultsPage({
             <PublishResultsButton
               classId={selectedClass.id}
               className={selectedClass.name}
-              term={selectedTerm}
+              termId={selectedTermId}
+              termName={selectedTerm}
               disabled={!allVerified}
             />
           )}

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { apiSuccess, apiUnauthorized, apiError, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { canManageSubjects } from '@/lib/permissions';
 import { CreateAssignmentSchema } from '@/lib/validations/results';
+import { requireTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -14,21 +15,22 @@ async function _GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const classId   = searchParams.get('classId')   ?? undefined;
   const teacherId = searchParams.get('teacherId') ?? undefined;
-  const term      = searchParams.get('term')      ?? undefined;
+  const termId    = searchParams.get('termId')    ?? undefined;
 
   const assignments = await prisma.subjectAssignment.findMany({
     where: {
       schoolId: user.schoolId,
       ...(classId   ? { classId }   : {}),
       ...(teacherId ? { teacherId } : {}),
-      ...(term      ? { term }      : {}),
+      ...(termId    ? { termId }    : {}),
     },
     include: {
       subject: { select: { id: true, name: true, code: true, maxMark: true } },
       class:   { select: { id: true, name: true } },
       teacher: { select: { id: true, fullName: true } },
+      term:    { select: { id: true, name: true } },
     },
-    orderBy: [{ class: { name: 'asc' } }, { subject: { name: 'asc' } }, { term: 'desc' }],
+    orderBy: [{ class: { name: 'asc' } }, { subject: { name: 'asc' } }, { term: { startDate: 'desc' } }],
   });
 
   return apiSuccess({ assignments });
@@ -43,7 +45,9 @@ async function _POST(req: NextRequest) {
 
   const parsed = await parseBody(req, CreateAssignmentSchema);
   if ('error' in parsed) return parsed.error;
-  const { teacherId, subjectId, classId, term } = parsed.data;
+  const { teacherId, subjectId, classId, termId } = parsed.data;
+  const term = await requireTerm(user.schoolId, termId);
+  if (term.status === 'CLOSED') return apiError(`${term.name} is closed`, 409);
 
   const [teacher, subject, schoolClass] = await Promise.all([
     prisma.user.findUnique({ where: { id: teacherId } }),
@@ -55,17 +59,17 @@ async function _POST(req: NextRequest) {
   if (!schoolClass || schoolClass.schoolId !== user.schoolId) return apiNotFound('Class');
 
   const existing = await prisma.subjectAssignment.findUnique({
-    where: { subjectId_classId_term: { subjectId, classId, term } },
+    where: { subjectId_classId_termId: { subjectId, classId, termId } },
   });
   if (existing) {
     return apiError(
-      `${schoolClass.name} already has a teacher assigned for ${subject.name} in ${term}. Remove the existing assignment first.`,
+      `${schoolClass.name} already has a teacher assigned for ${subject.name} in ${term.name}. Remove the existing assignment first.`,
       409,
     );
   }
 
   const assignment = await prisma.subjectAssignment.create({
-    data: { schoolId: user.schoolId, teacherId, subjectId, classId, term },
+    data: { schoolId: user.schoolId, teacherId, subjectId, classId, termId },
     include: {
       subject: { select: { id: true, name: true, code: true, maxMark: true } },
       class:   { select: { id: true, name: true } },

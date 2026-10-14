@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { ROLE_LABELS } from '@/components/layout/nav-config';
 import { ClassSizeSetting } from '@/components/admin/ClassSizeSetting';
+import { getOpenTerm } from '@/lib/academic/terms';
 import { cn } from '@/lib/utils';
 import type { SessionUser, UserRole } from '@/types';
 
@@ -77,23 +78,28 @@ export default async function AdminDashboard() {
   if (!(['ADMIN', 'DIRECTOR'] as string[]).includes(user.role)) redirect('/');
   const { schoolId } = user;
 
-  const school = await prisma.school.findUnique({ where: { id: schoolId }, select: { currentTerm: true, maxClassSize: true } });
-  const term = school?.currentTerm ?? undefined;
+  const [school, openTerm] = await Promise.all([
+    prisma.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } }),
+    getOpenTerm(schoolId),
+  ]);
+  const term = openTerm?.name;
+  const openTermId = openTerm?.id ?? '';
 
   const [totalUsers, totalStudents, totalSubjects, unplacedStudents, classes, recentUsers] = await Promise.all([
     prisma.user.count({ where: { schoolId } }),
-    prisma.student.count({ where: { schoolId, active: true } }),
+    prisma.student.count({ where: { schoolId, status: 'ACTIVE' } }),
     prisma.subject.count({ where: { schoolId } }),
-    prisma.student.count({ where: { schoolId, active: true, classId: null } }),
+    // Active students with no class in the open term.
+    prisma.student.count({ where: { schoolId, status: 'ACTIVE', enrollments: { none: { termId: openTermId, status: 'ACTIVE' } } } }),
     prisma.schoolClass.findMany({
       where: { schoolId, active: true },
-      orderBy: { name: 'asc' },
+      orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }],
       select: {
         id: true,
         name: true,
         classTeacherId: true,
-        _count: { select: { students: { where: { active: true } } } },
-        assignments: { where: term ? { term } : {}, select: { id: true }, take: 1 },
+        _count: { select: { enrollments: { where: { termId: openTermId, status: 'ACTIVE' } } } },
+        assignments: { where: { termId: openTermId }, select: { id: true }, take: 1 },
       },
     }),
     prisma.user.findMany({
@@ -109,7 +115,7 @@ export default async function AdminDashboard() {
   const withoutSubjects = classes.filter((c) => c.assignments.length === 0);
   const setupPercent = totalClasses ? Math.round(((totalClasses - withoutSubjects.length) / totalClasses) * 100) : 0;
 
-  const bars = classes.slice(0, 8).map((c) => ({ id: c.id, name: c.name, count: c._count.students }));
+  const bars = classes.slice(0, 8).map((c) => ({ id: c.id, name: c.name, count: c._count.enrollments }));
   const maxCount = Math.max(1, ...bars.map((b) => b.count));
   const topId = bars.reduce<string | null>((best, b) => (b.count > 0 && (!best || b.count > (bars.find((x) => x.id === best)?.count ?? 0)) ? b.id : best), null);
 

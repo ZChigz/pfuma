@@ -4,7 +4,8 @@ import {
   ageWarning,
   currentYearInHarare,
   defaultRegistrationValues,
-  formatStudentNumber,
+  formatAdmissionNumber,
+  ImportStudentRowSchema,
   normalizeName,
   normalizeZimMobile,
   RegisterStudentSchema,
@@ -21,10 +22,10 @@ function validInput(overrides: Partial<RegisterStudentInput> = {}): RegisterStud
     surname: 'MOYO',
     gender: 'M',
     dateOfBirth: `${year - 13}-03-05`,
-    form: 'Form 1',
+    level: 'Form 1',
     stream: 'North',
     guardianName: 'rudo   moyo',
-    guardianRelationship: 'Mother',
+    guardianRelationship: 'MOTHER',
     guardianPhone: '077 123 4567',
     houseNumber: '1234a',
     suburb: 'Kuwadzana',
@@ -79,10 +80,10 @@ describe('age rules', () => {
   });
 });
 
-describe('formatStudentNumber', () => {
+describe('formatAdmissionNumber', () => {
   it('pads the sequence to 4 digits', () => {
-    expect(formatStudentNumber(2026, 1)).toBe('STU20260001');
-    expect(formatStudentNumber(2026, 1234)).toBe('STU20261234');
+    expect(formatAdmissionNumber(2026, 1)).toBe('STU20260001');
+    expect(formatAdmissionNumber(2026, 1234)).toBe('STU20261234');
   });
 });
 
@@ -92,12 +93,16 @@ describe('RegisterStudentSchema', () => {
     expect(r.firstName).toBe('Tatenda');
     expect(r.surname).toBe('Moyo');
     expect(r.fullName).toBe('Tatenda Moyo');
+    expect(r.level).toBe('Form 1');
     expect(r.className).toBe('Form 1 North');
-    expect(r.guardianName).toBe('Rudo Moyo');
-    expect(r.guardianPhone).toBe('+263771234567');
+    expect(r.guardian.fullName).toBe('Rudo Moyo');
+    expect(r.guardian.phone).toBe('+263771234567');
+    expect(r.relationship).toBe('MOTHER');
+    expect(r.relationshipNote).toBeNull();
     expect(r.address).toBe('1234A, Kuwadzana, Harare');
-    expect(r.enrollmentYear).toBe(currentYearInHarare());
-    expect(r.status).toBe('ACTIVE');
+    expect(r.guardian.address).toBe('1234A, Kuwadzana, Harare');
+    expect(r.admissionDate).toBe(todayInHarare());
+    expect(r.admissionNumber).toBeNull();
     expect(r.medicalNotes).toBeNull();
   });
 
@@ -111,34 +116,38 @@ describe('RegisterStudentSchema', () => {
     expect(errorsFor(validInput({ guardianName: 'Moyo' })).guardianName).toMatch(/first name and surname/);
   });
 
-  it('rejects future dates of birth and enrollment years', () => {
+  it('rejects future or impossible dates', () => {
     const tomorrowYear = currentYearInHarare() + 1;
     expect(errorsFor(validInput({ dateOfBirth: `${tomorrowYear}-01-01` })).dateOfBirth).toMatch(/future/);
     expect(errorsFor(validInput({ dateOfBirth: '2013-02-30' })).dateOfBirth).toMatch(/real date/);
-    expect(errorsFor(validInput({ enrollmentYear: String(tomorrowYear) })).enrollmentYear).toMatch(/future/);
+    expect(errorsFor(validInput({ admissionDate: `${tomorrowYear}-01-01` })).admissionDate).toMatch(/future/);
+    expect(errorsFor(validInput({ dateOfBirth: '1990-01-01', admissionDate: '1999-12-31' })).admissionDate).toMatch(/2000 or later/);
+    expect(errorsFor(validInput({ dateOfBirth: '2013-03-05', admissionDate: '2013-03-04' })).admissionDate)
+      .toMatch(/before the date of birth/);
     expect(todayInHarare()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('rejects invalid phone numbers', () => {
     expect(errorsFor(validInput({ guardianPhone: '0242123456' })).guardianPhone).toMatch(/Zimbabwean mobile/);
-    expect(errorsFor(validInput({ secondGuardianPhone: '0771234567' })).secondGuardianPhone).toMatch(/same as/);
+    expect(errorsFor(validInput({ guardianAltPhone: '0771234567' })).guardianAltPhone).toMatch(/same as/);
   });
 
   it('needs the text box when Other is chosen', () => {
-    expect(errorsFor(validInput({ guardianRelationship: 'Other' })).guardianRelationshipOther).toBeDefined();
+    expect(errorsFor(validInput({ guardianRelationship: 'OTHER' })).guardianRelationshipOther).toBeDefined();
     expect(errorsFor(validInput({ suburb: 'Other' })).suburbOther).toBeDefined();
     const r = RegisterStudentSchema.parse(validInput({
-      guardianRelationship: 'Other', guardianRelationshipOther: 'step father',
+      guardianRelationship: 'OTHER', guardianRelationshipOther: 'step father',
       suburb: 'Other', suburbOther: 'cold comfort',
     }));
-    expect(r.guardianRelationship).toBe('Step Father');
+    expect(r.relationship).toBe('OTHER');
+    expect(r.relationshipNote).toBe('step father');
     expect(r.suburb).toBe('Cold Comfort');
   });
 
   it('requires dropdown choices', () => {
-    const e = errorsFor(validInput({ gender: '' as never, form: '' as never, stream: '' as never }));
+    const e = errorsFor(validInput({ gender: '' as never, level: '', stream: '' }));
     expect(e.gender).toMatch(/Male or Female/);
-    expect(e.form).toMatch(/form/);
+    expect(e.level).toMatch(/level/);
     expect(e.stream).toMatch(/stream/);
   });
 });
@@ -149,26 +158,41 @@ describe('CSV import mapping', () => {
     expect(rows).toEqual([['a', 'b'], ['x, y', 'line1\nline2']]);
   });
 
-  it('maps flexible headers and values to form input', () => {
+  it('maps flexible headers and values to an import row', () => {
     const [header, row] = parseCsv(
-      'First Name,surname,sex,dob,form,stream,guardian_name,guardianRelationship,guardianPhone,houseNumber,suburb\n'
-      + `tatenda,moyo,male,05/03/${currentYearInHarare() - 13},2,east,Rudo Moyo,step mother,0771234567,12,Hopley`,
+      'First Name,surname,sex,dob,form,stream,guardian_name,guardianRelationship,guardianPhone,address\n'
+      + `tatenda,moyo,male,05/03/${currentYearInHarare() - 13},2,east,Rudo Moyo,step mother,0771234567,"12 Hopley, Harare"`,
     );
     const { index, missing } = mapHeaders(header);
     expect(missing).toEqual([]);
     const input = csvRowToInput(row, index);
     expect(input.gender).toBe('M');
-    expect(input.form).toBe('Form 2');
-    expect(input.stream).toBe('East');
-    expect(input.guardianRelationship).toBe('Other');
+    expect(input.guardianRelationship).toBe('OTHER');
     expect(input.guardianRelationshipOther).toBe('step mother');
-    expect(input.suburb).toBe('Hopley');
-    expect(input.city).toBe('Harare');
-    expect(RegisterStudentSchema.safeParse(input).success).toBe(true);
+
+    const r = ImportStudentRowSchema.parse(input);
+    expect(r.level).toBe('Form 2');
+    expect(r.stream).toBe('East');
+    expect(r.className).toBe('Form 2 East');
+    expect(r.dateOfBirth).toBe(`${currentYearInHarare() - 13}-03-05`);
+    expect(r.relationshipNote).toBe('step mother');
+    expect(r.address).toBe('12 Hopley, Harare');
+    expect(r.admissionNumber).toBeNull();
+  });
+
+  it('maps known relationships and keeps a supplied admission number', () => {
+    const [header, row] = parseCsv(
+      'student_id,first_name,surname,gender,date_of_birth,form,stream,guardian_name,guardian_relationship,guardian_phone,address\n'
+      + 'stu20230007,Rudo,Dube,F,2010-05-02,Form 4,South,Patience Dube,Grandmother,+263771234567,"8172 Hatfield, Harare"',
+    );
+    const r = ImportStudentRowSchema.parse(csvRowToInput(row, mapHeaders(header).index));
+    expect(r.relationship).toBe('GRANDPARENT');
+    expect(r.admissionNumber).toBe('STU20230007');
+    expect(r.className).toBe('Form 4 South');
   });
 
   it('reports missing required columns', () => {
-    expect(mapHeaders(['firstName', 'surname']).missing).toContain('guardianPhone');
+    expect(mapHeaders(['firstName', 'surname']).missing).toContain('guardian_phone');
   });
 
   it('converts DD/MM/YYYY dates', () => {

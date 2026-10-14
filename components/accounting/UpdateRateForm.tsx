@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/Toast';
 
 const Schema = z.object({
   usdToZig: z
-    .number({ invalid_type_error: 'Please enter a rate' })
+    .number({ error: 'Please enter a rate' })
     .positive('Rate must be positive'),
   note: z.string().optional(),
 });

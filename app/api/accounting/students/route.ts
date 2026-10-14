@@ -1,13 +1,13 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { parseBody, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
-import { logAudit } from '@/lib/audit';
-import { canManageStudents } from '@/lib/permissions';
-import { CreateStudentSchema } from '@/lib/validations/accounting';
+import { apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { getDaysOverdue } from '@/lib/utils';
+import { PRIMARY_GUARDIAN_INCLUDE } from '@/lib/students/guardians';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
+// Students are admitted through POST /api/admin/students, which applies the
+// admission rules; this route only lists balances.
 async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
@@ -15,18 +15,20 @@ async function _GET(req: NextRequest) {
 
   const { searchParams } = req.nextUrl;
   const includeInactive = searchParams.get('includeInactive') === 'true';
-  const grade = searchParams.get('grade') || undefined;
+  const levelId = searchParams.get('levelId') || undefined;
   const statusFilter = searchParams.get('status') || undefined;
   const q = searchParams.get('q') || undefined;
 
   const rows = await prisma.student.findMany({
     where: {
       schoolId: user.schoolId,
-      ...(includeInactive ? {} : { active: true }),
-      ...(grade ? { grade } : {}),
-      ...(q ? { fullName: { contains: q, mode: 'insensitive' } } : {}),
+      ...(includeInactive ? {} : { status: 'ACTIVE' }),
+      ...(levelId ? { currentClass: { levelId } } : {}),
+      ...(q ? { OR: [{ fullName: { contains: q, mode: 'insensitive' } }, { admissionNumber: { contains: q, mode: 'insensitive' } }] } : {}),
     },
     include: {
+      currentClass: { select: { name: true, level: { select: { name: true } } } },
+      guardians: PRIMARY_GUARDIAN_INCLUDE,
       charges: { select: { currency: true, amount: true, issuedAt: true } },
       payments: {
         where: { status: 'VERIFIED' },
@@ -49,8 +51,17 @@ async function _GET(req: NextRequest) {
         ? s.charges.reduce((min, c) => (c.issuedAt < min ? c.issuedAt : min), s.charges[0].issuedAt)
         : null;
     const overdueDays = hasBalance && earliest ? getDaysOverdue(earliest) : 0;
-    const { charges: _charges, payments: _payments, ...rest } = s;
-    return { ...rest, balanceUSD, balanceZiG, overdueDays };
+    const { charges: _charges, payments: _payments, guardians, currentClass, ...rest } = s;
+    return {
+      ...rest,
+      levelName: currentClass?.level.name ?? null,
+      className: currentClass?.name ?? null,
+      guardianName: guardians[0]?.guardian.fullName ?? null,
+      guardianPhone: guardians[0]?.guardian.phone ?? null,
+      balanceUSD,
+      balanceZiG,
+      overdueDays,
+    };
   });
 
   const filtered =
@@ -65,40 +76,5 @@ async function _GET(req: NextRequest) {
   return apiSuccess({ students: filtered });
 }
 
-async function _POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return apiUnauthorized();
-  const user = session.user as unknown as SessionUser;
-
-  const parsed = await parseBody(req, CreateStudentSchema);
-  if ('error' in parsed) return parsed.error;
-
-  try {
-    await canManageStudents(user.role);
-  } catch (e) {
-    if (e instanceof Response) return e;
-    throw e;
-  }
-
-  const student = await prisma.student.create({
-    data: {
-      ...parsed.data,
-      schoolId: user.schoolId,
-      portalToken: crypto.randomUUID(),
-    },
-  });
-
-  await logAudit({
-    schoolId: user.schoolId,
-    actorId: user.id,
-    action: 'CREATE_STUDENT',
-    entityType: 'Student',
-    entityId: student.id,
-  });
-
-  return apiSuccess({ student }, 201);
-}
-
 type H = (req: Request, ctx?: unknown) => Promise<Response>;
-export const GET  = withApi('GET /api/accounting/students',  _GET  as H);
-export const POST = withApi('POST /api/accounting/students', _POST as H);
+export const GET = withApi('GET /api/accounting/students', _GET as H);

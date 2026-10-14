@@ -13,19 +13,17 @@ import { useToast } from '@/components/ui/Toast';
 import {
   ageWarning,
   className as buildClassName,
-  currentYearInHarare,
+  DEFAULT_STREAMS,
   defaultRegistrationValues,
-  FORMS,
   GENDER_OPTIONS,
+  LEVELS,
   normalizeName,
   OTHER_SUBURB,
   RegisterStudentSchema,
-  RELATIONSHIPS,
-  STREAMS,
-  STUDENT_STATUS_OPTIONS,
+  RELATIONSHIP_OPTIONS,
   SUBURBS,
   todayInHarare,
-  type RegisterStudentData,
+  type AdmissionData,
   type RegisterStudentInput,
   type RegistrationWarning,
   type WarningCode,
@@ -34,22 +32,24 @@ import {
 interface ClassOption {
   id: string;
   name: string;
-  grade: string;
-  section: string | null;
-  studentCount: number; // active students
+  level: string;
+  stream: string;
+  capacity: number;
+  studentCount: number; // in the open term
 }
 
 interface Props {
   classes: ClassOption[];
-  maxClassSize: number;
+  disabled?: boolean; // no open term
 }
 
 interface ReviewState {
-  student: RegisterStudentData;
+  student: AdmissionData;
   className: string;
   classExists: boolean;
   classCount: number;
-  maxClassSize: number;
+  capacity: number;
+  termName: string | null;
   warnings: RegistrationWarning[];
 }
 
@@ -73,13 +73,13 @@ function Notice({ tone, children }: { tone: 'warn' | 'info'; children: ReactNode
   return <p className={`rounded-md border px-3 py-2 text-xs ${cls}`}>{children}</p>;
 }
 
-export function AddStudentModal({ classes, maxClassSize }: Props) {
+export function AddStudentModal({ classes, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>('form');
   const [review, setReview] = useState<ReviewState | null>(null);
   const [accepted, setAccepted] = useState<Set<WarningCode>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState<{ studentNumber: string; fullName: string; className: string } | null>(null);
+  const [saved, setSaved] = useState<{ admissionNumber: string; fullName: string; className: string } | null>(null);
   const [uploadKey, setUploadKey] = useState(0);
   const router = useRouter();
   const toast = useToast();
@@ -93,30 +93,34 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
     setError,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterStudentInput, unknown, RegisterStudentData>({
+  } = useForm<RegisterStudentInput, unknown, AdmissionData>({
     resolver: zodResolver(RegisterStudentSchema),
     defaultValues: defaultRegistrationValues(),
     mode: 'onTouched',
   });
 
-  const [form, stream, dateOfBirth, surname, relationship, suburb, status] = watch([
-    'form', 'stream', 'dateOfBirth', 'surname', 'guardianRelationship', 'suburb', 'status',
+  const [level, stream, dateOfBirth, surname, relationship, suburb] = watch([
+    'level', 'stream', 'dateOfBirth', 'surname', 'guardianRelationship', 'suburb',
   ]);
 
-  // ── Class name + occupancy (live) ──────────────────────────────────────────
-  const selectedClass = useMemo(() => {
-    if (!form || !stream) return null;
-    return (
-      classes.find((c) => c.grade === form && c.section?.toLowerCase() === stream.toLowerCase()) ??
-      classes.find((c) => c.name === buildClassName(form, stream)) ??
-      null
-    );
-  }, [classes, form, stream]);
-  const liveClassName = form && stream ? selectedClass?.name ?? buildClassName(form, stream) : '';
-  const liveCount = selectedClass?.studentCount ?? 0;
-  const classIsFull = !!liveClassName && status === 'ACTIVE' && liveCount + 1 > maxClassSize;
+  // Streams offered for the chosen level: existing classes first, then the defaults.
+  const streamSuggestions = useMemo(() => {
+    const existing = classes.filter((c) => c.level === level && c.stream).map((c) => c.stream);
+    return Array.from(new Set([...existing, ...DEFAULT_STREAMS]));
+  }, [classes, level]);
 
-  const liveAgeWarning = dateOfBirth && form ? ageWarning(dateOfBirth, form) : null;
+  // ── Class name + occupancy (live) ──────────────────────────────────────────
+  const trimmedStream = (stream ?? '').trim();
+  const selectedClass = useMemo(() => {
+    if (!level || !trimmedStream) return null;
+    return classes.find((c) => c.level === level && c.stream.toLowerCase() === trimmedStream.toLowerCase()) ?? null;
+  }, [classes, level, trimmedStream]);
+  const liveClassName = level && trimmedStream ? selectedClass?.name ?? buildClassName(level, normalizeName(trimmedStream)) : '';
+  const liveCount = selectedClass?.studentCount ?? 0;
+  const liveCapacity = selectedClass?.capacity;
+  const classIsFull = !!selectedClass && liveCount + 1 > selectedClass.capacity;
+
+  const liveAgeWarning = dateOfBirth && level ? ageWarning(dateOfBirth, level) : null;
 
   // ── Pre-fill guardian surname until the admin edits the field ─────────────
   const lastPrefill = useRef('');
@@ -144,8 +148,7 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
   }
 
   function showServerErrors(fieldErrors: Record<string, string[]> | undefined, message?: string) {
-    const entries = Object.entries(fieldErrors ?? {});
-    for (const [field, messages] of entries) {
+    for (const [field, messages] of Object.entries(fieldErrors ?? {})) {
       setError(field as keyof RegisterStudentInput, { type: 'server', message: messages[0] });
     }
     toast.error(message ?? 'Please fix the highlighted fields');
@@ -187,12 +190,12 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
         setStep('form');
         return showServerErrors(body.errors, body.message);
       }
-      if (!res.ok) return toast.error(body.message ?? 'Failed to register student');
+      if (!res.ok) return toast.error(body.message ?? 'Failed to admit student');
 
       const s = body.data.student;
-      setSaved({ studentNumber: s.studentNumber, fullName: s.fullName, className: s.class?.name ?? review.className });
+      setSaved({ admissionNumber: s.admissionNumber, fullName: s.fullName, className: s.currentClass?.name ?? review.className });
       setStep('saved');
-      toast.success('Student registered');
+      toast.success('Student admitted');
       router.refresh();
     } catch {
       toast.error('Network error. Please try again.');
@@ -213,20 +216,20 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
     ) : step === 'review' ? (
       <>
         <Button variant="secondary" onClick={() => setStep('form')} disabled={saving}>Back to edit</Button>
-        <Button onClick={handleSave} loading={saving} disabled={!allWarningsAccepted}>Confirm &amp; save</Button>
+        <Button onClick={handleSave} loading={saving} disabled={!allWarningsAccepted}>Confirm &amp; admit</Button>
       </>
     ) : (
       <>
-        <Button variant="secondary" onClick={resetAll}>Register another</Button>
+        <Button variant="secondary" onClick={resetAll}>Admit another</Button>
         <Button onClick={handleClose}>Done</Button>
       </>
     );
 
-  const title = step === 'form' ? 'Register Student' : step === 'review' ? 'Confirm Student Details' : 'Student Registered';
+  const title = step === 'form' ? 'Admit Student' : step === 'review' ? 'Confirm Student Details' : 'Student Admitted';
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>+ Register Student</Button>
+      <Button onClick={() => setOpen(true)} disabled={disabled}>+ Admit Student</Button>
 
       <Modal open={open} onClose={handleClose} title={title} size="lg" footer={footer}>
         <div className="max-h-[65vh] overflow-y-auto pr-1">
@@ -250,27 +253,29 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
 
               <Section title="Class">
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Select id="form" label="Form" required placeholder="Select form" options={toOptions(FORMS)}
-                    error={errors.form?.message} {...register('form')} />
-                  <Select id="stream" label="Stream" required placeholder="Select stream" options={toOptions(STREAMS)}
-                    error={errors.stream?.message} {...register('stream')} />
-                  <Input id="enrollmentYear" label="Enrollment year" type="number" required
-                    min={2000} max={currentYearInHarare()}
-                    hint="Change only for transfer students"
-                    error={errors.enrollmentYear?.message} {...register('enrollmentYear')} />
+                  <Select id="level" label="Level" required placeholder="Select level" options={toOptions(LEVELS)}
+                    error={errors.level?.message} {...register('level')} />
+                  <div>
+                    <Input id="stream" label="Stream" required placeholder="e.g. North" list="stream-suggestions"
+                      error={errors.stream?.message} {...register('stream')} />
+                    <datalist id="stream-suggestions">
+                      {streamSuggestions.map((s) => <option key={s} value={s} />)}
+                    </datalist>
+                  </div>
+                  <Input id="admissionDate" label="Admission date" type="date" required max={todayInHarare()}
+                    hint="The year sets the admission number"
+                    error={errors.admissionDate?.message} {...register('admissionDate')} />
                 </div>
                 <Input id="className" label="Class" readOnly value={liveClassName}
-                  placeholder="Filled in from form and stream" className="bg-canvas"
+                  placeholder="Filled in from level and stream" className="bg-canvas"
                   hint={liveClassName
-                    ? `${liveCount} of ${maxClassSize} places taken${selectedClass ? '' : ' — this class will be created when you save'}`
+                    ? (selectedClass ? `${liveCount} of ${liveCapacity} places taken this term` : 'This class will be created when you save')
                     : undefined} />
                 {classIsFull && (
                   <Notice tone="warn">
-                    {liveClassName} is at or over its limit ({liveCount}/{maxClassSize}). You can still register this student, but you will be asked to confirm.
+                    {liveClassName} is at or over capacity ({liveCount}/{liveCapacity}). You can still admit this student, but you will be asked to confirm.
                   </Notice>
                 )}
-                <Select id="status" label="Status" required options={STUDENT_STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))}
-                  error={errors.status?.message} {...register('status')} />
               </Section>
 
               <Section title="Guardian">
@@ -279,15 +284,15 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
                     hint="Surname filled in from the student — add the guardian's first name"
                     error={errors.guardianName?.message} {...register('guardianName')} />
                   <Select id="guardianRelationship" label="Relationship to student" required placeholder="Select relationship"
-                    options={toOptions(RELATIONSHIPS)}
+                    options={RELATIONSHIP_OPTIONS.map((r) => ({ value: r.value, label: r.label }))}
                     error={errors.guardianRelationship?.message} {...register('guardianRelationship')} />
-                  {relationship === 'Other' && (
+                  {relationship === 'OTHER' && (
                     <Input id="guardianRelationshipOther" label="Describe relationship" required placeholder="e.g. Stepfather"
                       error={errors.guardianRelationshipOther?.message} {...register('guardianRelationshipOther')} />
                   )}
                   <Input id="guardianPhone" label="Guardian phone" required type="tel" inputMode="tel"
                     placeholder="0771234567 or +263771234567"
-                    hint="Saved as +263XXXXXXXXX"
+                    hint="Saved as +263XXXXXXXXX. Brothers and sisters with the same guardian share one record."
                     error={errors.guardianPhone?.message} {...register('guardianPhone')} />
                 </div>
               </Section>
@@ -312,12 +317,19 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
                 <div className="mt-4 flex flex-col gap-4">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Input id="birthCertificateNumber" label="Birth certificate number"
+                      hint="Must be unique in the school"
                       error={errors.birthCertificateNumber?.message} {...register('birthCertificateNumber')} />
                     <Input id="previousSchool" label="Previous school"
                       error={errors.previousSchool?.message} {...register('previousSchool')} />
-                    <Input id="secondGuardianPhone" label="Second guardian phone" type="tel" inputMode="tel"
+                    <Input id="guardianAltPhone" label="Guardian alternative phone" type="tel" inputMode="tel"
                       placeholder="0771234567"
-                      error={errors.secondGuardianPhone?.message} {...register('secondGuardianPhone')} />
+                      error={errors.guardianAltPhone?.message} {...register('guardianAltPhone')} />
+                    <Input id="guardianEmail" label="Guardian email" type="email"
+                      error={errors.guardianEmail?.message} {...register('guardianEmail')} />
+                    <Input id="guardianNationalId" label="Guardian national ID"
+                      error={errors.guardianNationalId?.message} {...register('guardianNationalId')} />
+                    <Input id="guardianOccupation" label="Guardian occupation"
+                      error={errors.guardianOccupation?.message} {...register('guardianOccupation')} />
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="medicalNotes" className="text-sm font-medium text-ink">Medical conditions / allergies</label>
@@ -352,9 +364,9 @@ export function AddStudentModal({ classes, maxClassSize }: Props) {
           {step === 'saved' && saved && (
             <div className="flex flex-col gap-4">
               <p className="text-sm text-ink">
-                <span className="font-medium">{saved.fullName}</span> has been registered in {saved.className}.
+                <span className="font-medium">{saved.fullName}</span> has been admitted to {saved.className}.
               </p>
-              <Input id="studentNumber" label="Student ID" readOnly value={saved.studentNumber}
+              <Input id="admissionNumber" label="Admission number" readOnly value={saved.admissionNumber}
                 className="bg-canvas font-mono text-base"
                 hint="Generated automatically and cannot be changed." />
             </div>
@@ -378,7 +390,9 @@ function ReviewDetails({
 }) {
   const s = review.student;
   const gender = GENDER_OPTIONS.find((g) => g.value === s.gender)?.label ?? s.gender;
-  const status = STUDENT_STATUS_OPTIONS.find((o) => o.value === s.status)?.label ?? s.status;
+  const relationship = s.relationship === 'OTHER'
+    ? s.relationshipNote ?? 'Other'
+    : RELATIONSHIP_OPTIONS.find((r) => r.value === s.relationship)?.label ?? s.relationship;
 
   const groups: { title: string; rows: [string, string | number | null][] }[] = [
     { title: 'Student', rows: [
@@ -386,18 +400,20 @@ function ReviewDetails({
     ] },
     { title: 'Class', rows: [
       ['Class', review.className + (review.classExists ? '' : ' (new class)')],
-      ['Students in class', `${review.classCount} of ${review.maxClassSize}`],
-      ['Enrollment year', s.enrollmentYear], ['Status', status],
-      ['Student ID', 'Generated when you save'],
+      ['Term', review.termName],
+      ['Students in class', review.classExists ? `${review.classCount} of ${review.capacity}` : '0'],
+      ['Admission date', s.admissionDate],
+      ['Admission number', 'Generated when you save'],
     ] },
     { title: 'Guardian', rows: [
-      ['Name', s.guardianName], ['Relationship', s.guardianRelationship], ['Phone', s.guardianPhone],
+      ['Name', s.guardian.fullName], ['Relationship', relationship], ['Phone', s.guardian.phone],
+      ['Alternative phone', s.guardian.altPhone], ['Email', s.guardian.email],
+      ['National ID', s.guardian.nationalId], ['Occupation', s.guardian.occupation],
     ] },
     { title: 'Address', rows: [['Address', s.address]] },
     { title: 'Optional details', rows: [
       ['Birth certificate no.', s.birthCertificateNumber], ['Previous school', s.previousSchool],
-      ['Second guardian phone', s.secondGuardianPhone], ['Medical / allergies', s.medicalNotes],
-      ['Photo', s.photoUrl ? 'Uploaded' : null],
+      ['Medical / allergies', s.medicalNotes], ['Photo', s.photoUrl ? 'Uploaded' : null],
     ] },
   ];
 

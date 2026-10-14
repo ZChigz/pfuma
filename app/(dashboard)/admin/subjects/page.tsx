@@ -8,6 +8,7 @@ import { AssignSubjectModal } from '@/components/admin/AssignSubjectModal';
 import { RemoveAssignmentButton } from '@/components/admin/RemoveAssignmentButton';
 import { GradeBoundariesManager } from '@/components/results/GradeBoundariesManager';
 import { canManageSubjects } from '@/lib/permissions';
+import { getOpenTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 
 export default async function AdminSubjectsPage() {
@@ -19,30 +20,27 @@ export default async function AdminSubjectsPage() {
 
   const { schoolId } = user;
 
-  const [subjects, classes, teachers, school] = await Promise.all([
+  const [subjects, classes, teachers, openTerm] = await Promise.all([
     prisma.subject.findMany({
       where: { schoolId },
       orderBy: { name: 'asc' },
     }),
     prisma.schoolClass.findMany({
       where: { schoolId, active: true },
-      orderBy: [{ grade: 'asc' }, { section: 'asc' }],
+      orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }],
     }),
     prisma.user.findMany({
       where: { schoolId, role: 'TEACHER', active: true },
       select: { id: true, fullName: true },
       orderBy: { fullName: 'asc' },
     }),
-    prisma.school.findUnique({
-      where: { id: schoolId },
-      select: { currentTerm: true },
-    }),
+    getOpenTerm(schoolId),
   ]);
 
-  const currentTerm = school?.currentTerm ?? '';
+  const currentTerm = openTerm?.name ?? '';
 
-  const assignments = await prisma.subjectAssignment.findMany({
-    where: { schoolId, term: currentTerm },
+  const assignments = !openTerm ? [] : await prisma.subjectAssignment.findMany({
+    where: { schoolId, termId: openTerm.id },
     include: {
       subject: { select: { id: true, name: true, code: true } },
       teacher: { select: { id: true, fullName: true } },
@@ -152,7 +150,8 @@ export default async function AdminSubjectsPage() {
                     <AssignSubjectModal
                       classId={c.id}
                       className={c.name}
-                      term={currentTerm}
+                      termId={openTerm?.id ?? ''}
+                      termName={currentTerm}
                       subjects={availableSubjects}
                       teachers={teachersWithLoad}
                     />

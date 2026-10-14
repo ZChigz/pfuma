@@ -4,64 +4,54 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { useToast } from '@/components/ui/Toast';
 import { formatUSD, formatZiG } from '@/lib/utils';
-
-const GRADE_OPTIONS = [
-  'ECD A', 'ECD B',
-  'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7',
-  'Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6',
-];
-
-interface FeeStructureOption {
-  id: string;
-  label: string;
-  grade: string;
-  term: string;
-  currency: 'USD' | 'ZIG';
-  amount: number;
-}
+import type { FeeStructureOption, LevelOption, TermOption } from './FeeStructureModal';
 
 interface ClassOption {
   id: string;
   name: string;
-  grade: string;
+  levelId: string;
 }
 
 interface Props {
   feeStructures: FeeStructureOption[];
   classes: ClassOption[];
+  levels: LevelOption[];
+  terms: TermOption[];
 }
 
-type Scope = 'class' | 'grade';
+type Scope = 'class' | 'level';
 
-export function BulkFeeModal({ feeStructures, classes }: Props) {
+// Charges go to students enrolled in the class/level for the chosen term.
+export function BulkFeeModal({ feeStructures, classes, levels, terms }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
-  const [scope, setScope] = useState<Scope>('grade');
+  const [scope, setScope] = useState<Scope>('level');
   const [classId, setClassId] = useState('');
-  const [grade, setGrade] = useState('');
+  const [levelId, setLevelId] = useState('');
   const [feeStructureId, setFeeStructureId] = useState('');
-  const [term, setTerm] = useState('');
+  const [termId, setTermId] = useState('');
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [result, setResult] = useState<{ applied: number; skipped: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
   const toast = useToast();
 
-  const targetGrade = scope === 'class' ? classes.find((c) => c.id === classId)?.grade : grade;
-  const matchingFeeStructures = feeStructures.filter((f) => !targetGrade || f.grade === targetGrade);
+  const targetLevelId = scope === 'class' ? classes.find((c) => c.id === classId)?.levelId : levelId;
+  const targetName = scope === 'class' ? classes.find((c) => c.id === classId)?.name : levels.find((l) => l.id === levelId)?.name;
+  const matchingFeeStructures = feeStructures.filter((f) => !f.levelId || f.levelId === targetLevelId);
   const selectedFeeStructure = feeStructures.find((f) => f.id === feeStructureId);
+  const termName = terms.find((t) => t.id === termId)?.name ?? '';
 
   function reset() {
     setStep(1);
-    setScope('grade');
+    setScope('level');
     setClassId('');
-    setGrade('');
+    setLevelId('');
     setFeeStructureId('');
-    setTerm('');
+    setTermId('');
     setPreviewCount(null);
     setResult(null);
   }
@@ -71,18 +61,23 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
     reset();
   }
 
+  function chooseFeeStructure(id: string) {
+    setFeeStructureId(id);
+    // Default the term to the fee structure's own term.
+    setTermId(feeStructures.find((f) => f.id === id)?.termId ?? '');
+  }
+
   async function goToPreview() {
     setBusy(true);
     try {
-      const qs = scope === 'class' ? `classId=${classId}` : `grade=${encodeURIComponent(grade)}`;
+      const qs = new URLSearchParams({ termId, ...(scope === 'class' ? { classId } : { levelId }) });
       const res = await fetch(`/api/admin/students?${qs}`);
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.message ?? 'Failed to load students');
         return;
       }
-      const count = (data.data.students as { active: boolean }[]).filter((s) => s.active).length;
-      setPreviewCount(count);
+      setPreviewCount((data.data.students as unknown[]).length);
       setStep(4);
     } finally {
       setBusy(false);
@@ -97,9 +92,9 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           scope,
-          ...(scope === 'class' ? { classId } : { grade }),
+          ...(scope === 'class' ? { classId } : { levelId }),
           feeStructureId,
-          term,
+          termId,
         }),
       });
       const data = await res.json();
@@ -114,13 +109,13 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
     }
   }
 
-  const step1Valid = scope === 'class' ? !!classId : !!grade;
+  const step1Valid = scope === 'class' ? !!classId : !!levelId;
   const step2Valid = !!feeStructureId;
-  const step3Valid = !!term.trim();
+  const step3Valid = !!termId;
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>Apply Fees by Grade</Button>
+      <Button variant="secondary" onClick={() => setOpen(true)}>Apply Fees by Level</Button>
 
       <Modal
         open={open}
@@ -167,7 +162,7 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
               Applied to {result.applied} student(s).
             </p>
             {result.skipped > 0 && (
-              <p className="mt-1 text-muted">{result.skipped} student(s) already had this charge for {term}.</p>
+              <p className="mt-1 text-muted">{result.skipped} student(s) already had this charge for {termName}.</p>
             )}
           </div>
         ) : (
@@ -192,11 +187,11 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
                     <input
                       type="radio"
                       name="scope"
-                      checked={scope === 'grade'}
-                      onChange={() => { setScope('grade'); setFeeStructureId(''); }}
+                      checked={scope === 'level'}
+                      onChange={() => { setScope('level'); setFeeStructureId(''); }}
                       className="h-4 w-4 text-primary focus:ring-primary/30"
                     />
-                    By Grade
+                    By Level
                   </label>
                   <label className="flex items-center gap-2 text-sm font-medium text-ink">
                     <input
@@ -209,15 +204,15 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
                     By Class
                   </label>
                 </div>
-                {scope === 'grade' ? (
+                {scope === 'level' ? (
                   <Select
-                    id="bulk-grade"
-                    label="Grade"
+                    id="bulk-level"
+                    label="Level"
                     required
-                    options={GRADE_OPTIONS.map((g) => ({ value: g, label: g }))}
-                    placeholder="Select a grade"
-                    value={grade}
-                    onChange={(e) => setGrade(e.target.value)}
+                    options={levels.map((l) => ({ value: l.id, label: l.name }))}
+                    placeholder="Select a level"
+                    value={levelId}
+                    onChange={(e) => setLevelId(e.target.value)}
                   />
                 ) : (
                   <Select
@@ -242,12 +237,12 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
                   required
                   options={matchingFeeStructures.map((f) => ({
                     value: f.id,
-                    label: `${f.label} — ${f.currency === 'USD' ? formatUSD(f.amount) : formatZiG(f.amount)} (${f.grade}, ${f.term})`,
+                    label: `${f.label} — ${f.currency === 'USD' ? formatUSD(f.amount) : formatZiG(f.amount)} (${f.levelName}, ${f.termName})`,
                   }))}
                   placeholder="Select a fee structure"
                   value={feeStructureId}
-                  onChange={(e) => setFeeStructureId(e.target.value)}
-                  hint={matchingFeeStructures.length === 0 ? `No fee structures defined for ${targetGrade}.` : undefined}
+                  onChange={(e) => chooseFeeStructure(e.target.value)}
+                  hint={matchingFeeStructures.length === 0 ? `No fee structures defined for ${targetName}.` : undefined}
                 />
               </div>
             )}
@@ -255,14 +250,15 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
             {/* Step 3: Term */}
             {step === 3 && (
               <div className="flex flex-col gap-4">
-                <Input
+                <Select
                   id="bulk-term"
                   label="Term"
                   required
-                  placeholder="e.g. Term 1 2026"
-                  value={term}
-                  onChange={(e) => setTerm(e.target.value)}
-                  hint="The charge will be recorded against this term."
+                  placeholder="Select a term"
+                  options={terms.filter((t) => t.status !== 'CLOSED').map((t) => ({ value: t.id, label: t.status === 'OPEN' ? `${t.name} (current)` : t.name }))}
+                  value={termId}
+                  onChange={(e) => setTermId(e.target.value)}
+                  hint="Students enrolled in that term are charged, and the charge is recorded against it."
                 />
               </div>
             )}
@@ -273,7 +269,7 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
                 <div className="rounded-xl border border-line bg-rowhover p-4 text-sm">
                   <p>
                     <span className="font-medium text-ink">Scope: </span>
-                    {scope === 'class' ? classes.find((c) => c.id === classId)?.name : grade}
+                    {targetName}
                   </p>
                   <p className="mt-1">
                     <span className="font-medium text-ink">Fee: </span>
@@ -284,15 +280,15 @@ export function BulkFeeModal({ feeStructures, classes }: Props) {
                   </p>
                   <p className="mt-1">
                     <span className="font-medium text-ink">Term: </span>
-                    {term}
+                    {termName}
                   </p>
                   <p className="mt-1">
-                    <span className="font-medium text-ink">Students affected: </span>
+                    <span className="font-medium text-ink">Students enrolled: </span>
                     {previewCount ?? '—'}
                   </p>
                 </div>
                 <p className="text-xs text-muted">
-                  Students who already have a &quot;{selectedFeeStructure?.label}&quot; charge for {term} will be skipped.
+                  Students who already have a &quot;{selectedFeeStructure?.label}&quot; charge for {termName} will be skipped.
                 </p>
               </div>
             )}

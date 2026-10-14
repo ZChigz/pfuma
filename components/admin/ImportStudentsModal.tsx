@@ -5,20 +5,30 @@ import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
-import { CSV_COLUMNS, csvTemplate } from '@/lib/students/csv';
+import { CSV_COLUMNS, csvTemplate, rejectionReportCsv } from '@/lib/students/csv';
 
 interface RowReport {
   row: number;
   name: string;
   messages: string[];
-  studentNumber?: string;
+  admissionNumber?: string;
 }
 
 interface ImportResult {
   totalRows: number;
   imported: number;
-  failed: RowReport[];
+  termName: string;
+  rejected: RowReport[];
   warnings: RowReport[];
+}
+
+function download(filename: string, csv: string) {
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function ReportTable({ title, tone, rows }: { title: string; tone: 'error' | 'warn'; rows: RowReport[] }) {
@@ -41,7 +51,7 @@ function ReportTable({ title, tone, rows }: { title: string; tone: 'error' | 'wa
                 <td className="px-3 py-2 tabular-nums">{r.row}</td>
                 <td className="px-3 py-2">
                   {r.name}
-                  {r.studentNumber && <span className="block font-mono text-muted">{r.studentNumber}</span>}
+                  {r.admissionNumber && <span className="block font-mono text-muted">{r.admissionNumber}</span>}
                 </td>
                 <td className={`px-3 py-2 ${color}`}>
                   <ul className="list-disc pl-4">
@@ -57,7 +67,7 @@ function ReportTable({ title, tone, rows }: { title: string; tone: 'error' | 'wa
   );
 }
 
-export function ImportStudentsModal() {
+export function ImportStudentsModal({ disabled }: { disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -72,12 +82,7 @@ export function ImportStudentsModal() {
   }
 
   function downloadTemplate() {
-    const url = URL.createObjectURL(new Blob([csvTemplate()], { type: 'text/csv' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'student-import-template.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    download('student-import-template.csv', csvTemplate());
   }
 
   async function handleFile(file: File) {
@@ -113,7 +118,7 @@ export function ImportStudentsModal() {
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>Import from CSV</Button>
+      <Button variant="secondary" onClick={() => setOpen(true)} disabled={disabled}>Import from CSV</Button>
 
       <Modal
         open={open}
@@ -124,10 +129,10 @@ export function ImportStudentsModal() {
       >
         <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto pr-1">
           <div className="flex flex-col gap-2 text-sm text-muted">
-            <p>Every row is checked with the same rules as the Register Student form. Rows with errors or likely duplicates are skipped; the rest are imported and given a Student ID.</p>
+            <p>Every row is checked with the same rules as the Admit Student form. Rows with errors, likely duplicates or numbers already in use are rejected; all other rows are admitted together into the current term and given an admission number (unless the file supplies one).</p>
             <p><span className="font-medium text-ink">Required columns:</span> <code className="font-mono text-xs">{required.join(', ')}</code></p>
             <p><span className="font-medium text-ink">Optional columns:</span> <code className="font-mono text-xs">{optional.join(', ')}</code></p>
-            <p>Dates can be YYYY-MM-DD or DD/MM/YYYY. Gender can be M, F, Male or Female. Form can be &quot;Form 2&quot; or just &quot;2&quot;.</p>
+            <p>Dates can be YYYY-MM-DD or DD/MM/YYYY. Gender can be M, F, Male or Female. Level can be &quot;Form 2&quot;, &quot;F2&quot; or just &quot;2&quot;; Lower/Upper Six also work.</p>
             <div>
               <Button size="sm" variant="ghost" onClick={downloadTemplate}>Download template</Button>
             </div>
@@ -150,14 +155,19 @@ export function ImportStudentsModal() {
             <div className="flex flex-col gap-4">
               <div className="rounded-lg border border-line bg-rowhover p-4 text-sm text-ink">
                 <p className="font-medium">
-                  {result.imported} of {result.totalRows} student(s) imported
-                  {result.failed.length > 0 && `, ${result.failed.length} row(s) not imported`}.
+                  {result.imported} of {result.totalRows} student(s) admitted into {result.termName}
+                  {result.rejected.length > 0 && `, ${result.rejected.length} row(s) rejected`}.
                 </p>
-                {result.failed.length > 0 && (
-                  <p className="mt-1 text-xs text-muted">Fix the rows below and import just those rows again.</p>
+                {result.rejected.length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <p className="text-xs text-muted">Fix the rejected rows and import just those rows again.</p>
+                    <Button size="sm" variant="secondary" onClick={() => download('rejected-rows.csv', rejectionReportCsv(result.rejected))}>
+                      Download report
+                    </Button>
+                  </div>
                 )}
               </div>
-              {result.failed.length > 0 && <ReportTable title="Not imported" tone="error" rows={result.failed} />}
+              {result.rejected.length > 0 && <ReportTable title="Rejected" tone="error" rows={result.rejected} />}
               {result.warnings.length > 0 && <ReportTable title="Imported with warnings — please check" tone="warn" rows={result.warnings} />}
             </div>
           )}

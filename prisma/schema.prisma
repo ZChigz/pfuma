@@ -71,6 +71,40 @@ enum StudentStatus {
   WITHDRAWN
 }
 
+enum LevelCategory {
+  O_LEVEL
+  A_LEVEL
+}
+
+enum TermStatus {
+  PLANNED
+  OPEN
+  CLOSED
+}
+
+// How a student's time in a class for one term ended. ACTIVE means the
+// enrollment is current, or (when endDate is set) the term finished normally
+// and the student carried on in the next term.
+enum EnrollmentStatus {
+  ACTIVE
+  PROMOTED
+  REPEATED
+  TRANSFERRED_OUT
+  WITHDRAWN
+  GRADUATED
+}
+
+enum GuardianRelationship {
+  FATHER
+  MOTHER
+  UNCLE
+  AUNT
+  GRANDPARENT
+  SIBLING
+  GUARDIAN
+  OTHER
+}
+
 enum SubjectType {
   CORE
   ELECTIVE
@@ -155,18 +189,41 @@ enum AuditAction {
   REJECT_EXPENSE_REQUEST
   DISBURSE_EXPENSE_REQUEST
   UPDATE_SCHOOL_SETTINGS
+  CREATE_ACADEMIC_YEAR
+  UPDATE_ACADEMIC_TERM
+  OPEN_TERM
+  CLOSE_TERM
+  ADMIT_STUDENT
+  TRANSFER_CLASS
+  PROMOTE_STUDENT
+  REPEAT_STUDENT
+  TRANSFER_OUT_STUDENT
+  WITHDRAW_STUDENT
+  GRADUATE_STUDENT
+  CREATE_GUARDIAN
+  UPDATE_GUARDIAN
+  LINK_GUARDIAN
+  UNLINK_GUARDIAN
+  SET_PRIMARY_GUARDIAN
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
 
 model School {
-  id          String   @id @default(cuid())
-  name        String
-  location    String?
-  currentTerm String?
-  // Soft limit — registering beyond it shows a warning the admin can override.
-  maxClassSize Int     @default(45)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  location     String?
+  // Default capacity for newly created classes.
+  maxClassSize Int      @default(45)
+  createdAt    DateTime @default(now())
+  // Legacy column "currentTerm" still exists in the database until the
+  // contract migration; the current term is now the OPEN AcademicTerm.
+
+  levels        Level[]
+  academicYears AcademicYear[]
+  academicTerms AcademicTerm[]
+  enrollments   Enrollment[]
+  guardians     Guardian[]
 
   users              User[]
   students           Student[]
@@ -205,23 +262,24 @@ model User {
 
   school School @relation(fields: [schoolId], references: [id])
 
-  recordedPayments   Payment[]           @relation("RecordedPayments")
-  verifiedPayments   Payment[]           @relation("VerifiedPayments")
-  voidedPayments     Payment[]           @relation("VoidedPayments")
-  recordedExpenses   Expense[]           @relation("RecordedExpenses")
-  voidedExpenses     Expense[]           @relation("VoidedExpenses")
-  requestedExpenses  ExpenseRequest[]    @relation("RequestedExpenses")
-  approvedExpenses   ExpenseRequest[]    @relation("ApprovedExpenses")
-  rejectedExpenses   ExpenseRequest[]    @relation("RejectedExpenses")
-  disbursedExpenses  ExpenseRequest[]    @relation("DisbursedExpenses")
-  auditLogs          AuditLog[]
-  subjectAssignments SubjectAssignment[]
+  recordedPayments    Payment[]           @relation("RecordedPayments")
+  verifiedPayments    Payment[]           @relation("VerifiedPayments")
+  voidedPayments      Payment[]           @relation("VoidedPayments")
+  recordedExpenses    Expense[]           @relation("RecordedExpenses")
+  voidedExpenses      Expense[]           @relation("VoidedExpenses")
+  requestedExpenses   ExpenseRequest[]    @relation("RequestedExpenses")
+  approvedExpenses    ExpenseRequest[]    @relation("ApprovedExpenses")
+  rejectedExpenses    ExpenseRequest[]    @relation("RejectedExpenses")
+  disbursedExpenses   ExpenseRequest[]    @relation("DisbursedExpenses")
+  auditLogs           AuditLog[]
+  subjectAssignments  SubjectAssignment[]
   verifiedAssignments SubjectAssignment[] @relation("VerifiedAssignments")
-  marks              Mark[]
-  assetMaintenances  AssetMaintenance[]
-  assetDisposals     AssetDisposal[]
-  libraryMember      LibraryMember?
-  classesTaught      SchoolClass[]
+  marks               Mark[]
+  assetMaintenances   AssetMaintenance[]
+  assetDisposals      AssetDisposal[]
+  libraryMember       LibraryMember?
+  classesTaught       SchoolClass[]
+  closedTerms         AcademicTerm[]      @relation("ClosedTerms")
 
   accounts      Account[]
   sessions      Session[]
@@ -237,115 +295,251 @@ model SchoolClass {
   id             String   @id @default(cuid())
   schoolId       String
   name           String
-  grade          String
-  section        String?
+  levelId        String
+  stream         String // e.g. "North"; "" for a level with a single class
+  capacity       Int      @default(45)
   classTeacherId String?
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
+  // Legacy columns "grade" and "section" remain in the database until the
+  // contract migration and are no longer read or written.
 
-  school       School              @relation(fields: [schoolId], references: [id])
-  classTeacher User?               @relation(fields: [classTeacherId], references: [id])
-  students     Student[]
-  assignments  SubjectAssignment[]
+  school          School              @relation(fields: [schoolId], references: [id])
+  level           Level               @relation(fields: [levelId], references: [id])
+  classTeacher    User?               @relation(fields: [classTeacherId], references: [id])
+  currentStudents Student[]           @relation("CurrentClass")
+  enrollments     Enrollment[]
+  assignments     SubjectAssignment[]
 
   @@unique([schoolId, name])
+  @@unique([schoolId, levelId, stream])
   @@index([schoolId])
-  @@index([schoolId, grade])
+}
+
+// ─── Academic structure ──────────────────────────────────────────────────────
+
+model Level {
+  id       String        @id @default(cuid())
+  schoolId String
+  name     String // "Form 1" … "Form 6"
+  order    Int // 1–6: sorting and promotion
+  category LevelCategory
+
+  school        School         @relation(fields: [schoolId], references: [id])
+  classes       SchoolClass[]
+  feeStructures FeeStructure[]
+
+  @@unique([schoolId, name])
+  @@unique([schoolId, order])
+  @@index([schoolId])
+}
+
+model AcademicYear {
+  id        String   @id @default(cuid())
+  schoolId  String
+  year      Int
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  school School         @relation(fields: [schoolId], references: [id])
+  terms  AcademicTerm[]
+
+  @@unique([schoolId, year])
+  @@index([schoolId])
+}
+
+// At most one OPEN term per school: enforced in lib/academic/terms.ts and by the
+// partial unique index "AcademicTerm_one_open_per_school" (created in SQL;
+// Prisma cannot express partial indexes, so keep it when writing migrations).
+model AcademicTerm {
+  id             String     @id @default(cuid())
+  schoolId       String
+  academicYearId String
+  termNumber     Int // 1–3
+  name           String // "Term 1 2026"
+  startDate      DateTime   @db.Date
+  endDate        DateTime   @db.Date
+  status         TermStatus @default(PLANNED)
+  closedAt       DateTime?
+  closedById     String?
+  createdAt      DateTime   @default(now())
+
+  school             School              @relation(fields: [schoolId], references: [id])
+  academicYear       AcademicYear        @relation(fields: [academicYearId], references: [id])
+  closedBy           User?               @relation("ClosedTerms", fields: [closedById], references: [id])
+  feeStructures      FeeStructure[]
+  charges            Charge[]
+  subjectAssignments SubjectAssignment[]
+  marks              Mark[]
+  termResults        TermResult[]
+  enrollments        Enrollment[]
+
+  @@unique([academicYearId, termNumber])
+  @@index([schoolId])
+  @@index([schoolId, status])
+}
+
+// Class history: exactly one class per student per term.
+model Enrollment {
+  id        String           @id @default(cuid())
+  schoolId  String
+  studentId String
+  classId   String
+  termId    String
+  status    EnrollmentStatus @default(ACTIVE)
+  startDate DateTime
+  endDate   DateTime?
+  createdAt DateTime         @default(now())
+
+  school  School       @relation(fields: [schoolId], references: [id])
+  student Student      @relation(fields: [studentId], references: [id])
+  class   SchoolClass  @relation(fields: [classId], references: [id])
+  term    AcademicTerm @relation(fields: [termId], references: [id])
+
+  @@unique([studentId, termId])
+  @@index([schoolId])
+  @@index([termId, classId])
+}
+
+// ─── Students & guardians ────────────────────────────────────────────────────
+
+model Student {
+  id                     String        @id @default(cuid())
+  schoolId               String
+  admissionNumber        String // STU + admission year + 4-digit sequence
+  firstName              String
+  surname                String
+  fullName               String // firstName + surname, kept for display and search
+  gender                 Gender? // required for new students; null for some legacy rows
+  dateOfBirth            DateTime?     @db.Date
+  birthCertificateNumber String?
+  admissionDate          DateTime      @db.Date
+  previousSchool         String?
+  medicalNotes           String?
+  photoUrl               String?
+  status                 StudentStatus @default(ACTIVE)
+  // Cache of the class in the OPEN term's Enrollment; updated in the same
+  // transaction as the Enrollment. Never the source of truth.
+  currentClassId         String?
+  houseNumber            String?
+  suburb                 String?
+  city                   String?
+  address                String?
+  portalToken            String        @unique @default(cuid())
+  createdAt              DateTime      @default(now())
+  // Legacy columns "grade", "classId", "parentName", "parentPhone", "active",
+  // "studentNumber", "enrollmentYear", "guardianRelationship" and
+  // "secondGuardianPhone" remain in the database until the contract migration.
+
+  school       School            @relation(fields: [schoolId], references: [id])
+  currentClass SchoolClass?      @relation("CurrentClass", fields: [currentClassId], references: [id])
+  enrollments  Enrollment[]
+  guardians    StudentGuardian[]
+  charges      Charge[]
+  payments     Payment[]
+  marks        Mark[]
+  termResults  TermResult[]
+
+  @@unique([schoolId, admissionNumber])
+  @@unique([schoolId, birthCertificateNumber])
+  @@index([schoolId])
+  @@index([schoolId, currentClassId])
+  @@index([schoolId, surname, firstName])
+}
+
+model Guardian {
+  id         String   @id @default(cuid())
+  schoolId   String
+  fullName   String
+  phone      String // +263XXXXXXXXX (legacy rows that could not be normalised keep their original text)
+  altPhone   String?
+  email      String?
+  nationalId String?
+  address    String?
+  occupation String?
+  createdAt  DateTime @default(now())
+
+  school   School            @relation(fields: [schoolId], references: [id])
+  students StudentGuardian[]
+
+  @@index([schoolId])
+  @@index([schoolId, phone])
+}
+
+// One primary guardian per student: at most one is enforced by the partial
+// unique index "StudentGuardian_one_primary_per_student" (SQL only); at least
+// one is enforced in lib/students/guardians.ts.
+model StudentGuardian {
+  studentId        String
+  guardianId       String
+  relationship     GuardianRelationship
+  relationshipNote String? // free text when relationship is OTHER
+  isPrimary        Boolean              @default(false)
+  isFeePayer       Boolean              @default(false)
+  canReceiveSms    Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+
+  student  Student  @relation(fields: [studentId], references: [id])
+  guardian Guardian @relation(fields: [guardianId], references: [id])
+
+  @@id([studentId, guardianId])
+  @@index([guardianId])
 }
 
 // ─── Accounting ──────────────────────────────────────────────────────────────
 
-model Student {
-  id          String   @id @default(cuid())
-  schoolId    String
-  fullName    String   // firstName + surname for registered students
-  grade       String   // the form, e.g. "Form 2"
-  classId     String?
-  parentName  String   // guardian name
-  parentPhone String   // guardian phone, +263XXXXXXXXX for registered students
-  active      Boolean  @default(true) // kept equal to (status == ACTIVE)
-  portalToken String   @unique @default(cuid())
-  createdAt   DateTime @default(now())
-
-  // Registration details. Nullable because students created before the
-  // registration form existed do not have them.
-  studentNumber          String?        // STU + enrollment year + 4-digit sequence
-  firstName              String?
-  surname                String?
-  gender                 Gender?
-  dateOfBirth            DateTime?      @db.Date
-  enrollmentYear         Int?
-  guardianRelationship   String?
-  houseNumber            String?
-  suburb                 String?
-  city                   String?
-  address                String?        // houseNumber, suburb, city combined
-  status                 StudentStatus  @default(ACTIVE)
-  birthCertificateNumber String?
-  previousSchool         String?
-  secondGuardianPhone    String?
-  medicalNotes           String?
-  photoUrl               String?
-
-  school      School       @relation(fields: [schoolId], references: [id])
-  class       SchoolClass? @relation(fields: [classId], references: [id])
-  charges     Charge[]
-  payments    Payment[]
-  marks       Mark[]
-  termResults TermResult[]
-
-  @@unique([schoolId, studentNumber])
-  @@index([schoolId])
-  @@index([schoolId, classId])
-  @@index([schoolId, surname, firstName])
-}
-
 model FeeStructure {
   id        String   @id @default(cuid())
   schoolId  String
-  grade     String
-  term      String
+  levelId   String? // null = applies to every level
+  termId    String
   label     String
   currency  Currency
   amount    Decimal  @db.Decimal(14, 2)
   createdAt DateTime @default(now())
 
-  school School @relation(fields: [schoolId], references: [id])
+  school School       @relation(fields: [schoolId], references: [id])
+  level  Level?       @relation(fields: [levelId], references: [id])
+  term   AcademicTerm @relation(fields: [termId], references: [id])
 
   @@index([schoolId])
+  @@index([termId])
 }
 
 model Charge {
   id        String   @id @default(cuid())
   schoolId  String
   studentId String
-  term      String
+  termId    String
   label     String
   currency  Currency
   amount    Decimal  @db.Decimal(14, 2)
   issuedAt  DateTime @default(now())
 
-  school  School  @relation(fields: [schoolId], references: [id])
-  student Student @relation(fields: [studentId], references: [id])
+  school  School       @relation(fields: [schoolId], references: [id])
+  student Student      @relation(fields: [studentId], references: [id])
+  term    AcademicTerm @relation(fields: [termId], references: [id])
 
   @@index([schoolId])
   @@index([schoolId, studentId])
+  @@index([termId])
 }
 
 model Payment {
-  id         String        @id @default(cuid())
-  schoolId   String
-  studentId  String
-  currency   Currency
-  amount     Decimal       @db.Decimal(14, 2)
-  method     PaymentMethod
-  reference  String?
-  feeLabel   String
-  status     PaymentStatus @default(PENDING)
-  popUrl     String?
-  recordedBy String
-  verifiedBy String?
-  voidedBy   String?
+  id               String        @id @default(cuid())
+  schoolId         String
+  studentId        String
+  currency         Currency
+  amount           Decimal       @db.Decimal(14, 2)
+  method           PaymentMethod
+  reference        String?
+  feeLabel         String
+  status           PaymentStatus @default(PENDING)
+  popUrl           String?
+  recordedBy       String
+  verifiedBy       String?
+  voidedBy         String?
   recordedAt       DateTime      @default(now())
   verifiedAt       DateTime?
   voidedAt         DateTime?
@@ -353,11 +547,11 @@ model Payment {
   zigAmountPaid    Decimal?      @db.Decimal(14, 2)
   exchangeRateUsed Decimal?      @db.Decimal(14, 2)
 
-  school         School  @relation(fields: [schoolId], references: [id])
-  student        Student @relation(fields: [studentId], references: [id])
-  recorder       User    @relation("RecordedPayments", fields: [recordedBy], references: [id])
-  verifier       User?   @relation("VerifiedPayments", fields: [verifiedBy], references: [id])
-  voider         User?   @relation("VoidedPayments", fields: [voidedBy], references: [id])
+  school   School  @relation(fields: [schoolId], references: [id])
+  student  Student @relation(fields: [studentId], references: [id])
+  recorder User    @relation("RecordedPayments", fields: [recordedBy], references: [id])
+  verifier User?   @relation("VerifiedPayments", fields: [verifiedBy], references: [id])
+  voider   User?   @relation("VoidedPayments", fields: [voidedBy], references: [id])
 
   @@index([schoolId])
   @@index([schoolId, status])
@@ -365,17 +559,17 @@ model Payment {
 }
 
 model Expense {
-  id               String          @id @default(cuid())
-  schoolId         String
-  category         String
-  currency         Currency
-  amount           Decimal         @db.Decimal(14, 2)
-  note             String?
-  spentOn          DateTime
-  recordedBy       String
-  status           ExpenseStatus   @default(ACTIVE)
-  voidedBy         String?
-  createdAt        DateTime        @default(now())
+  id         String        @id @default(cuid())
+  schoolId   String
+  category   String
+  currency   Currency
+  amount     Decimal       @db.Decimal(14, 2)
+  note       String?
+  spentOn    DateTime
+  recordedBy String
+  status     ExpenseStatus @default(ACTIVE)
+  voidedBy   String?
+  createdAt  DateTime      @default(now())
 
   expenseRequestId String?         @unique
   expenseRequest   ExpenseRequest? @relation(fields: [expenseRequestId], references: [id])
@@ -389,43 +583,43 @@ model Expense {
 }
 
 model ExpenseRequest {
-  id               String              @id @default(cuid())
-  schoolId         String
-  school           School              @relation(fields: [schoolId], references: [id])
-  requestNumber    String
-  title            String
-  type             ExpenseRequestType
-  department       String
-  justification    String
-  currency         Currency
-  estimatedTotal   Decimal             @db.Decimal(14, 2)
-  actualTotal      Decimal?            @db.Decimal(14, 2)
+  id             String             @id @default(cuid())
+  schoolId       String
+  school         School             @relation(fields: [schoolId], references: [id])
+  requestNumber  String
+  title          String
+  type           ExpenseRequestType
+  department     String
+  justification  String
+  currency       Currency
+  estimatedTotal Decimal            @db.Decimal(14, 2)
+  actualTotal    Decimal?           @db.Decimal(14, 2)
 
-  status           RequestStatus       @default(DRAFT)
+  status RequestStatus @default(DRAFT)
 
-  requestedById    String
-  requestedBy      User                @relation("RequestedExpenses", fields: [requestedById], references: [id])
-  requestedAt      DateTime            @default(now())
+  requestedById String
+  requestedBy   User     @relation("RequestedExpenses", fields: [requestedById], references: [id])
+  requestedAt   DateTime @default(now())
 
-  approvedById     String?
-  approvedBy       User?               @relation("ApprovedExpenses", fields: [approvedById], references: [id])
-  approvedAt       DateTime?
+  approvedById String?
+  approvedBy   User?     @relation("ApprovedExpenses", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
 
-  rejectedById     String?
-  rejectedBy       User?               @relation("RejectedExpenses", fields: [rejectedById], references: [id])
-  rejectedAt       DateTime?
-  rejectionReason  String?
+  rejectedById    String?
+  rejectedBy      User?     @relation("RejectedExpenses", fields: [rejectedById], references: [id])
+  rejectedAt      DateTime?
+  rejectionReason String?
 
   disbursedById    String?
-  disbursedBy      User?               @relation("DisbursedExpenses", fields: [disbursedById], references: [id])
+  disbursedBy      User?          @relation("DisbursedExpenses", fields: [disbursedById], references: [id])
   disbursedAt      DateTime?
   disbursementNote String?
   paymentMethod    PaymentMethod?
 
-  items            ExpenseRequestItem[]
-  expense          Expense?
+  items   ExpenseRequestItem[]
+  expense Expense?
 
-  createdAt        DateTime            @default(now())
+  createdAt DateTime @default(now())
 
   @@index([schoolId])
   @@index([schoolId, status])
@@ -463,13 +657,13 @@ model AuditLog {
 // ─── Results ─────────────────────────────────────────────────────────────────
 
 model Subject {
-  id        String      @id @default(cuid())
-  schoolId  String
-  name      String
-  code      String
-  maxMark   Int         @default(100)
-  type      SubjectType @default(CORE)
-  active    Boolean     @default(true)
+  id       String      @id @default(cuid())
+  schoolId String
+  name     String
+  code     String
+  maxMark  Int         @default(100)
+  type     SubjectType @default(CORE)
+  active   Boolean     @default(true)
 
   school      School              @relation(fields: [schoolId], references: [id])
   assignments SubjectAssignment[]
@@ -480,24 +674,26 @@ model Subject {
 }
 
 model SubjectAssignment {
-  id        String      @id @default(cuid())
+  id        String       @id @default(cuid())
   schoolId  String
-  school    School      @relation(fields: [schoolId], references: [id])
+  school    School       @relation(fields: [schoolId], references: [id])
   teacherId String
-  teacher   User        @relation(fields: [teacherId], references: [id])
+  teacher   User         @relation(fields: [teacherId], references: [id])
   subjectId String
-  subject   Subject     @relation(fields: [subjectId], references: [id])
+  subject   Subject      @relation(fields: [subjectId], references: [id])
   classId   String
-  class     SchoolClass @relation(fields: [classId], references: [id])
-  term      String
-  createdAt DateTime    @default(now())
+  class     SchoolClass  @relation(fields: [classId], references: [id])
+  termId    String
+  term      AcademicTerm @relation(fields: [termId], references: [id])
+  createdAt DateTime     @default(now())
 
-  marksStatus     AssignmentMarkStatus @default(NOT_STARTED)
-  marksVerifiedAt DateTime?
+  marksStatus       AssignmentMarkStatus @default(NOT_STARTED)
+  marksVerifiedAt   DateTime?
   marksVerifiedById String?
-  marksVerifiedBy   User?              @relation("VerifiedAssignments", fields: [marksVerifiedById], references: [id])
+  marksVerifiedBy   User?                @relation("VerifiedAssignments", fields: [marksVerifiedById], references: [id])
 
-  @@unique([subjectId, classId, term])
+  @@unique([subjectId, classId, termId])
+  @@index([termId])
   @@index([schoolId])
   @@index([teacherId, schoolId])
 }
@@ -507,7 +703,7 @@ model Mark {
   schoolId    String
   studentId   String
   subjectId   String
-  term        String
+  termId      String
   rawMark     Decimal    @db.Decimal(14, 2)
   percentage  Decimal?   @db.Decimal(14, 2)
   letterGrade String?
@@ -516,12 +712,14 @@ model Mark {
   enteredBy   String
   enteredAt   DateTime   @default(now())
 
-  school  School  @relation(fields: [schoolId], references: [id])
-  student Student @relation(fields: [studentId], references: [id])
-  subject Subject @relation(fields: [subjectId], references: [id])
-  enterer User    @relation(fields: [enteredBy], references: [id])
+  school  School       @relation(fields: [schoolId], references: [id])
+  student Student      @relation(fields: [studentId], references: [id])
+  subject Subject      @relation(fields: [subjectId], references: [id])
+  enterer User         @relation(fields: [enteredBy], references: [id])
+  term    AcademicTerm @relation(fields: [termId], references: [id])
 
-  @@unique([studentId, subjectId, term])
+  @@unique([studentId, subjectId, termId])
+  @@index([termId])
   @@index([schoolId])
   @@index([schoolId, studentId])
 }
@@ -530,7 +728,7 @@ model TermResult {
   id            String    @id @default(cuid())
   schoolId      String
   studentId     String
-  term          String
+  termId        String
   totalMarks    Decimal   @db.Decimal(14, 2)
   percentage    Decimal   @db.Decimal(14, 2)
   classPosition Int?
@@ -538,10 +736,12 @@ model TermResult {
   published     Boolean   @default(false)
   publishedAt   DateTime?
 
-  school  School  @relation(fields: [schoolId], references: [id])
-  student Student @relation(fields: [studentId], references: [id])
+  school  School       @relation(fields: [schoolId], references: [id])
+  student Student      @relation(fields: [studentId], references: [id])
+  term    AcademicTerm @relation(fields: [termId], references: [id])
 
-  @@unique([studentId, term])
+  @@unique([studentId, termId])
+  @@index([termId])
   @@index([schoolId])
   @@index([schoolId, studentId])
 }
@@ -658,12 +858,12 @@ model Book {
 }
 
 model BookCopy {
-  id               String        @id @default(cuid())
-  schoolId         String
-  bookId           String
-  accessionNumber  String
-  condition        CopyCondition @default(NEW)
-  status           CopyStatus    @default(AVAILABLE)
+  id              String        @id @default(cuid())
+  schoolId        String
+  bookId          String
+  accessionNumber String
+  condition       CopyCondition @default(NEW)
+  status          CopyStatus    @default(AVAILABLE)
 
   school     School      @relation(fields: [schoolId], references: [id])
   book       Book        @relation(fields: [bookId], references: [id])

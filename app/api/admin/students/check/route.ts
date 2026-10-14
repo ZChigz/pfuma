@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
-import { canManageStudents } from '@/lib/permissions';
+import { canManageEnrollment } from '@/lib/permissions';
+import { requireOpenTerm } from '@/lib/academic/terms';
 import { fieldErrors, RegisterStudentRequestSchema, RegisterStudentSchema } from '@/lib/students/registration';
 import { checkRegistration } from '@/lib/students/server';
 import type { SessionUser } from '@/types';
 
-// Validates a registration without saving it and returns the cleaned data plus
+// Validates an admission without saving it and returns the cleaned data plus
 // any warnings, for the confirmation screen.
 async function _POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
 
-  try { await canManageStudents(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  try { await canManageEnrollment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
   const body = await parseBody(req, RegisterStudentRequestSchema);
   if ('error' in body) return body.error;
@@ -26,6 +27,7 @@ async function _POST(req: Request) {
     );
   }
 
+  await requireOpenTerm(user.schoolId);
   const check = await checkRegistration(user.schoolId, parsed.data);
   return apiSuccess({ student: parsed.data, ...check });
 }

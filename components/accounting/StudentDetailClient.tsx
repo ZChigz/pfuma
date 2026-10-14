@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Table, type Column } from '@/components/ui/Table';
-import { ApplyChargeModal } from './ApplyChargeModal';
+import { ApplyChargeModal, type TermOption } from './ApplyChargeModal';
 import { formatUSD, formatZiG, formatDate } from '@/lib/utils';
 import type { PaymentStatus } from '@/types';
 
@@ -25,6 +25,7 @@ export interface StatementItem {
 
 interface Props {
   studentId: string;
+  terms: TermOption[];
   portalUrl: string;
   balanceUSD: number;
   balanceZiG: number;
@@ -40,6 +41,7 @@ const STATUS_VARIANT: Record<PaymentStatus, 'success' | 'warning' | 'neutral'> =
 
 export function StudentDetailClient({
   studentId,
+  terms,
   portalUrl,
   balanceUSD,
   balanceZiG,
@@ -111,7 +113,7 @@ export function StudentDetailClient({
         <Button variant="ghost" size="sm" onClick={handleCopy}>
           {copied ? '✓ Copied' : 'Copy link'}
         </Button>
-        {canApplyCharge && <ApplyChargeModal studentId={studentId} />}
+        {canApplyCharge && <ApplyChargeModal studentId={studentId} terms={terms} />}
       </div>
 
       {/* Balance cards */}

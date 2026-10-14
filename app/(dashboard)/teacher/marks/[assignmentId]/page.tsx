@@ -15,6 +15,7 @@ export default async function TeacherMarkEntryPage({ params }: { params: { assig
     include: {
       subject: { select: { id: true, name: true, code: true, maxMark: true } },
       class:   { select: { id: true, name: true } },
+      term:    { select: { id: true, name: true } },
     },
   });
   if (!assignment) notFound();
@@ -27,7 +28,8 @@ export default async function TeacherMarkEntryPage({ params }: { params: { assig
       subjectId={assignment.subjectId}
       subjectName={assignment.subject.name}
       maxMark={assignment.subject.maxMark}
-      term={assignment.term}
+      termId={assignment.term.id}
+      termName={assignment.term.name}
     />
   );
 }

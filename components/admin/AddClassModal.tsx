@@ -1,66 +1,67 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { useToast } from '@/components/ui/Toast';
-import { CreateClassSchema } from '@/lib/validations/admin';
-import type { z } from 'zod';
 
-type FormValues = z.infer<typeof CreateClassSchema>;
-
-const GRADE_OPTIONS = [
-  'ECD A', 'ECD B',
-  'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7',
-  'Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6',
-].map((g) => ({ value: g, label: g }));
-
-interface Teacher {
-  id: string;
-  fullName: string;
-}
+interface Option { id: string; name: string }
 
 interface Props {
-  teachers: Teacher[];
+  teachers: { id: string; fullName: string }[];
+  levels: Option[];
+  defaultCapacity: number;
 }
 
-export function AddClassModal({ teachers }: Props) {
+export function AddClassModal({ teachers, levels, defaultCapacity }: Props) {
   const [open, setOpen] = useState(false);
+  const [levelId, setLevelId] = useState('');
+  const [stream, setStream] = useState('');
+  const [capacity, setCapacity] = useState(String(defaultCapacity));
+  const [classTeacherId, setClassTeacherId] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
   const toast = useToast();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    reset,
-  } = useForm<FormValues>({ resolver: zodResolver(CreateClassSchema) });
-
   function handleClose() {
     setOpen(false);
-    reset();
+    setLevelId(''); setStream(''); setCapacity(String(defaultCapacity)); setClassTeacherId(''); setErrors({});
   }
 
-  async function onSubmit(values: FormValues) {
-    const res = await fetch('/api/admin/classes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(values),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      toast.error(data.message ?? 'Failed to add class');
-      return;
+  async function onSubmit() {
+    setBusy(true);
+    setErrors({});
+    try {
+      const res = await fetch('/api/admin/classes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          levelId,
+          stream: stream.trim(),
+          capacity: Number(capacity),
+          ...(classTeacherId ? { classTeacherId } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const fieldErrs = Object.fromEntries(Object.entries(data.errors ?? {}).map(([k, v]) => [k, (v as string[])[0]]));
+        setErrors(fieldErrs);
+        if (!Object.keys(fieldErrs).length) toast.error(data.message ?? 'Failed to add class');
+        return;
+      }
+      toast.success('Class created');
+      handleClose();
+      router.refresh();
+    } finally {
+      setBusy(false);
     }
-    toast.success('Class created');
-    handleClose();
-    router.refresh();
   }
+
+  const levelName = levels.find((l) => l.id === levelId)?.name;
 
   return (
     <>
@@ -72,42 +73,51 @@ export function AddClassModal({ teachers }: Props) {
         title="Add Class"
         footer={
           <>
-            <Button variant="secondary" onClick={handleClose} disabled={isSubmitting}>
-              Cancel
-            </Button>
-            <Button form="add-class-form" type="submit" loading={isSubmitting}>
-              Add Class
-            </Button>
+            <Button variant="secondary" onClick={handleClose} disabled={busy}>Cancel</Button>
+            <Button onClick={onSubmit} loading={busy} disabled={!levelId}>Add Class</Button>
           </>
         }
       >
-        <form id="add-class-form" onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <Select
-            id="grade"
-            label="Grade"
+            id="levelId"
+            label="Level"
             required
-            options={GRADE_OPTIONS}
-            placeholder="Select a grade"
-            error={errors.grade?.message}
-            {...register('grade')}
+            options={levels.map((l) => ({ value: l.id, label: l.name }))}
+            placeholder="Select a level"
+            value={levelId}
+            onChange={(e) => setLevelId(e.target.value)}
+            error={errors.levelId}
           />
           <Input
-            id="section"
-            label="Section"
-            placeholder="e.g. A (optional)"
-            hint="Used to distinguish multiple classes in the same grade, e.g. Form 4A, Form 4B"
-            error={errors.section?.message}
-            {...register('section')}
+            id="stream"
+            label="Stream"
+            placeholder="e.g. North"
+            value={stream}
+            onChange={(e) => setStream(e.target.value)}
+            hint={levelName ? `The class will be called "${stream.trim() ? `${levelName} ${stream.trim()}` : levelName}". Leave blank if this level has one class.` : 'Distinguishes classes in the same level, e.g. North, South, East'}
+            error={errors.stream}
+          />
+          <Input
+            id="capacity"
+            label="Capacity"
+            type="number"
+            min={1}
+            max={200}
+            value={capacity}
+            onChange={(e) => setCapacity(e.target.value)}
+            hint="Admitting beyond this shows a warning"
+            error={errors.capacity}
           />
           <Select
             id="classTeacherId"
             label="Class Teacher"
             options={teachers.map((t) => ({ value: t.id, label: t.fullName }))}
             placeholder="Select a teacher (optional)"
-            error={errors.classTeacherId?.message}
-            {...register('classTeacherId')}
+            value={classTeacherId}
+            onChange={(e) => setClassTeacherId(e.target.value)}
           />
-        </form>
+        </div>
       </Modal>
     </>
   );

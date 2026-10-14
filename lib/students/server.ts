@@ -1,72 +1,71 @@
-// Server-only helpers for student registration (form + CSV import).
+// Server-only helpers for admission (form + CSV import) and classes.
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
+import { classDisplayName } from '@/lib/academic/rules';
+import { dateOnly, ensureLevels, getOpenTerm, requireOpenTerm } from '@/lib/academic/terms';
+import { findOrCreateGuardian, linkGuardian } from '@/lib/students/guardians';
 import {
   ageWarning,
-  className as buildClassName,
   DEFAULT_MAX_CLASS_SIZE,
-  formatStudentNumber,
-  type RegisterStudentData,
+  formatAdmissionNumber,
+  type AdmissionData,
   type RegistrationWarning,
 } from '@/lib/students/registration';
 
 type Db = Prisma.TransactionClient | typeof prisma;
+type Tx = Prisma.TransactionClient;
 
-export function dobToDate(isoDate: string): Date {
-  return new Date(`${isoDate}T00:00:00Z`);
+export const dobToDate = dateOnly;
+
+// ─── Classes ─────────────────────────────────────────────────────────────────
+
+export async function levelByName(schoolId: string, levelName: string, db: Db = prisma) {
+  const level = await db.level.findUnique({ where: { schoolId_name: { schoolId, name: levelName } } });
+  if (level) return level;
+  const levels = await ensureLevels(schoolId, db);
+  const found = levels.find((l) => l.name === levelName);
+  if (!found) throw new ServiceError(`Unknown level ${levelName}`, 422);
+  return found;
 }
 
-export async function getMaxClassSize(schoolId: string, db: Db = prisma): Promise<number> {
-  const school = await db.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } });
-  return school?.maxClassSize ?? DEFAULT_MAX_CLASS_SIZE;
+export async function findClass(schoolId: string, levelName: string, stream: string, db: Db = prisma) {
+  return db.schoolClass.findFirst({
+    where: { schoolId, level: { name: levelName }, stream: { equals: stream, mode: 'insensitive' } },
+    include: { level: true },
+  });
 }
 
-// Matches on grade + section first so classes created on the Classes page
-// (named e.g. "Form 2East") are reused instead of duplicated.
-export async function findClass(schoolId: string, form: string, stream: string, db: Db = prisma) {
-  return (
-    (await db.schoolClass.findFirst({
-      where: { schoolId, grade: form, section: { equals: stream, mode: 'insensitive' } },
-      orderBy: { active: 'desc' },
-    })) ??
-    (await db.schoolClass.findFirst({ where: { schoolId, name: buildClassName(form, stream) } }))
-  );
-}
-
-export async function findOrCreateClass(
-  tx: Prisma.TransactionClient,
-  schoolId: string,
-  actorId: string,
-  form: string,
-  stream: string,
-) {
-  const existing = await findClass(schoolId, form, stream, tx);
+export async function findOrCreateClass(tx: Tx, schoolId: string, actorId: string, levelName: string, stream: string) {
+  const existing = await findClass(schoolId, levelName, stream, tx);
   if (existing) return existing;
 
-  const name = buildClassName(form, stream);
+  const [level, school] = await Promise.all([
+    levelByName(schoolId, levelName, tx),
+    tx.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } }),
+  ]);
+  const name = classDisplayName(level.name, stream);
   const created = await tx.schoolClass.create({
-    data: { schoolId, name, grade: form, section: stream },
+    data: { schoolId, name, levelId: level.id, stream, capacity: school?.maxClassSize ?? DEFAULT_MAX_CLASS_SIZE },
+    include: { level: true },
   });
   await logAudit(
-    { schoolId, actorId, action: 'CREATE_CLASS', entityType: 'SchoolClass', entityId: created.id, detail: `${name} (created during student registration)` },
+    { schoolId, actorId, action: 'CREATE_CLASS', entityType: 'SchoolClass', entityId: created.id, detail: `${name} (created automatically)` },
     tx,
   );
   return created;
 }
 
-export async function activeStudentCount(classId: string | null | undefined, db: Db = prisma): Promise<number> {
-  if (!classId) return 0;
-  return db.student.count({ where: { classId, active: true } });
+// Students currently in a class = ACTIVE enrollments in the open term.
+export async function classOccupancy(classId: string | null | undefined, termId: string | null | undefined, db: Db = prisma) {
+  if (!classId || !termId) return 0;
+  return db.enrollment.count({ where: { classId, termId, status: 'ACTIVE' } });
 }
 
-export async function findDuplicate(
-  schoolId: string,
-  firstName: string,
-  surname: string,
-  dateOfBirth: string,
-  db: Db = prisma,
-) {
+// ─── Duplicates & warnings ───────────────────────────────────────────────────
+
+export async function findDuplicate(schoolId: string, firstName: string, surname: string, dateOfBirth: string, db: Db = prisma) {
   return db.student.findFirst({
     where: {
       schoolId,
@@ -74,130 +73,177 @@ export async function findDuplicate(
       surname:     { equals: surname,   mode: 'insensitive' },
       dateOfBirth: dobToDate(dateOfBirth),
     },
-    select: { id: true, studentNumber: true, fullName: true, class: { select: { name: true } } },
+    select: { id: true, admissionNumber: true, fullName: true, currentClass: { select: { name: true } } },
   });
 }
 
-export function duplicateMessage(dup: { studentNumber: string | null; fullName: string; class: { name: string } | null }): string {
-  const who = dup.studentNumber ? `${dup.fullName} (${dup.studentNumber})` : dup.fullName;
-  const where = dup.class ? ` in ${dup.class.name}` : '';
-  return `A student with the same name and date of birth is already registered: ${who}${where}. Make sure this is not the same child.`;
+export function duplicateMessage(dup: { admissionNumber: string; fullName: string; currentClass: { name: string } | null }): string {
+  const where = dup.currentClass ? ` in ${dup.currentClass.name}` : '';
+  return `A student with the same name and date of birth is already registered: ${dup.fullName} (${dup.admissionNumber})${where}. Make sure this is not the same child.`;
 }
 
-export function classFullMessage(name: string, current: number, max: number): string {
-  return `${name} already has ${current} active students and the class limit is ${max}. Adding this student will make it ${current + 1}.`;
+export function classFullMessage(name: string, current: number, capacity: number): string {
+  return `${name} already has ${current} students and its capacity is ${capacity}. Adding this student will make it ${current + 1}.`;
 }
 
 export interface RegistrationCheck {
   className: string;
   classExists: boolean;
   classCount: number;
-  maxClassSize: number;
+  capacity: number;
+  termName: string | null;
   warnings: RegistrationWarning[];
 }
 
-export async function checkRegistration(schoolId: string, data: RegisterStudentData): Promise<RegistrationCheck> {
-  const [schoolClass, maxClassSize, duplicate] = await Promise.all([
-    findClass(schoolId, data.form, data.stream),
-    getMaxClassSize(schoolId),
+export async function checkRegistration(schoolId: string, data: AdmissionData): Promise<RegistrationCheck> {
+  const [schoolClass, school, duplicate, term] = await Promise.all([
+    findClass(schoolId, data.level, data.stream),
+    prisma.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } }),
     findDuplicate(schoolId, data.firstName, data.surname, data.dateOfBirth),
+    getOpenTerm(schoolId),
   ]);
-  const classCount = await activeStudentCount(schoolClass?.id);
+  const classCount = await classOccupancy(schoolClass?.id, term?.id);
+  const capacity = schoolClass?.capacity ?? school?.maxClassSize ?? DEFAULT_MAX_CLASS_SIZE;
   const name = schoolClass?.name ?? data.className;
 
   const warnings: RegistrationWarning[] = [];
-  const age = ageWarning(data.dateOfBirth, data.form);
+  const age = ageWarning(data.dateOfBirth, data.level);
   if (age) warnings.push({ code: 'AGE_OUT_OF_RANGE', message: age });
-  if (data.status === 'ACTIVE' && classCount + 1 > maxClassSize) {
-    warnings.push({ code: 'CLASS_FULL', message: classFullMessage(name, classCount, maxClassSize) });
-  }
+  if (classCount + 1 > capacity) warnings.push({ code: 'CLASS_FULL', message: classFullMessage(name, classCount, capacity) });
   if (duplicate) warnings.push({ code: 'POSSIBLE_DUPLICATE', message: duplicateMessage(duplicate) });
 
-  return { className: name, classExists: !!schoolClass, classCount, maxClassSize, warnings };
+  return { className: name, classExists: !!schoolClass, classCount, capacity, termName: term?.name ?? null, warnings };
 }
 
-// Next free sequence number for each enrollment year, e.g. { 2026: 14 }.
-// Sequence numbers are fixed-width, so the lexically largest is the highest.
-export async function nextSequences(
-  tx: Prisma.TransactionClient,
-  schoolId: string,
-  years: number[],
-): Promise<Map<number, number>> {
+// ─── Admission numbers ───────────────────────────────────────────────────────
+
+// Next free sequence number for each admission year, e.g. { 2026: 14 }.
+// Generated numbers are fixed-width, so the lexically largest is the highest.
+export async function nextSequences(tx: Tx, schoolId: string, years: number[]): Promise<Map<number, number>> {
   const result = new Map<number, number>();
   for (const year of Array.from(new Set(years))) {
     const last = await tx.student.findFirst({
-      where: { schoolId, studentNumber: { startsWith: `STU${year}` } },
-      orderBy: { studentNumber: 'desc' },
-      select: { studentNumber: true },
+      where: { schoolId, admissionNumber: { startsWith: `STU${year}` } },
+      orderBy: { admissionNumber: 'desc' },
+      select: { admissionNumber: true },
     });
-    const lastSeq = last?.studentNumber ? Number(last.studentNumber.slice(7)) : 0;
-    result.set(year, (Number.isFinite(lastSeq) ? lastSeq : 0) + 1);
+    const lastSeq = last && /^STU\d{8}$/.test(last.admissionNumber) ? Number(last.admissionNumber.slice(7)) : 0;
+    result.set(year, lastSeq + 1);
   }
   return result;
 }
 
-export function takeStudentNumber(sequences: Map<number, number>, year: number): string {
-  const seq = sequences.get(year) ?? 1;
-  if (seq > 9999) throw new StudentNumberExhaustedError(year);
+export function takeAdmissionNumber(sequences: Map<number, number>, year: number, taken: Set<string> = new Set()): string {
+  let seq = sequences.get(year) ?? 1;
+  let candidate = formatAdmissionNumber(year, seq);
+  while (taken.has(candidate)) candidate = formatAdmissionNumber(year, ++seq);
+  if (seq > 9999) throw new ServiceError(`All 9999 admission numbers for ${year} are used`, 409);
   sequences.set(year, seq + 1);
-  return formatStudentNumber(year, seq);
+  return candidate;
 }
 
-export class StudentNumberExhaustedError extends Error {
-  constructor(year: number) {
-    super(`All 9999 student numbers for ${year} are used`);
-  }
-}
-
-export function isStudentNumberClash(e: unknown): boolean {
+export function isUniqueClash(e: unknown, field: string): boolean {
   if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== 'P2002') return false;
-  const target = (e.meta?.target ?? []) as string[] | string;
-  return String(target).includes('studentNumber');
+  return String(e.meta?.target ?? '').includes(field);
 }
 
-// Runs fn, retrying when a concurrent registration took the same student number.
-export async function withStudentNumberRetry<T>(fn: () => Promise<T>, attempts = 5): Promise<T> {
+// Runs fn, retrying when a concurrent admission took the same admission number.
+export async function withAdmissionNumberRetry<T>(fn: () => Promise<T>, attempts = 5): Promise<T> {
   for (let i = 1; ; i++) {
     try {
       return await fn();
     } catch (e) {
-      if (i >= attempts || !isStudentNumberClash(e)) throw e;
+      if (isUniqueClash(e, 'birthCertificateNumber')) {
+        throw new ServiceError('Another student already has this birth certificate number', 409);
+      }
+      if (i >= attempts || !isUniqueClash(e, 'admissionNumber')) throw e;
     }
   }
 }
 
-// Student columns shared by the form and the CSV import.
-export function studentRecord(
+// ─── Admission ───────────────────────────────────────────────────────────────
+
+// Admit: Student + primary Guardian link + ACTIVE Enrollment in the open term,
+// written in the caller's transaction with one ADMIT_STUDENT audit row.
+export async function admitStudent(
+  tx: Tx,
   schoolId: string,
-  classId: string,
-  studentNumber: string,
-  data: RegisterStudentData,
-): Prisma.StudentCreateManyInput {
-  return {
-    schoolId,
-    studentNumber,
-    classId,
-    grade:                  data.form,
-    fullName:               data.fullName,
-    firstName:              data.firstName,
-    surname:                data.surname,
-    gender:                 data.gender,
-    dateOfBirth:            dobToDate(data.dateOfBirth),
-    enrollmentYear:         data.enrollmentYear,
-    parentName:             data.guardianName,
-    guardianRelationship:   data.guardianRelationship,
-    parentPhone:            data.guardianPhone,
-    houseNumber:            data.houseNumber,
-    suburb:                 data.suburb,
-    city:                   data.city,
-    address:                data.address,
-    status:                 data.status,
-    active:                 data.status === 'ACTIVE',
-    birthCertificateNumber: data.birthCertificateNumber,
-    previousSchool:         data.previousSchool,
-    secondGuardianPhone:    data.secondGuardianPhone,
-    medicalNotes:           data.medicalNotes,
-    photoUrl:               data.photoUrl,
-    portalToken:            crypto.randomUUID(),
-  };
+  actorId: string,
+  data: AdmissionData,
+  opts: { admissionNumber: string; termId: string; classId: string; className: string; auditNote?: string },
+) {
+  const student = await tx.student.create({
+    data: {
+      schoolId,
+      admissionNumber:        opts.admissionNumber,
+      firstName:              data.firstName,
+      surname:                data.surname,
+      fullName:               data.fullName,
+      gender:                 data.gender,
+      dateOfBirth:            dateOnly(data.dateOfBirth),
+      birthCertificateNumber: data.birthCertificateNumber,
+      admissionDate:          dateOnly(data.admissionDate),
+      previousSchool:         data.previousSchool,
+      medicalNotes:           data.medicalNotes,
+      photoUrl:               data.photoUrl,
+      houseNumber:            data.houseNumber,
+      suburb:                 data.suburb,
+      city:                   data.city,
+      address:                data.address,
+      status:                 'ACTIVE',
+      currentClassId:         opts.classId,
+      portalToken:            crypto.randomUUID(),
+    },
+  });
+
+  const term = await tx.academicTerm.findUniqueOrThrow({ where: { id: opts.termId } });
+  const admitted = dateOnly(data.admissionDate);
+  await tx.enrollment.create({
+    data: {
+      schoolId,
+      studentId: student.id,
+      classId: opts.classId,
+      termId: opts.termId,
+      status: 'ACTIVE',
+      startDate: admitted > term.startDate ? admitted : term.startDate,
+    },
+  });
+
+  const guardian = await findOrCreateGuardian(tx, schoolId, actorId, data.guardian);
+  await linkGuardian(tx, schoolId, actorId, student.id, guardian.id, {
+    relationship: data.relationship,
+    relationshipNote: data.relationshipNote,
+    isPrimary: true,
+    isFeePayer: true,
+    canReceiveSms: true,
+  });
+
+  await logAudit(
+    {
+      schoolId,
+      actorId,
+      action: 'ADMIT_STUDENT',
+      entityType: 'Student',
+      entityId: student.id,
+      detail: `${opts.admissionNumber} ${data.fullName} — ${opts.className}${opts.auditNote ? ` (${opts.auditNote})` : ''}`,
+    },
+    tx,
+  );
+  return student;
+}
+
+// Admits one student from the form: class found or created, number generated.
+export async function admitFromForm(schoolId: string, actorId: string, data: AdmissionData, auditNote?: string) {
+  return withAdmissionNumberRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const term = await requireOpenTerm(schoolId, tx);
+      const schoolClass = await findOrCreateClass(tx, schoolId, actorId, data.level, data.stream);
+      const year = Number(data.admissionDate.slice(0, 4));
+      const admissionNumber = data.admissionNumber ?? takeAdmissionNumber(await nextSequences(tx, schoolId, [year]), year);
+      const student = await admitStudent(tx, schoolId, actorId, data, {
+        admissionNumber, termId: term.id, classId: schoolClass.id, className: schoolClass.name, auditNote,
+      });
+      return { ...student, currentClass: { id: schoolClass.id, name: schoolClass.name } };
+    }),
+  );
 }

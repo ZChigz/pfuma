@@ -1,7 +1,5 @@
 import type { AssignmentMarkStatus, MarkStatus } from '@/types';
 
-export const TERMS = ['Term 1, 2026', 'Term 2, 2026', 'Term 3, 2026'];
-
 // Tie-aware ranking: equal totals share the same position, and the next
 // distinct (lower) total resumes at its 1-based index rather than +1.
 export function assignPositions(

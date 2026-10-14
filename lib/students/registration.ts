@@ -1,24 +1,34 @@
-// Student registration rules — shared by the Register Student form (client),
-// the registration API and the CSV import so all three validate identically.
+// Student admission rules — shared by the Register Student form (client), the
+// admission API and the CSV import so all three validate identically.
 // Must stay free of server-only imports.
 import { z } from 'zod';
+import { LEVEL_DEFINITIONS, normalizeStream, parseLevelOrder } from '@/lib/academic/rules';
 
 // ─── Reference lists ─────────────────────────────────────────────────────────
 
-export const FORMS = ['Form 1', 'Form 2', 'Form 3', 'Form 4'] as const;
-export const STREAMS = ['North', 'South', 'East'] as const;
-export type Form = (typeof FORMS)[number];
-export type Stream = (typeof STREAMS)[number];
+export const LEVELS = LEVEL_DEFINITIONS.map((l) => l.name) as unknown as readonly [
+  'Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6',
+];
+export type LevelName = (typeof LEVELS)[number];
+export { DEFAULT_STREAMS } from '@/lib/academic/rules';
 
 export const GENDER_OPTIONS = [
   { value: 'M', label: 'Male' },
   { value: 'F', label: 'Female' },
 ] as const;
 
-export const RELATIONSHIPS = [
-  'Father', 'Mother', 'Uncle', 'Aunt', 'Grandfather', 'Grandmother',
-  'Brother', 'Sister', 'Guardian', 'Other',
+export const RELATIONSHIP_OPTIONS = [
+  { value: 'FATHER',      label: 'Father' },
+  { value: 'MOTHER',      label: 'Mother' },
+  { value: 'UNCLE',       label: 'Uncle' },
+  { value: 'AUNT',        label: 'Aunt' },
+  { value: 'GRANDPARENT', label: 'Grandparent' },
+  { value: 'SIBLING',     label: 'Sibling' },
+  { value: 'GUARDIAN',    label: 'Guardian' },
+  { value: 'OTHER',       label: 'Other' },
 ] as const;
+export const RELATIONSHIPS = ['FATHER', 'MOTHER', 'UNCLE', 'AUNT', 'GRANDPARENT', 'SIBLING', 'GUARDIAN', 'OTHER'] as const;
+export type Relationship = (typeof RELATIONSHIPS)[number];
 
 export const STUDENT_STATUS_OPTIONS = [
   { value: 'ACTIVE',      label: 'Active' },
@@ -27,8 +37,6 @@ export const STUDENT_STATUS_OPTIONS = [
   { value: 'GRADUATED',   label: 'Graduated' },
   { value: 'WITHDRAWN',   label: 'Withdrawn' },
 ] as const;
-export const STUDENT_STATUSES = ['ACTIVE', 'TRANSFERRED', 'SUSPENDED', 'GRADUATED', 'WITHDRAWN'] as const;
-export type StudentStatus = (typeof STUDENT_STATUSES)[number];
 
 export const OTHER_SUBURB = 'Other';
 export const SUBURBS = [
@@ -43,14 +51,16 @@ export const SUBURBS = [
 
 export const DEFAULT_CITY = 'Harare';
 export const DEFAULT_MAX_CLASS_SIZE = 45;
-export const MIN_ENROLLMENT_YEAR = 2000;
+export const MIN_ADMISSION_DATE = '2000-01-01';
 
-// Typical age range per form. Outside it is a warning, never a hard block.
-export const FORM_AGE_RANGES: Record<Form, [number, number]> = {
+// Typical age range per level. Outside it is a warning, never a hard block.
+export const LEVEL_AGE_RANGES: Record<LevelName, [number, number]> = {
   'Form 1': [12, 14],
   'Form 2': [13, 15],
   'Form 3': [14, 16],
   'Form 4': [15, 17],
+  'Form 5': [16, 18],
+  'Form 6': [17, 19],
 };
 
 export const WARNING_CODES = ['AGE_OUT_OF_RANGE', 'CLASS_FULL', 'POSSIBLE_DUPLICATE'] as const;
@@ -74,8 +84,8 @@ export function currentYearInHarare(): number {
   return Number(todayInHarare().slice(0, 4));
 }
 
-export function className(form: string, stream: string): string {
-  return `${form} ${stream}`;
+export function className(level: string, stream: string): string {
+  return stream ? `${level} ${stream}` : level;
 }
 
 // Trims, collapses spaces, and capitalises each part of a name.
@@ -93,6 +103,7 @@ export function normalizeName(raw: string): string {
 // Letters (any alphabet), single spaces, hyphens and apostrophes between letters.
 // Built with RegExp() because the tsconfig target predates the literal /u flag.
 const NAME_PATTERN = new RegExp("^\\p{L}+(?:[ '-]\\p{L}+)*$", 'u');
+const STREAM_PATTERN = new RegExp('^[\\p{L}\\d]+(?: [\\p{L}\\d]+)*$', 'u');
 
 // Accepts 07X…, 7X…, 263… or +263… with spaces/dashes; returns +263XXXXXXXXX.
 // Valid Zimbabwean mobile prefixes: 71 (NetOne), 73 (Telecel), 77/78 (Econet).
@@ -117,38 +128,36 @@ export function ageOn(dateOfBirth: string, onDate: string): number {
   return age;
 }
 
-export function ageWarning(dateOfBirth: string, form: string, today = todayInHarare()): string | null {
-  if (!isRealIsoDate(dateOfBirth) || !(form in FORM_AGE_RANGES)) return null;
-  const [min, max] = FORM_AGE_RANGES[form as Form];
+export function ageWarning(dateOfBirth: string, level: string, today = todayInHarare()): string | null {
+  if (!isRealIsoDate(dateOfBirth) || !(level in LEVEL_AGE_RANGES)) return null;
+  const [min, max] = LEVEL_AGE_RANGES[level as LevelName];
   const age = ageOn(dateOfBirth, today);
   if (age >= min && age <= max) return null;
-  return `This student is ${age} years old. ${form} students are usually ${min}–${max}. Please double-check the date of birth and form.`;
+  return `This student is ${age} years old. ${level} students are usually ${min}–${max}. Please double-check the date of birth and level.`;
 }
 
 export function buildAddress(houseNumber: string, suburb: string, city: string): string {
   return `${houseNumber}, ${suburb}, ${city}`;
 }
 
-export function formatStudentNumber(enrollmentYear: number, sequence: number): string {
-  return `STU${enrollmentYear}${String(sequence).padStart(4, '0')}`;
+export function formatAdmissionNumber(admissionYear: number, sequence: number): string {
+  return `STU${admissionYear}${String(sequence).padStart(4, '0')}`;
 }
 
 // ─── Field schemas ───────────────────────────────────────────────────────────
+
+const custom = (ctx: z.RefinementCtx, message: string, path?: string[]) =>
+  ctx.addIssue({ code: 'custom', message, ...(path ? { path } : {}) });
 
 function personName(label: string) {
   return z
     .string({ error: `${label} is required` })
     .transform(normalizeName)
     .superRefine((v, ctx) => {
-      if (!v) ctx.addIssue({ code: 'custom', message: `${label} is required` });
-      else if (v.length < 2) ctx.addIssue({ code: 'custom', message: `${label} must be at least 2 characters` });
-      else if (v.length > 50) ctx.addIssue({ code: 'custom', message: `${label} must be 50 characters or fewer` });
-      else if (!NAME_PATTERN.test(v)) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `${label} can only contain letters, spaces, hyphens (-) and apostrophes (')`,
-        });
-      }
+      if (!v) custom(ctx, `${label} is required`);
+      else if (v.length < 2) custom(ctx, `${label} must be at least 2 characters`);
+      else if (v.length > 50) custom(ctx, `${label} must be 50 characters or fewer`);
+      else if (!NAME_PATTERN.test(v)) custom(ctx, `${label} can only contain letters, spaces, hyphens (-) and apostrophes (')`);
     });
 }
 
@@ -159,15 +168,12 @@ function mobilePhone(label: string, required: boolean) {
     .transform((raw, ctx) => {
       const v = (raw ?? '').trim();
       if (!v) {
-        if (required) ctx.addIssue({ code: 'custom', message: `${label} is required` });
+        if (required) custom(ctx, `${label} is required`);
         return null;
       }
       const normalized = normalizeZimMobile(v);
       if (!normalized) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `${label} must be a Zimbabwean mobile number starting with 071, 073, 077, 078 or +263 (e.g. 0771234567)`,
-        });
+        custom(ctx, `${label} must be a Zimbabwean mobile number starting with 071, 073, 077, 078 or +263 (e.g. 0771234567)`);
         return null;
       }
       return normalized;
@@ -182,9 +188,21 @@ function optionalText(label: string, max: number, pattern?: { re: RegExp; messag
     .transform((raw, ctx) => {
       const v = (raw ?? '').trim().replace(/\s+/g, ' ');
       if (!v) return null;
-      if (v.length > max) ctx.addIssue({ code: 'custom', message: `${label} must be ${max} characters or fewer` });
-      else if (pattern && !pattern.re.test(v)) ctx.addIssue({ code: 'custom', message: pattern.message });
+      if (v.length > max) custom(ctx, `${label} must be ${max} characters or fewer`);
+      else if (pattern && !pattern.re.test(v)) custom(ctx, pattern.message);
       return v;
+    });
+}
+
+function isoDateField(label: string, opts: { min?: string; minMessage?: string }) {
+  return z
+    .string({ error: `${label} is required` })
+    .trim()
+    .superRefine((v, ctx) => {
+      if (!v) custom(ctx, `${label} is required`);
+      else if (!isRealIsoDate(v)) custom(ctx, `Enter a real ${label.toLowerCase()}`);
+      else if (v > todayInHarare()) custom(ctx, `${label} cannot be in the future`);
+      else if (opts.min && v < opts.min) custom(ctx, opts.minMessage ?? `${label} is too early`);
     });
 }
 
@@ -192,140 +210,232 @@ function choice<const T extends readonly [string, ...string[]]>(values: T, messa
   return z.enum(values, { error: message });
 }
 
-// ─── Registration schema ─────────────────────────────────────────────────────
-// Input: what the form / CSV supplies (strings). Output: clean, normalised data.
+// Fields shared by the form and the CSV import.
+const commonFields = {
+  firstName: personName('First name'),
+  surname:   personName('Surname'),
+  gender:    choice(['M', 'F'], 'Please select Male or Female'),
+  dateOfBirth: isoDateField('Date of birth', {}),
+
+  level: z
+    .string({ error: 'Please select a level (Form 1–6)' })
+    .transform((v, ctx) => {
+      const order = parseLevelOrder(v ?? '');
+      if (!order) {
+        custom(ctx, 'Please select a level (Form 1–6)');
+        return z.NEVER;
+      }
+      return `Form ${order}` as LevelName;
+    }),
+  stream: z
+    .string({ error: 'Please select a stream' })
+    .transform(normalizeStream)
+    .superRefine((v, ctx) => {
+      if (!v) custom(ctx, 'Please select a stream');
+      else if (v.length > 30) custom(ctx, 'Stream must be 30 characters or fewer');
+      else if (!STREAM_PATTERN.test(v)) custom(ctx, 'Stream can only contain letters, numbers and spaces');
+    }),
+  admissionDate: isoDateField('Admission date', {
+    min: MIN_ADMISSION_DATE,
+    minMessage: 'Admission date must be in 2000 or later',
+  }),
+
+  guardianName: personName('Guardian name'),
+  guardianRelationship: choice(RELATIONSHIPS, "Please select the guardian's relationship to the student"),
+  guardianRelationshipOther: optionalText('Relationship', 30),
+  guardianPhone: mobilePhone('Guardian phone', true),
+  guardianAltPhone: mobilePhone('Guardian alternative phone', false),
+  guardianEmail: optionalText('Guardian email', 100, {
+    re: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    message: 'Guardian email must look like name@example.com',
+  }),
+  guardianNationalId: optionalText('Guardian national ID', 20, {
+    re: /^[A-Za-z0-9 -]+$/,
+    message: 'Guardian national ID can only contain letters, numbers, spaces and -',
+  }),
+  guardianOccupation: optionalText('Guardian occupation', 60),
+
+  birthCertificateNumber: optionalText('Birth certificate number', 30, {
+    re: /^[A-Za-z0-9 /-]+$/,
+    message: 'Birth certificate number can only contain letters, numbers, spaces, / and -',
+  }),
+  previousSchool: optionalText('Previous school', 100),
+  medicalNotes:   optionalText('Medical conditions / allergies', 500),
+};
+
+type CommonParsed = {
+  firstName: string; surname: string; dateOfBirth: string; admissionDate: string;
+  guardianName: string; guardianRelationship: Relationship; guardianRelationshipOther: string | null;
+  guardianPhone: string | null; guardianAltPhone: string | null;
+};
+
+function commonRules(d: CommonParsed, ctx: z.RefinementCtx) {
+  if (d.guardianRelationship === 'OTHER' && !d.guardianRelationshipOther) {
+    custom(ctx, 'Please type the relationship', ['guardianRelationshipOther']);
+  }
+  if (d.guardianName && !d.guardianName.includes(' ')) {
+    custom(ctx, "Enter the guardian's first name and surname", ['guardianName']);
+  }
+  if (d.guardianAltPhone && d.guardianAltPhone === d.guardianPhone) {
+    custom(ctx, 'Alternative phone is the same as the guardian phone', ['guardianAltPhone']);
+  }
+  if (isRealIsoDate(d.dateOfBirth) && isRealIsoDate(d.admissionDate) && d.admissionDate < d.dateOfBirth) {
+    custom(ctx, 'Admission date cannot be before the date of birth', ['admissionDate']);
+  }
+}
+
+type CommonOut = {
+  firstName: string; surname: string; gender: 'M' | 'F'; dateOfBirth: string; level: LevelName; stream: string;
+  admissionDate: string; guardianName: string; guardianRelationship: Relationship; guardianRelationshipOther: string | null;
+  guardianPhone: string | null; guardianAltPhone: string | null; guardianEmail: string | null;
+  guardianNationalId: string | null; guardianOccupation: string | null;
+  birthCertificateNumber: string | null; previousSchool: string | null; medicalNotes: string | null;
+};
+
+// Clean admission data produced by both the form and the CSV import.
+export interface AdmissionData {
+  firstName: string;
+  surname: string;
+  fullName: string;
+  gender: 'M' | 'F';
+  dateOfBirth: string;
+  level: LevelName;
+  stream: string;
+  className: string;
+  admissionDate: string;
+  admissionNumber: string | null; // null = generate
+  guardian: {
+    fullName: string;
+    phone: string;
+    altPhone: string | null;
+    email: string | null;
+    nationalId: string | null;
+    occupation: string | null;
+    address: string | null;
+  };
+  relationship: Relationship;
+  relationshipNote: string | null;
+  birthCertificateNumber: string | null;
+  previousSchool: string | null;
+  medicalNotes: string | null;
+  houseNumber: string | null;
+  suburb: string | null;
+  city: string | null;
+  address: string | null;
+  photoUrl: string | null;
+}
+
+function commonOutput(d: CommonOut) {
+  return {
+    firstName:      d.firstName,
+    surname:        d.surname,
+    fullName:       `${d.firstName} ${d.surname}`,
+    gender:         d.gender,
+    dateOfBirth:    d.dateOfBirth,
+    level:          d.level,
+    stream:         d.stream,
+    className:      className(d.level, d.stream),
+    admissionDate:  d.admissionDate,
+    guardian: {
+      fullName:   d.guardianName,
+      phone:      d.guardianPhone as string,
+      altPhone:   d.guardianAltPhone,
+      email:      d.guardianEmail?.toLowerCase() ?? null,
+      nationalId: d.guardianNationalId?.toUpperCase() ?? null,
+      occupation: d.guardianOccupation,
+    },
+    relationship:     d.guardianRelationship,
+    relationshipNote: d.guardianRelationship === 'OTHER' ? d.guardianRelationshipOther : null,
+    birthCertificateNumber: d.birthCertificateNumber?.toUpperCase() ?? null,
+    previousSchool: d.previousSchool,
+    medicalNotes:   d.medicalNotes,
+  };
+}
+
+// ─── Register Student form ───────────────────────────────────────────────────
+// Input: what the form supplies (strings). Output: clean, normalised data.
 
 export const RegisterStudentSchema = z
   .object({
-    firstName: personName('First name'),
-    surname:   personName('Surname'),
-    gender:    choice(['M', 'F'], 'Please select Male or Female'),
-
-    dateOfBirth: z
-      .string({ error: 'Date of birth is required' })
-      .trim()
-      .superRefine((v, ctx) => {
-        if (!v) ctx.addIssue({ code: 'custom', message: 'Date of birth is required' });
-        else if (!isRealIsoDate(v)) ctx.addIssue({ code: 'custom', message: 'Enter a real date of birth' });
-        else if (v > todayInHarare()) ctx.addIssue({ code: 'custom', message: 'Date of birth cannot be in the future' });
-      }),
-
-    form:   choice(FORMS, 'Please select a form (Form 1–4)'),
-    stream: choice(STREAMS, 'Please select a stream (North, South or East)'),
-
-    enrollmentYear: z
-      .union([z.string(), z.number()], { error: 'Enrollment year is required' })
-      .transform((raw, ctx) => {
-        const v = String(raw).trim();
-        if (!v) {
-          ctx.addIssue({ code: 'custom', message: 'Enrollment year is required' });
-          return z.NEVER;
-        }
-        if (!/^\d{4}$/.test(v)) {
-          ctx.addIssue({ code: 'custom', message: 'Enrollment year must be a 4-digit year, e.g. 2026' });
-          return z.NEVER;
-        }
-        const year = Number(v);
-        if (year > currentYearInHarare()) {
-          ctx.addIssue({ code: 'custom', message: 'Enrollment year cannot be in the future' });
-        } else if (year < MIN_ENROLLMENT_YEAR) {
-          ctx.addIssue({ code: 'custom', message: `Enrollment year must be ${MIN_ENROLLMENT_YEAR} or later` });
-        }
-        return year;
-      }),
-
-    guardianName: personName('Guardian name'),
-    guardianRelationship: choice(RELATIONSHIPS, "Please select the guardian's relationship to the student"),
-    guardianRelationshipOther: optionalText('Relationship', 30),
-    guardianPhone: mobilePhone('Guardian phone', true),
-
+    ...commonFields,
     houseNumber: z
       .string({ error: 'House / stand number is required' })
       .trim()
       .superRefine((v, ctx) => {
-        if (!v) ctx.addIssue({ code: 'custom', message: 'House / stand number is required' });
-        else if (v.length > 30) ctx.addIssue({ code: 'custom', message: 'House / stand number must be 30 characters or fewer' });
-        else if (!/^[A-Za-z0-9 ,./#-]+$/.test(v)) {
-          ctx.addIssue({ code: 'custom', message: 'House / stand number can only contain letters, numbers, spaces and / - , . #' });
-        }
+        if (!v) custom(ctx, 'House / stand number is required');
+        else if (v.length > 30) custom(ctx, 'House / stand number must be 30 characters or fewer');
+        else if (!/^[A-Za-z0-9 ,./#-]+$/.test(v)) custom(ctx, 'House / stand number can only contain letters, numbers, spaces and / - , . #');
       }),
     suburb: z
       .string({ error: 'Suburb is required' })
       .trim()
       .superRefine((v, ctx) => {
-        if (!v) ctx.addIssue({ code: 'custom', message: 'Please select a suburb' });
-        else if (!(SUBURBS as readonly string[]).includes(v)) {
-          ctx.addIssue({ code: 'custom', message: 'Please pick a suburb from the list, or choose "Other" and type it' });
-        }
+        if (!v) custom(ctx, 'Please select a suburb');
+        else if (!(SUBURBS as readonly string[]).includes(v)) custom(ctx, 'Please pick a suburb from the list, or choose "Other" and type it');
       }),
     suburbOther: optionalText('Suburb', 50),
     city: personName('City'),
-
-    status: choice(STUDENT_STATUSES, 'Please select a status'),
-
-    birthCertificateNumber: optionalText('Birth certificate number', 30, {
-      re: /^[A-Za-z0-9 /-]+$/,
-      message: 'Birth certificate number can only contain letters, numbers, spaces, / and -',
-    }),
-    previousSchool:      optionalText('Previous school', 100),
-    secondGuardianPhone: mobilePhone('Second guardian phone', false),
-    medicalNotes:        optionalText('Medical conditions / allergies', 500),
-    photoUrl: optionalText('Photo', 500, {
-      re: /^https:\/\/\S+$/,
-      message: 'Photo upload failed — please upload it again',
-    }),
+    photoUrl: optionalText('Photo', 500, { re: /^https:\/\/\S+$/, message: 'Photo upload failed — please upload it again' }),
   })
   .superRefine((d, ctx) => {
-    if (d.guardianRelationship === 'Other' && !d.guardianRelationshipOther) {
-      ctx.addIssue({ code: 'custom', path: ['guardianRelationshipOther'], message: 'Please type the relationship' });
-    }
-    if (d.suburb === OTHER_SUBURB && !d.suburbOther) {
-      ctx.addIssue({ code: 'custom', path: ['suburbOther'], message: 'Please type the suburb name' });
-    }
-    if (d.guardianName && !d.guardianName.includes(' ')) {
-      ctx.addIssue({ code: 'custom', path: ['guardianName'], message: "Enter the guardian's first name and surname" });
-    }
-    if (d.secondGuardianPhone && d.secondGuardianPhone === d.guardianPhone) {
-      ctx.addIssue({ code: 'custom', path: ['secondGuardianPhone'], message: 'Second guardian phone is the same as the guardian phone' });
-    }
-    if (isRealIsoDate(d.dateOfBirth) && Number.isInteger(d.enrollmentYear)
-        && d.enrollmentYear < Number(d.dateOfBirth.slice(0, 4))) {
-      ctx.addIssue({ code: 'custom', path: ['enrollmentYear'], message: 'Enrollment year cannot be before the student was born' });
-    }
+    commonRules(d, ctx);
+    if (d.suburb === OTHER_SUBURB && !d.suburbOther) custom(ctx, 'Please type the suburb name', ['suburbOther']);
   })
-  .transform((d) => {
+  .transform((d): AdmissionData => {
     const suburb = d.suburb === OTHER_SUBURB ? normalizeName(d.suburbOther ?? '') : d.suburb;
-    const guardianRelationship = d.guardianRelationship === 'Other'
-      ? normalizeName(d.guardianRelationshipOther ?? '')
-      : d.guardianRelationship;
+    const houseNumber = d.houseNumber.toUpperCase();
+    const address = buildAddress(houseNumber, suburb, d.city);
+    const base = commonOutput(d);
     return {
-      firstName:      d.firstName,
-      surname:        d.surname,
-      fullName:       `${d.firstName} ${d.surname}`,
-      gender:         d.gender,
-      dateOfBirth:    d.dateOfBirth,
-      form:           d.form,
-      stream:         d.stream,
-      className:      className(d.form, d.stream),
-      enrollmentYear: d.enrollmentYear,
-      guardianName:   d.guardianName,
-      guardianRelationship,
-      guardianPhone:  d.guardianPhone as string,
-      houseNumber:    d.houseNumber.toUpperCase(),
+      ...base,
+      guardian: { ...base.guardian, address },
+      houseNumber,
       suburb,
-      city:           d.city,
-      address:        buildAddress(d.houseNumber.toUpperCase(), suburb, d.city),
-      status:         d.status,
-      birthCertificateNumber: d.birthCertificateNumber?.toUpperCase() ?? null,
-      previousSchool:      d.previousSchool,
-      secondGuardianPhone: d.secondGuardianPhone,
-      medicalNotes:        d.medicalNotes,
-      photoUrl:            d.photoUrl,
+      city: d.city,
+      address,
+      photoUrl: d.photoUrl,
+      admissionNumber: null,
     };
   });
 
 export type RegisterStudentInput = z.input<typeof RegisterStudentSchema>;
-export type RegisterStudentData = z.output<typeof RegisterStudentSchema>;
+
+// ─── CSV import row ──────────────────────────────────────────────────────────
+// Same field rules; the address is a single column and the admission number
+// may be supplied (otherwise generated).
+
+export const ImportStudentRowSchema = z
+  .object({
+    ...commonFields,
+    address: z
+      .string({ error: 'Address is required' })
+      .transform((v) => v.trim().replace(/\s+/g, ' '))
+      .superRefine((v, ctx) => {
+        if (!v) custom(ctx, 'Address is required');
+        else if (v.length < 5) custom(ctx, 'Address is too short — include the house/stand number and suburb');
+        else if (v.length > 200) custom(ctx, 'Address must be 200 characters or fewer');
+      }),
+    admissionNumber: optionalText('Admission number', 20, {
+      re: /^[A-Za-z0-9/-]{3,20}$/,
+      message: 'Admission number can only contain letters, numbers, / and - (3–20 characters)',
+    }),
+  })
+  .superRefine((d, ctx) => commonRules(d, ctx))
+  .transform((d): AdmissionData => {
+    const base = commonOutput(d);
+    return {
+      ...base,
+      guardian: { ...base.guardian, address: d.address },
+      houseNumber: null,
+      suburb: null,
+      city: null,
+      address: d.address,
+      photoUrl: null,
+      admissionNumber: d.admissionNumber?.toUpperCase() ?? null,
+    };
+  });
+
+export type ImportStudentRowInput = z.input<typeof ImportStudentRowSchema>;
 
 export const RegisterStudentRequestSchema = z.object({
   student: z.unknown(),
@@ -348,21 +458,23 @@ export function defaultRegistrationValues(): RegisterStudentInput {
     surname: '',
     gender: '' as never,
     dateOfBirth: '',
-    form: '' as never,
-    stream: '' as never,
-    enrollmentYear: String(currentYearInHarare()),
+    level: '',
+    stream: '',
+    admissionDate: todayInHarare(),
     guardianName: '',
     guardianRelationship: '' as never,
     guardianRelationshipOther: '',
     guardianPhone: '',
+    guardianAltPhone: '',
+    guardianEmail: '',
+    guardianNationalId: '',
+    guardianOccupation: '',
     houseNumber: '',
     suburb: '',
     suburbOther: '',
     city: DEFAULT_CITY,
-    status: 'ACTIVE',
     birthCertificateNumber: '',
     previousSchool: '',
-    secondGuardianPhone: '',
     medicalNotes: '',
     photoUrl: '',
   };

@@ -29,10 +29,11 @@ interface Props {
   subjectId: string;
   subjectName: string;
   maxMark: number;
-  term: string;
+  termId: string;
+  termName: string;
 }
 
-export function MarkEntryGrid({ assignmentId, classId, className, subjectId, subjectName, maxMark, term }: Props) {
+export function MarkEntryGrid({ assignmentId, classId, className, subjectId, subjectName, maxMark, termId, termName }: Props) {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [marks, setMarks] = useState<Record<string, MarkCell>>({});
   const [marksStatus, setMarksStatus] = useState<AssignmentMarkStatus>('NOT_STARTED');
@@ -44,7 +45,7 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/results/marks?classId=${classId}&subjectId=${subjectId}&term=${encodeURIComponent(term)}`)
+    fetch(`/api/results/marks?classId=${classId}&subjectId=${subjectId}&termId=${termId}`)
       .then((r) => r.json())
       .then((body) => {
         if (!body.success) {
@@ -103,7 +104,7 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
       const res = await fetch('/api/results/marks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, subjectId, classId, term, rawMark: rawNum }),
+        body: JSON.stringify({ studentId, subjectId, classId, termId, rawMark: rawNum }),
       });
       const body = await res.json();
       if (!res.ok || !body.success) {
@@ -145,7 +146,7 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
       const res = await fetch('/api/results/marks/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignmentId, term, force }),
+        body: JSON.stringify({ assignmentId, force }),
       });
       const body = await res.json();
       if (!res.ok || !body.success) {
@@ -177,7 +178,7 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
           ← Back to my assignments
         </Link>
         <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Subject: {subjectName} | Class: {className} | Max: {maxMark}</h1>
-        <p className="mt-1 text-sm text-muted">{term}</p>
+        <p className="mt-1 text-sm text-muted">{termName}</p>
       </div>
 
       {isLocked && (

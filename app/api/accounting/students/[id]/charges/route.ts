@@ -4,6 +4,7 @@ import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/
 import { logAudit } from '@/lib/audit';
 import { canApplyCharge } from '@/lib/permissions';
 import { CreateChargeSchema } from '@/lib/validations/accounting';
+import { requireTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -31,6 +32,7 @@ async function _POST(
     select: { id: true, schoolId: true },
   });
   if (!student || student.schoolId !== user.schoolId) return apiNotFound('Student');
+  const term = await requireTerm(user.schoolId, parsed.data.termId);
 
   const charge = await prisma.$transaction(async (tx) => {
     const newCharge = await tx.charge.create({
@@ -40,7 +42,7 @@ async function _POST(
         label: parsed.data.label,
         currency: parsed.data.currency,
         amount: parsed.data.amount,
-        term: parsed.data.term,
+        termId: term.id,
       },
     });
     await logAudit(
@@ -50,7 +52,7 @@ async function _POST(
         action: 'APPLY_CHARGE',
         entityType: 'Charge',
         entityId: newCharge.id,
-        detail: `${parsed.data.label} — ${parsed.data.currency} ${parsed.data.amount}`,
+        detail: `${parsed.data.label} — ${parsed.data.currency} ${parsed.data.amount} (${term.name})`,
       },
       tx,
     );

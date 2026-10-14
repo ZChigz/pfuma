@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { StatCard } from '@/components/ui/StatCard';
 import Link from 'next/link';
 import { getDaysOverdue } from '@/lib/utils';
+import { getOpenTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 
 export default async function HeadDashboard() {
@@ -14,24 +15,21 @@ export default async function HeadDashboard() {
 
   const { schoolId } = user;
 
-  const school = await prisma.school.findUnique({
-    where: { id: schoolId },
-    select: { currentTerm: true },
-  });
-  const currentTerm = school?.currentTerm ?? '';
+  const openTerm = await getOpenTerm(schoolId);
+  const currentTerm = openTerm?.name ?? '';
 
-  const [pendingPaymentsCount, marksForTerm, publishedForTerm, students] = await Promise.all([
+  const [pendingPaymentsCount, unpublishedAssignments, students] = await Promise.all([
     prisma.payment.count({ where: { schoolId, status: 'PENDING' } }),
-    prisma.mark.findMany({
-      where: { schoolId, term: currentTerm },
-      select: { student: { select: { grade: true } } },
-    }),
-    prisma.termResult.findMany({
-      where: { schoolId, term: currentTerm, published: true },
-      select: { student: { select: { grade: true } } },
-    }),
+    // Classes where marking has started but results are not yet published.
+    openTerm
+      ? prisma.subjectAssignment.findMany({
+          where: { schoolId, termId: openTerm.id, marksStatus: { in: ['IN_PROGRESS', 'VERIFIED'] } },
+          select: { classId: true },
+          distinct: ['classId'],
+        })
+      : [],
     prisma.student.findMany({
-      where: { schoolId, active: true },
+      where: { schoolId, status: 'ACTIVE' },
       select: {
         id: true,
         charges:  { select: { currency: true, amount: true, issuedAt: true } },
@@ -40,9 +38,7 @@ export default async function HeadDashboard() {
     }),
   ]);
 
-  const gradesWithMarks = new Set(marksForTerm.map((m) => m.student.grade));
-  const gradesPublished = new Set(publishedForTerm.map((r) => r.student.grade));
-  const unpublishedGrades = Array.from(gradesWithMarks).filter((g) => !gradesPublished.has(g));
+  const unpublishedClasses = unpublishedAssignments.length;
 
   let overdueCount = 0;
   for (const s of students) {
@@ -68,8 +64,8 @@ export default async function HeadDashboard() {
       href: '/head/payments',
     },
     {
-      label: 'Grades with unpublished results',
-      value: unpublishedGrades.length,
+      label: 'Classes with unpublished results',
+      value: unpublishedClasses,
       tone: 'amber',
       href: '/head/results',
     },
@@ -117,7 +113,7 @@ export default async function HeadDashboard() {
             href="/head/fees"
             className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-medium text-ink transition-colors hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
-            Apply fees to a grade
+            Apply fees to a level
           </Link>
           <Link
             href="/head/results"

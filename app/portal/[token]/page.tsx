@@ -36,12 +36,15 @@ export default async function PortalPage({ params }: { params: { token: string }
       marks: {
         where:   { status: 'PUBLISHED' },
         include: { subject: { select: { name: true, maxMark: true } } },
-        orderBy: [{ term: 'asc' }, { subject: { name: 'asc' } }],
+        orderBy: [{ term: { startDate: 'asc' } }, { subject: { name: 'asc' } }],
       },
       termResults: {
         where:   { published: true },
-        orderBy: { term: 'asc' },
+        include: { term: { select: { name: true } } },
+        orderBy: { term: { startDate: 'asc' } },
       },
+      currentClass: { select: { name: true } },
+      enrollments: { select: { termId: true, classId: true } },
     },
   });
 
@@ -78,9 +81,9 @@ export default async function PortalPage({ params }: { params: { token: string }
   // ── Group marks by term ────────────────────────────────────────────────────
   const marksByTerm = new Map<string, typeof student.marks>();
   for (const m of student.marks) {
-    const arr = marksByTerm.get(m.term) ?? [];
+    const arr = marksByTerm.get(m.termId) ?? [];
     arr.push(m);
-    marksByTerm.set(m.term, arr);
+    marksByTerm.set(m.termId, arr);
   }
 
   // ── Letter grade helper ────────────────────────────────────────────────────
@@ -92,19 +95,20 @@ export default async function PortalPage({ params }: { params: { token: string }
   const publishedTerms = student.termResults;
 
   // ── Class size per term (for "Position N out of M") ───────────────────────
+  // Classmates are the students enrolled in the same class for that term.
   const classSizeByTerm = new Map<string, number>();
-  if (publishedTerms.length > 0 && student.classId) {
-    const counts = await prisma.termResult.groupBy({
-      by: ['term'],
+  const classByTerm = new Map(student.enrollments.map((e) => [e.termId, e.classId]));
+  for (const tr of publishedTerms) {
+    const classId = classByTerm.get(tr.termId);
+    if (!classId) continue;
+    classSizeByTerm.set(tr.termId, await prisma.termResult.count({
       where: {
         schoolId:  student.schoolId,
         published: true,
-        term:      { in: publishedTerms.map((tr) => tr.term) },
-        student:   { classId: student.classId },
+        termId:    tr.termId,
+        student:   { enrollments: { some: { termId: tr.termId, classId } } },
       },
-      _count: { _all: true },
-    });
-    for (const c of counts) classSizeByTerm.set(c.term, c._count._all);
+    }));
   }
 
   return (
@@ -122,7 +126,7 @@ export default async function PortalPage({ params }: { params: { token: string }
         <div className="rounded-2xl bg-white p-5">
           <p className="text-xs font-medium text-muted">Student</p>
           <p className="mt-1 text-xl font-bold text-ink">{student.fullName}</p>
-          <p className="text-sm text-muted">{student.grade}</p>
+          <p className="text-sm text-muted">{student.currentClass?.name ?? ''}</p>
         </div>
 
         {/* ── Section 1: Fee Balance ──────────────────────────────────────── */}
@@ -202,14 +206,14 @@ export default async function PortalPage({ params }: { params: { token: string }
             <h2 className="mb-3 text-base font-semibold text-ink">Academic Results</h2>
             <div className="flex flex-col gap-4">
               {publishedTerms.map((tr) => {
-                const termMarks = marksByTerm.get(tr.term) ?? [];
+                const termMarks = marksByTerm.get(tr.termId) ?? [];
                 const pct = tr.percentage.toNumber();
-                const classSize = classSizeByTerm.get(tr.term);
+                const classSize = classSizeByTerm.get(tr.termId);
                 return (
                   <div key={tr.id} className="rounded-2xl bg-white overflow-hidden">
                     {/* Term header */}
                     <div className="border-b border-line bg-primary px-4 py-3 text-white">
-                      <p className="text-sm font-bold">{tr.term}</p>
+                      <p className="text-sm font-bold">{tr.term.name}</p>
                       {tr.classPosition != null && classSize != null && (
                         <p className="mt-0.5 text-xs text-emerald-100">
                           Position {tr.classPosition} out of {classSize} students

@@ -5,6 +5,8 @@ import { apiUnauthorized, apiError, apiNotFound, withApi } from '@/lib/api';
 import { renderToStream } from '@react-pdf/renderer';
 import { ReportCardDocument, type ReportCardData } from '@/components/results/ReportCardDocument';
 import { createElement } from 'react';
+import { requireTerm } from '@/lib/academic/terms';
+import { enrollmentFor } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
 
 export const runtime = 'nodejs';
@@ -17,20 +19,22 @@ async function _GET(
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
 
-  const term = new URL(req.url).searchParams.get('term');
-  if (!term) return apiError('term query parameter is required', 400);
+  const termId = new URL(req.url).searchParams.get('termId');
+  if (!termId) return apiError('termId query parameter is required', 400);
+  const termRow = await requireTerm(user.schoolId, termId);
+  const term = termRow.name;
 
   const student = await prisma.student.findUnique({
     where: { id: params.studentId },
     include: {
       school:  { select: { name: true } },
       marks: {
-        where: { term, schoolId: user.schoolId },
+        where: { termId, schoolId: user.schoolId },
         include: { subject: { select: { name: true, maxMark: true } } },
         orderBy: { subject: { name: 'asc' } },
       },
       termResults: {
-        where: { term },
+        where: { termId },
       },
     },
   });
@@ -38,11 +42,13 @@ async function _GET(
   if (!student || student.schoolId !== user.schoolId) return apiNotFound('Student');
 
   const termResult = student.termResults[0] ?? null;
+  // The class the student was in for that term, not their class today.
+  const enrollment = await enrollmentFor(student.id, termId);
 
   const reportData: ReportCardData = {
     schoolName:    student.school.name,
     studentName:   student.fullName,
-    grade:         student.grade,
+    grade:         enrollment?.class.name ?? '—',
     term,
     classPosition: termResult?.classPosition ?? null,
     percentage:    termResult?.percentage?.toNumber() ?? 0,

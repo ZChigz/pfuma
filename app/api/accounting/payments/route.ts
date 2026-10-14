@@ -4,6 +4,7 @@ import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/
 import { logAudit } from '@/lib/audit';
 import { canRecordPayment } from '@/lib/permissions';
 import { CreatePaymentSchema } from '@/lib/validations/accounting';
+import { PRIMARY_GUARDIAN_INCLUDE } from '@/lib/students/guardians';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -27,7 +28,7 @@ async function _GET(req: NextRequest) {
       ...(studentId ? { studentId }                     : {}),
     },
     include: {
-      student:  { select: { fullName: true, grade: true } },
+      student:  { select: { fullName: true, admissionNumber: true, currentClass: { select: { name: true } } } },
       recorder: { select: { fullName: true } },
       verifier: { select: { fullName: true } },
       voider:   { select: { fullName: true } },
@@ -51,7 +52,11 @@ async function _POST(req: NextRequest) {
   const [student, school] = await Promise.all([
     prisma.student.findUnique({
       where: { id: parsed.data.studentId },
-      select: { id: true, schoolId: true, fullName: true, grade: true, parentPhone: true },
+      select: {
+        id: true, schoolId: true, fullName: true,
+        currentClass: { select: { name: true } },
+        guardians: PRIMARY_GUARDIAN_INCLUDE,
+      },
     }),
     prisma.school.findUnique({
       where: { id: user.schoolId },
@@ -107,8 +112,8 @@ async function _POST(req: NextRequest) {
       },
       schoolName:         school?.name          ?? '',
       studentFullName:    student.fullName,
-      studentGrade:       student.grade,
-      studentParentPhone: student.parentPhone,
+      studentGrade:       student.currentClass?.name ?? '',
+      studentParentPhone: student.guardians[0]?.guardian.phone ?? '',
     },
     201,
   );

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { isoWeekKey } from '@/lib/utils';
+import { PRIMARY_GUARDIAN_INCLUDE } from '@/lib/students/guardians';
 import { type Currency } from '@prisma/client';
 import type { SessionUser } from '@/types';
 
@@ -42,11 +43,11 @@ async function _GET(req: NextRequest) {
       _count: { id: true },
     }),
     prisma.student.findMany({
-      where: { schoolId, active: true },
+      where: { schoolId, status: 'ACTIVE' },
       select: {
         id: true,
         fullName: true,
-        parentPhone: true,
+        guardians: PRIMARY_GUARDIAN_INCLUDE,
         charges: { select: { currency: true, amount: true, issuedAt: true } },
         payments: {
           where: { status: 'VERIFIED' },
@@ -93,7 +94,9 @@ async function _GET(req: NextRequest) {
 
     if (balUSD > 0 || balZiG > 0) {
       owingCount++;
-      owingStudents.push({ id: s.id, fullName: s.fullName, parentPhone: s.parentPhone, balanceUSD: balUSD, balanceZiG: balZiG });
+      // Reminders go to the primary guardian, and only if they accept messages.
+      const g = s.guardians[0];
+      owingStudents.push({ id: s.id, fullName: s.fullName, parentPhone: g?.canReceiveSms ? g.guardian.phone : '', balanceUSD: balUSD, balanceZiG: balZiG });
 
       if (balUSD > 0) {
         const usdCharges = s.charges.filter(c => c.currency === 'USD');

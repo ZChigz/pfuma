@@ -1,14 +1,12 @@
 import { z } from 'zod';
 
-export const CreateStudentSchema = z.object({
-  fullName: z.string().min(1),
-  grade: z.string().min(1),
-  parentName: z.string().min(1),
-  parentPhone: z.string().min(1),
-});
-
-export const UpdateStudentSchema = CreateStudentSchema.partial().extend({
-  active: z.boolean().optional(),
+// Students are admitted through /api/admin/students (lib/students/registration.ts)
+// and change status through lifecycle actions; only these details are editable here.
+export const UpdateStudentSchema = z.object({
+  firstName:      z.string().trim().min(2).max(50).optional(),
+  surname:        z.string().trim().min(2).max(50).optional(),
+  previousSchool: z.string().trim().max(100).nullable().optional(),
+  medicalNotes:   z.string().trim().max(500).nullable().optional(),
 });
 
 export const CreateChargeSchema = z.object({
@@ -16,12 +14,12 @@ export const CreateChargeSchema = z.object({
   label: z.string().min(1),
   currency: z.enum(['USD', 'ZIG']),
   amount: z.number().positive(),
-  term: z.string().min(1),
+  termId: z.string().min(1, 'Term is required'),
 });
 
 export const CreateFeeStructureSchema = z.object({
-  grade: z.string().min(1),
-  term: z.string().min(1),
+  levelId: z.string().min(1).nullable(), // null = every level
+  termId: z.string().min(1, 'Term is required'),
   label: z.string().min(1),
   currency: z.enum(['USD', 'ZIG']),
   amount: z.number().positive(),
@@ -39,7 +37,7 @@ export const CreatePaymentSchema = z
     studentId: z.string().min(1),
     currency: z.enum(['USD', 'ZIG']),
     amount: z
-      .number({ invalid_type_error: 'Please enter an amount' })
+      .number({ error: 'Please enter an amount' })
       .positive('Amount must be greater than zero'),
     method: z.enum(['CASH', 'ECOCASH', 'SWIPE', 'ZIPIT']),
     reference: z.string().optional(),
@@ -77,7 +75,7 @@ export const CreateExpenseSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   currency: z.enum(['USD', 'ZIG']),
   amount: z
-    .number({ invalid_type_error: 'Please enter an amount' })
+    .number({ error: 'Please enter an amount' })
     .positive('Amount must be greater than zero'),
   spentOn: z.string().min(1, 'Date is required'),
   note: z.string().optional(),
@@ -88,11 +86,11 @@ export const CreateExpenseSchema = z.object({
 export const ExpenseRequestItemSchema = z.object({
   description: z.string().min(1, 'Description is required'),
   quantity: z
-    .number({ invalid_type_error: 'Quantity is required' })
+    .number({ error: 'Quantity is required' })
     .int()
     .positive('Quantity must be greater than zero'),
   unitPrice: z
-    .number({ invalid_type_error: 'Unit price is required' })
+    .number({ error: 'Unit price is required' })
     .positive('Unit price must be greater than zero'),
 });
 
@@ -111,7 +109,7 @@ export const RejectExpenseRequestSchema = z.object({
 
 export const DisburseExpenseRequestSchema = z.object({
   actualTotal: z
-    .number({ invalid_type_error: 'Please enter an amount' })
+    .number({ error: 'Please enter an amount' })
     .positive('Amount must be greater than zero'),
   paymentMethod: z.enum(['CASH', 'ECOCASH', 'SWIPE', 'ZIPIT']),
   disbursementNote: z.string().optional(),

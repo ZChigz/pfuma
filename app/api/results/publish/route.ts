@@ -6,6 +6,8 @@ import { canPublishResults } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { PublishResultsSchema } from '@/lib/validations/results';
 import { assignPositions, getLetterGrade } from '@/lib/results';
+import { requireTerm } from '@/lib/academic/terms';
+import { classRoster } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
 
 async function _POST(req: NextRequest) {
@@ -18,15 +20,17 @@ async function _POST(req: NextRequest) {
 
   const parsed = await parseBody(req, PublishResultsSchema);
   if ('error' in parsed) return parsed.error;
-  const { classId, term } = parsed.data;
+  const { classId, termId } = parsed.data;
 
   const schoolClass = await prisma.schoolClass.findFirst({
     where: { id: classId, schoolId: user.schoolId },
   });
   if (!schoolClass) return apiNotFound('Class');
+  const termRow = await requireTerm(user.schoolId, termId);
+  const term = termRow.name;
 
   const assignments = await prisma.subjectAssignment.findMany({
-    where: { schoolId: user.schoolId, classId, term },
+    where: { schoolId: user.schoolId, classId, termId },
     include: { subject: { select: { id: true, name: true, maxMark: true } } },
   });
 
@@ -42,13 +46,12 @@ async function _POST(req: NextRequest) {
     );
   }
 
+  // Positions are among the students enrolled in this class for this term.
   const [students, boundaryRows] = await Promise.all([
-    prisma.student.findMany({
-      where: { schoolId: user.schoolId, classId, active: true },
-      select: { id: true, fullName: true },
-    }),
+    classRoster(classId, termId),
     prisma.gradeBoundary.findMany({ where: { schoolId: user.schoolId } }),
   ]);
+  const studentIds = students.map((s) => s.id);
 
   const boundaries = boundaryRows.map((b) => ({
     minPercent:  b.minPercent.toNumber(),
@@ -63,9 +66,9 @@ async function _POST(req: NextRequest) {
     where: {
       schoolId:  user.schoolId,
       subjectId: { in: subjectIds },
-      term,
+      termId,
       status:    'VERIFIED',
-      student:   { classId },
+      studentId: { in: studentIds },
     },
   });
 
@@ -85,7 +88,7 @@ async function _POST(req: NextRequest) {
   await prisma.$transaction(async (tx) => {
     for (const s of summaries) {
       await tx.termResult.upsert({
-        where:  { studentId_term: { studentId: s.studentId, term } },
+        where:  { studentId_termId: { studentId: s.studentId, termId } },
         update: {
           totalMarks:    s.totalMarks,
           percentage:    s.percentage,
@@ -96,7 +99,7 @@ async function _POST(req: NextRequest) {
         create: {
           schoolId:      user.schoolId,
           studentId:     s.studentId,
-          term,
+          termId,
           totalMarks:    s.totalMarks,
           percentage:    s.percentage,
           classPosition: positions.get(s.studentId) ?? null,
@@ -110,15 +113,15 @@ async function _POST(req: NextRequest) {
       where: {
         schoolId:  user.schoolId,
         subjectId: { in: subjectIds },
-        term,
+        termId,
         status:    'VERIFIED',
-        student:   { classId },
+        studentId: { in: studentIds },
       },
       data: { status: 'PUBLISHED' },
     });
 
     await tx.subjectAssignment.updateMany({
-      where: { schoolId: user.schoolId, classId, term },
+      where: { schoolId: user.schoolId, classId, termId },
       data: { marksStatus: 'PUBLISHED' },
     });
 
@@ -128,7 +131,7 @@ async function _POST(req: NextRequest) {
         actorId:    user.id,
         action:     'PUBLISH_RESULTS',
         entityType: 'TermResult',
-        entityId:   `${classId}:${term}`,
+        entityId:   `${classId}:${termId}`,
         detail:     `Published ${summaries.length} results for ${schoolClass.name} — ${term}`,
       },
       tx,

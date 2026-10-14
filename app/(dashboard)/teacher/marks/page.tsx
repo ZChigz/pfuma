@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ASSIGNMENT_STATUS_LABELS } from '@/lib/results';
+import { getOpenTerm } from '@/lib/academic/terms';
+import { classRosterIds } from '@/lib/academic/roster';
 import type { SessionUser, AssignmentMarkStatus } from '@/types';
 
 const STATUS_BADGE: Record<AssignmentMarkStatus, string> = {
@@ -26,14 +28,11 @@ export default async function TeacherMarksPage() {
   const user = session.user as unknown as SessionUser;
   if (user.role !== 'TEACHER') redirect('/');
 
-  const school = await prisma.school.findUnique({
-    where: { id: user.schoolId },
-    select: { currentTerm: true },
-  });
-  const currentTerm = school?.currentTerm ?? '';
+  const openTerm = await getOpenTerm(user.schoolId);
+  const currentTerm = openTerm?.name ?? '';
 
-  const assignments = await prisma.subjectAssignment.findMany({
-    where: { schoolId: user.schoolId, teacherId: user.id, term: currentTerm },
+  const assignments = !openTerm ? [] : await prisma.subjectAssignment.findMany({
+    where: { schoolId: user.schoolId, teacherId: user.id, termId: openTerm.id },
     include: {
       subject: { select: { id: true, name: true, code: true, maxMark: true } },
       class:   { select: { id: true, name: true } },
@@ -43,15 +42,11 @@ export default async function TeacherMarksPage() {
 
   const rows = await Promise.all(
     assignments.map(async (a) => {
-      const [marksEntered, totalStudents] = await Promise.all([
-        prisma.mark.count({
-          where: { schoolId: user.schoolId, subjectId: a.subjectId, term: a.term, student: { classId: a.classId } },
-        }),
-        prisma.student.count({
-          where: { schoolId: user.schoolId, classId: a.classId, active: true },
-        }),
-      ]);
-      return { ...a, marksEntered, totalStudents };
+      const studentIds = await classRosterIds(a.classId, a.termId);
+      const marksEntered = await prisma.mark.count({
+        where: { schoolId: user.schoolId, subjectId: a.subjectId, termId: a.termId, studentId: { in: studentIds } },
+      });
+      return { ...a, marksEntered, totalStudents: studentIds.length };
     }),
   );
 

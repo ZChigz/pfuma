@@ -1,9 +1,10 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { apiSuccess, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
+import { apiError, apiSuccess, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canBulkApplyFees } from '@/lib/permissions';
 import { UpdateFeeStructureSchema } from '@/lib/validations/accounting';
+import { requireTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -19,18 +20,24 @@ async function _PATCH(req: NextRequest, ctx: { params: { id: string } }) {
 
   const parsed = await parseBody(req, UpdateFeeStructureSchema);
   if ('error' in parsed) return parsed.error;
-  const { grade, term, label, currency, amount } = parsed.data;
+  const { levelId, termId, label, currency, amount } = parsed.data;
+
+  if (termId) await requireTerm(user.schoolId, termId);
+  if (levelId && !await prisma.level.findFirst({ where: { id: levelId, schoolId: user.schoolId } })) {
+    return apiError('Level not found', 404);
+  }
 
   const feeStructure = await prisma.$transaction(async (tx) => {
     const fs = await tx.feeStructure.update({
       where: { id: existing.id },
       data: {
-        ...(grade    !== undefined ? { grade }    : {}),
-        ...(term     !== undefined ? { term }     : {}),
+        ...(levelId  !== undefined ? { levelId }  : {}),
+        ...(termId   !== undefined ? { termId }   : {}),
         ...(label    !== undefined ? { label }    : {}),
         ...(currency !== undefined ? { currency } : {}),
         ...(amount   !== undefined ? { amount }   : {}),
       },
+      include: { level: { select: { name: true } }, term: { select: { name: true } } },
     });
     await logAudit(
       {
@@ -39,7 +46,7 @@ async function _PATCH(req: NextRequest, ctx: { params: { id: string } }) {
         action:     'UPDATE_FEE_STRUCTURE',
         entityType: 'FeeStructure',
         entityId:   fs.id,
-        detail:     `${fs.label} — ${fs.currency} ${fs.amount} (${fs.grade}, ${fs.term})`,
+        detail:     `${fs.label} — ${fs.currency} ${fs.amount} (${fs.level?.name ?? 'All levels'}, ${fs.term.name})`,
       },
       tx,
     );
@@ -50,4 +57,4 @@ async function _PATCH(req: NextRequest, ctx: { params: { id: string } }) {
 }
 
 type H = (req: Request, ctx?: unknown) => Promise<Response>;
-export const PATCH = withApi('PATCH /api/accounting/fee-structures/[id]', _PATCH as H);
+export const PATCH = withApi('PATCH /api/accounting/fee-structures/[id]', _PATCH as unknown as H);

@@ -5,6 +5,7 @@ import { apiSuccess, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/
 import { canUnverifyMarks } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { UnverifyMarksSchema } from '@/lib/validations/results';
+import { classRosterIds } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
 
 async function _POST(req: NextRequest) {
@@ -21,18 +22,20 @@ async function _POST(req: NextRequest) {
 
   const assignment = await prisma.subjectAssignment.findFirst({
     where: { id: assignmentId, schoolId: user.schoolId },
-    include: { subject: { select: { name: true } }, class: { select: { name: true } } },
+    include: { subject: { select: { name: true } }, class: { select: { name: true } }, term: { select: { name: true } } },
   });
   if (!assignment) return apiNotFound('Assignment');
+
+  const studentIds = await classRosterIds(assignment.classId, assignment.termId);
 
   await prisma.$transaction(async (tx) => {
     await tx.mark.updateMany({
       where: {
         schoolId:  user.schoolId,
         subjectId: assignment.subjectId,
-        term:      assignment.term,
+        termId:    assignment.termId,
         status:    'VERIFIED',
-        student:   { classId: assignment.classId },
+        studentId: { in: studentIds },
       },
       data: { status: 'DRAFT', verifiedAt: null },
     });
@@ -49,7 +52,7 @@ async function _POST(req: NextRequest) {
         action:     'UNVERIFY_MARKS',
         entityType: 'SubjectAssignment',
         entityId:   assignment.id,
-        detail:     `Unlocked marks for ${assignment.subject.name} — ${assignment.class.name} (${assignment.term})`,
+        detail:     `Unlocked marks for ${assignment.subject.name} — ${assignment.class.name} (${assignment.term.name})`,
       },
       tx,
     );

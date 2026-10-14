@@ -5,6 +5,7 @@ import { apiSuccess, apiUnauthorized, apiForbidden, apiNotFound, parseBody, with
 import { canVerifyMarks } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { VerifyMarksSchema } from '@/lib/validations/results';
+import { classRoster } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
 
 async function _POST(req: NextRequest) {
@@ -17,11 +18,11 @@ async function _POST(req: NextRequest) {
 
   const parsed = await parseBody(req, VerifyMarksSchema);
   if ('error' in parsed) return parsed.error;
-  const { assignmentId, term, force } = parsed.data;
+  const { assignmentId, force } = parsed.data;
 
   const assignment = await prisma.subjectAssignment.findFirst({
     where: { id: assignmentId, schoolId: user.schoolId },
-    include: { subject: { select: { name: true } }, class: { select: { name: true } } },
+    include: { subject: { select: { name: true } }, class: { select: { name: true } }, term: { select: { name: true } } },
   });
   if (!assignment) return apiNotFound('Assignment');
 
@@ -33,16 +34,12 @@ async function _POST(req: NextRequest) {
     return apiSuccess({ verified: false, message: 'Marks have already been verified for this assignment' });
   }
 
-  const [students, marks] = await Promise.all([
-    prisma.student.findMany({
-      where: { schoolId: user.schoolId, classId: assignment.classId, active: true },
-      select: { id: true, fullName: true },
-    }),
-    prisma.mark.findMany({
-      where: { schoolId: user.schoolId, subjectId: assignment.subjectId, term, student: { classId: assignment.classId } },
-      select: { studentId: true },
-    }),
-  ]);
+  const students = await classRoster(assignment.classId, assignment.termId);
+  const studentIds = students.map((s) => s.id);
+  const marks = await prisma.mark.findMany({
+    where: { schoolId: user.schoolId, subjectId: assignment.subjectId, termId: assignment.termId, studentId: { in: studentIds } },
+    select: { studentId: true },
+  });
 
   const enteredStudentIds = new Set(marks.map((m) => m.studentId));
   const missingStudents = students.filter((s) => !enteredStudentIds.has(s.id));
@@ -61,7 +58,7 @@ async function _POST(req: NextRequest) {
     const now = new Date();
 
     await tx.mark.updateMany({
-      where: { schoolId: user.schoolId, subjectId: assignment.subjectId, term, status: 'DRAFT', student: { classId: assignment.classId } },
+      where: { schoolId: user.schoolId, subjectId: assignment.subjectId, termId: assignment.termId, status: 'DRAFT', studentId: { in: studentIds } },
       data: { status: 'VERIFIED', verifiedAt: now },
     });
 
@@ -77,7 +74,7 @@ async function _POST(req: NextRequest) {
         action:     'VERIFY_MARKS',
         entityType: 'SubjectAssignment',
         entityId:   assignment.id,
-        detail:     `Verified marks for ${assignment.subject.name} — ${assignment.class.name} (${term})`,
+        detail:     `Verified marks for ${assignment.subject.name} — ${assignment.class.name} (${assignment.term.name})`,
       },
       tx,
     );

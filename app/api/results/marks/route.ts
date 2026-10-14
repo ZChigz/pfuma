@@ -8,6 +8,8 @@ import { canEnterMarksSync } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { EnterMarkSchema } from '@/lib/validations/results';
 import { getLetterGrade } from '@/lib/results';
+import { requireTerm } from '@/lib/academic/terms';
+import { classRoster } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
 
 async function _GET(req: NextRequest): Promise<Response> {
@@ -18,48 +20,29 @@ async function _GET(req: NextRequest): Promise<Response> {
   const { searchParams } = new URL(req.url);
   const classId   = searchParams.get('classId');
   const subjectId = searchParams.get('subjectId');
-  const term      = searchParams.get('term');
-  if (!classId || !subjectId || !term) return apiError('classId, subjectId and term are required', 400);
+  const termId    = searchParams.get('termId');
+  if (!classId || !subjectId || !termId) return apiError('classId, subjectId and termId are required', 400);
 
-  const schoolClass = await prisma.schoolClass.findFirst({
-    where: { id: classId, schoolId: user.schoolId },
-  });
+  const [schoolClass, subject, term] = await Promise.all([
+    prisma.schoolClass.findFirst({ where: { id: classId, schoolId: user.schoolId } }),
+    prisma.subject.findFirst({ where: { id: subjectId, schoolId: user.schoolId } }),
+    requireTerm(user.schoolId, termId),
+  ]);
   if (!schoolClass) return apiNotFound('Class');
-
-  const subject = await prisma.subject.findFirst({
-    where: { id: subjectId, schoolId: user.schoolId },
-  });
   if (!subject) return apiNotFound('Subject');
 
-  let assignment = await prisma.subjectAssignment.findFirst({
-    where: { schoolId: user.schoolId, subjectId, classId, term },
+  const assignment = await prisma.subjectAssignment.findFirst({
+    where: { schoolId: user.schoolId, subjectId, classId, termId: term.id },
   });
-
-  if (user.role === 'TEACHER') {
-    const ownAssignment = await prisma.subjectAssignment.findFirst({
-      where: { schoolId: user.schoolId, teacherId: user.id, subjectId, classId, term },
-    });
-    if (!ownAssignment) return apiError('You are not assigned to this subject for this class', 403);
-    assignment = ownAssignment;
+  if (!assignment) return apiNotFound('Assignment');
+  if (user.role === 'TEACHER' && assignment.teacherId !== user.id) {
+    return apiError('You are not assigned to this subject for this class', 403);
   }
 
-  if (!assignment) return apiNotFound('Assignment');
-
-  const [students, marks] = await Promise.all([
-    prisma.student.findMany({
-      where: { schoolId: user.schoolId, classId, active: true },
-      select: { id: true, fullName: true, grade: true },
-      orderBy: { fullName: 'asc' },
-    }),
-    prisma.mark.findMany({
-      where: {
-        schoolId: user.schoolId,
-        subjectId,
-        term,
-        student: { classId },
-      },
-    }),
-  ]);
+  const students = await classRoster(classId, term.id);
+  const marks = await prisma.mark.findMany({
+    where: { schoolId: user.schoolId, subjectId, termId: term.id, studentId: { in: students.map((s) => s.id) } },
+  });
 
   return apiSuccess({
     students,
@@ -69,6 +52,7 @@ async function _GET(req: NextRequest): Promise<Response> {
       percentage: m.percentage?.toNumber() ?? null,
     })),
     subject,
+    termName: term.name,
     assignment: {
       id:              assignment.id,
       marksStatus:     assignment.marksStatus,
@@ -92,24 +76,28 @@ async function _POST(req: NextRequest) {
 
   const parsed = await parseBody(req, EnterMarkSchema);
   if ('error' in parsed) return parsed.error;
-  const { studentId, subjectId, classId, term, rawMark } = parsed.data;
+  const { studentId, subjectId, classId, termId, rawMark } = parsed.data;
 
-  const subject = await prisma.subject.findFirst({
-    where: { id: subjectId, schoolId: user.schoolId },
-  });
+  const subject = await prisma.subject.findFirst({ where: { id: subjectId, schoolId: user.schoolId } });
   if (!subject) return apiNotFound('Subject');
-
   if (rawMark < 0 || rawMark > subject.maxMark) {
     return apiError(`Mark must be between 0 and ${subject.maxMark}`, 422);
   }
 
-  const student = await prisma.student.findFirst({
-    where: { id: studentId, schoolId: user.schoolId },
-  });
+  const term = await requireTerm(user.schoolId, termId);
+  if (term.status === 'CLOSED') return apiError(`${term.name} is closed — marks can no longer be entered`, 409);
+
+  const student = await prisma.student.findFirst({ where: { id: studentId, schoolId: user.schoolId } });
   if (!student) return apiNotFound('Student');
 
+  // The student must have been in this class for this term.
+  const enrollment = await prisma.enrollment.findUnique({ where: { studentId_termId: { studentId, termId: term.id } } });
+  if (!enrollment || enrollment.classId !== classId) {
+    return apiError(`${student.fullName} is not in this class for ${term.name}`, 422);
+  }
+
   const assignment = await prisma.subjectAssignment.findFirst({
-    where: { schoolId: user.schoolId, subjectId, classId, term },
+    where: { schoolId: user.schoolId, subjectId, classId, termId: term.id },
   });
   if (!assignment) return apiNotFound('Assignment');
 
@@ -122,9 +110,7 @@ async function _POST(req: NextRequest) {
   }
 
   const percentage = subject.maxMark > 0 ? (rawMark / subject.maxMark) * 100 : 0;
-  const boundaries = await prisma.gradeBoundary.findMany({
-    where: { schoolId: user.schoolId },
-  });
+  const boundaries = await prisma.gradeBoundary.findMany({ where: { schoolId: user.schoolId } });
   const letterGrade = getLetterGrade(
     percentage,
     boundaries.map((b) => ({ minPercent: b.minPercent.toNumber(), maxPercent: b.maxPercent.toNumber(), letterGrade: b.letterGrade })),
@@ -132,9 +118,9 @@ async function _POST(req: NextRequest) {
 
   const mark = await prisma.$transaction(async (tx) => {
     const m = await tx.mark.upsert({
-      where: { studentId_subjectId_term: { studentId, subjectId, term } },
+      where: { studentId_subjectId_termId: { studentId, subjectId, termId: term.id } },
       update: { rawMark, percentage, letterGrade, status: 'DRAFT', enteredBy: user.id, enteredAt: new Date() },
-      create: { schoolId: user.schoolId, studentId, subjectId, term, rawMark, percentage, letterGrade, status: 'DRAFT', enteredBy: user.id },
+      create: { schoolId: user.schoolId, studentId, subjectId, termId: term.id, rawMark, percentage, letterGrade, status: 'DRAFT', enteredBy: user.id },
     });
 
     if (assignment.marksStatus === 'NOT_STARTED') {
@@ -151,7 +137,7 @@ async function _POST(req: NextRequest) {
         action:     'RECORD_MARK',
         entityType: 'Mark',
         entityId:   m.id,
-        detail:     `Recorded mark ${rawMark}/${subject.maxMark} for ${student.fullName} in ${subject.name} (${term})`,
+        detail:     `Recorded mark ${rawMark}/${subject.maxMark} for ${student.fullName} in ${subject.name} (${term.name})`,
       },
       tx,
     );
