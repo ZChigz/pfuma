@@ -1,0 +1,501 @@
+student_id,first_name,surname,gender,date_of_birth,form,stream,class_name,enrollment_year,guardian_name,guardian_relationship,guardian_phone,address,status
+STU20260001,Tatenda,Chidzikwe,M,2013-05-06,1,North,Form 1 North,2026,Tendai Chidzikwe,Father,+263778078673,"521 Mbare, Harare",Active
+STU20260002,Tapiwa,Musekiwa,M,2013-10-15,1,North,Form 1 North,2026,Munyaradzi Musekiwa,Father,+263734698379,"7360 Chitungwiza, Harare",Active
+STU20260003,Rutendo,Maposa,F,2013-03-23,1,North,Form 1 North,2026,Memory Maposa,Mother,+263786647119,"1675 Budiriro, Harare",Active
+STU20260004,Chiedza,Mlambo,F,2013-11-06,1,North,Form 1 North,2026,Netsai Mlambo,Mother,+263739996414,"2046 Greendale, Harare",Active
+STU20260005,Tichaona,Nyamande,M,2013-10-23,1,North,Form 1 North,2026,Munyaradzi Nyamande,Father,+263785855124,"1308 Tafara, Harare",Active
+STU20260006,Tinotenda,Makoni,M,2012-11-21,1,North,Form 1 North,2026,Tsitsi Makoni,Mother,+263785479144,"1170 Borrowdale, Harare",Active
+STU20260007,Tichaona,Sibanda,M,2013-03-25,1,North,Form 1 North,2026,Rutendo Sibanda,Mother,+263786440561,"917 Tafara, Harare",Active
+STU20260008,Tafara,Dube,M,2012-05-17,1,North,Form 1 North,2026,Stanley Dube,Grandmother,+263789375710,"6483 Waterfalls, Harare",Active
+STU20260009,Tawanda,Zvobgo,M,2013-10-15,1,North,Form 1 North,2026,Tariro Zvobgo,Mother,+263737073292,"3594 Warren Park, Harare",Active
+STU20260010,Nyasha,Mashingaidze,F,2013-02-26,1,North,Form 1 North,2026,Innocent Mashingaidze,Father,+263732065818,"6305 Greendale, Harare",Active
+STU20260011,Tsitsi,Chinyanga,F,2013-12-15,1,North,Form 1 North,2026,Innocent Chinyanga,Grandmother,+263712871534,"4809 Hatfield, Harare",Active
+STU20260012,Takunda,Moyo,M,2013-09-14,1,North,Form 1 North,2026,Simbarashe Moyo,Grandmother,+263783564217,"6127 Kuwadzana, Harare",Active
+STU20260013,Tapiwanashe,Dube,M,2012-01-10,1,North,Form 1 North,2026,Kudzai Dube,Father,+263715017343,"950 Tafara, Harare",Active
+STU20260014,Tinashe,Sibanda,M,2012-02-05,1,North,Form 1 North,2026,Tendai Sibanda,Father,+263785446912,"8646 Borrowdale, Harare",Active
+STU20260015,Anotidaishe,Mhlanga,F,2013-06-09,1,North,Form 1 North,2026,Ruvimbo Mhlanga,Mother,+263739683481,"7398 Glen View, Harare",Active
+STU20260016,Simbarashe,Chiweshe,M,2013-01-11,1,North,Form 1 North,2026,Takesure Chiweshe,Father,+263771987737,"3751 Budiriro, Harare",Active
+STU20260017,Anesu,Shumba,M,2013-09-21,1,North,Form 1 North,2026,Farai Shumba,Father,+263783219824,"9356 Chitungwiza, Harare",Active
+STU20260018,Fadzai,Chabata,F,2012-07-27,1,North,Form 1 North,2026,Godfrey Chabata,Father,+263736944126,"6940 Hatfield, Harare",Active
+STU20260019,Paidamoyo,Sibanda,F,2013-12-11,1,North,Form 1 North,2026,Tichafa Sibanda,Father,+263712833230,"4074 Mabvuku, Harare",Active
+STU20260020,Tichaona,Nhamo,M,2013-08-05,1,North,Form 1 North,2026,Farai Nhamo,Father,+263778434500,"9017 Glen View, Harare",Active
+STU20260021,Kupakwashe,Nyakudya,M,2013-02-17,1,North,Form 1 North,2026,Tendai Nyakudya,Father,+263734586084,"6571 Highfield, Harare",Active
+STU20260022,Tinotenda,Moyo,M,2012-05-15,1,North,Form 1 North,2026,Nyasha Moyo,Mother,+263733597059,"3112 Epworth, Harare",Active
+STU20260023,Tafadzwa,Chari,M,2013-06-10,1,North,Form 1 North,2026,Tichafa Chari,Father,+263781954280,"8321 Budiriro, Harare",Active
+STU20260024,Tinashe,Mazarura,M,2013-12-12,1,North,Form 1 North,2026,Tapiwa Mazarura,Father,+263781666754,"1344 Hatfield, Harare",Active
+STU20260025,Tafadzwa,Chinyanga,F,2013-12-09,1,North,Form 1 North,2026,Shuvai Chinyanga,Mother,+263786033115,"7492 Avondale, Harare",Active
+STU20260026,Tatenda,Mupfumi,M,2013-02-07,1,North,Form 1 North,2026,Simbarashe Mupfumi,Father,+263712154126,"4003 Marlborough, Harare",Active
+STU20260027,Rutendo,Nhamo,F,2013-11-10,1,North,Form 1 North,2026,Innocent Nhamo,Father,+263712737893,"2201 Dzivarasekwa, Harare",Active
+STU20260028,Dzikamai,Marufu,M,2013-05-20,1,North,Form 1 North,2026,Fadzai Marufu,Mother,+263714415796,"4326 Kambuzuma, Harare",Active
+STU20260029,Mazvita,Kanengoni,F,2013-02-17,1,North,Form 1 North,2026,Precious Kanengoni,Mother,+263776596150,"2144 Dzivarasekwa, Harare",Active
+STU20260030,Tendekai,Nhamo,M,2012-10-14,1,North,Form 1 North,2026,Godfrey Nhamo,Father,+263781604451,"6050 Chitungwiza, Harare",Active
+STU20260031,Kundai,Zvobgo,M,2013-06-07,1,North,Form 1 North,2026,Mavis Zvobgo,Uncle,+263714524499,"4089 Glen View, Harare",Active
+STU20260032,Makanaka,Zhou,F,2012-11-13,1,North,Form 1 North,2026,Kudzai Zhou,Aunt,+263787917152,"407 Kuwadzana, Harare",Active
+STU20260033,Rutendo,Chimedza,F,2012-12-08,1,North,Form 1 North,2026,Farai Chimedza,Father,+263777417985,"635 Mufakose, Harare",Active
+STU20260034,Tapiwa,Nyamayaro,M,2012-06-28,1,North,Form 1 North,2026,Precious Nyamayaro,Mother,+263784740036,"388 Mabvuku, Harare",Active
+STU20260035,Tanyaradzwa,Makoni,F,2013-05-23,1,North,Form 1 North,2026,Ruvimbo Makoni,Mother,+263711463060,"1890 Dzivarasekwa, Harare",Active
+STU20260036,Munyaradzi,Chinyanga,M,2013-02-25,1,North,Form 1 North,2026,Memory Chinyanga,Mother,+263718321474,"9933 Kambuzuma, Harare",Active
+STU20260037,Tinotenda,Kanengoni,M,2013-05-11,1,North,Form 1 North,2026,Munyaradzi Kanengoni,Father,+263787110622,"7067 Budiriro, Harare",Active
+STU20260038,Shamiso,Dube,F,2013-06-03,1,North,Form 1 North,2026,Ruvimbo Dube,Mother,+263735960271,"9084 Warren Park, Harare",Active
+STU20260039,Kundai,Makumbe,M,2012-12-12,1,North,Form 1 North,2026,Takesure Makumbe,Father,+263731006810,"4979 Epworth, Harare",Active
+STU20260040,Kundai,Chabata,M,2013-08-27,1,North,Form 1 North,2026,Patience Chabata,Mother,+263733846949,"1390 Epworth, Harare",Active
+STU20260041,Nyasha,Nyamayaro,F,2013-12-11,1,North,Form 1 North,2026,Shuvai Nyamayaro,Mother,+263781409790,"758 Tafara, Harare",Active
+STU20260042,Shamiso,Chitsiga,F,2013-08-22,1,North,Form 1 North,2026,Mavis Chitsiga,Mother,+263787442089,"8100 Greendale, Harare",Active
+STU20260043,Kudakwashe,Hove,M,2013-02-24,1,South,Form 1 South,2026,Shuvai Hove,Mother,+263731842524,"9133 Tafara, Harare",Active
+STU20260044,Takunda,Zvobgo,M,2012-12-07,1,South,Form 1 South,2026,Netsai Zvobgo,Guardian,+263733670226,"7778 Waterfalls, Harare",Active
+STU20260045,Makanaka,Mutambara,F,2013-09-24,1,South,Form 1 South,2026,Ruvimbo Mutambara,Mother,+263732299954,"4682 Tafara, Harare",Active
+STU20260046,Tanyaradzwa,Dube,F,2013-03-12,1,South,Form 1 South,2026,Stanley Dube,Father,+263784589533,"1053 Hatfield, Harare",Active
+STU20260047,Tanyaradzwa,Nyakudya,F,2012-07-31,1,South,Form 1 South,2026,Stanley Nyakudya,Father,+263731327691,"9433 Greendale, Harare",Active
+STU20260048,Rumbidzai,Mlambo,F,2013-07-19,1,South,Form 1 South,2026,Sekai Mlambo,Mother,+263789191131,"3596 Dzivarasekwa, Harare",Active
+STU20260049,Nokutenda,Ncube,F,2012-06-21,1,South,Form 1 South,2026,Tariro Ncube,Mother,+263733141239,"8752 Mbare, Harare",Active
+STU20260050,Rudo,Muzondo,F,2013-02-12,1,South,Form 1 South,2026,Tsitsi Muzondo,Aunt,+263775364698,"6212 Avondale, Harare",Active
+STU20260051,Takunda,Dube,M,2013-07-14,1,South,Form 1 South,2026,Netsai Dube,Guardian,+263712374158,"7706 Mbare, Harare",Active
+STU20260052,Tonderai,Musekiwa,M,2013-11-30,1,South,Form 1 South,2026,Tonderai Musekiwa,Father,+263784344717,"334 Borrowdale, Harare",Active
+STU20260053,Simbarashe,Zvobgo,M,2012-12-08,1,South,Form 1 South,2026,Takesure Zvobgo,Guardian,+263717189034,"2750 Borrowdale, Harare",Active
+STU20260054,Itai,Nyamayaro,M,2013-06-09,1,South,Form 1 South,2026,Takesure Nyamayaro,Father,+263717296605,"6499 Mabvuku, Harare",Active
+STU20260055,Munyaradzi,Chingwaru,M,2013-02-22,1,South,Form 1 South,2026,Precious Chingwaru,Mother,+263771689025,"5689 Belvedere, Harare",Active
+STU20260056,Nyarai,Chitepo,F,2013-09-17,1,South,Form 1 South,2026,Rudo Chitepo,Mother,+263732770648,"7103 Marlborough, Harare",Active
+STU20260057,Ratidzo,Chinamasa,F,2012-03-31,1,South,Form 1 South,2026,Fadzai Chinamasa,Mother,+263738799287,"7137 Chitungwiza, Harare",Active
+STU20260058,Tanyaradzwa,Chitsiga,F,2013-02-14,1,South,Form 1 South,2026,Mavis Chitsiga,Mother,+263737358385,"5512 Mbare, Harare",Active
+STU20260059,Paidamoyo,Dube,F,2013-09-07,1,South,Form 1 South,2026,Lovemore Dube,Father,+263715691890,"9768 Dzivarasekwa, Harare",Active
+STU20260060,Shingirai,Chimombe,M,2013-05-04,1,South,Form 1 South,2026,Patience Chimombe,Mother,+263788987516,"8042 Waterfalls, Harare",Active
+STU20260061,Tinashe,Nyamande,M,2013-07-27,1,South,Form 1 South,2026,Farai Nyamande,Father,+263718939993,"9069 Kambuzuma, Harare",Active
+STU20260062,Kudzai,Chidzikwe,F,2013-06-30,1,South,Form 1 South,2026,Nyasha Chidzikwe,Mother,+263783024269,"3156 Avondale, Harare",Active
+STU20260063,Tendekai,Nyakudya,M,2013-04-09,1,South,Form 1 South,2026,Munyaradzi Nyakudya,Father,+263712686548,"3181 Epworth, Harare",Active
+STU20260064,Tonderai,Tsvangirai,M,2013-01-08,1,South,Form 1 South,2026,Farai Tsvangirai,Father,+263775901239,"2069 Mufakose, Harare",Active
+STU20260065,Anesu,Moyo,M,2013-08-29,1,South,Form 1 South,2026,Patience Moyo,Mother,+263775235884,"7828 Glen View, Harare",Active
+STU20260066,Tinotenda,Madzima,M,2013-10-23,1,South,Form 1 South,2026,Tendai Madzima,Father,+263712429098,"4067 Glen View, Harare",Active
+STU20260067,Shamiso,Mazarura,F,2013-09-25,1,South,Form 1 South,2026,Patience Mazarura,Grandmother,+263736123430,"9317 Borrowdale, Harare",Active
+STU20260068,Tapiwanashe,Chidzikwe,M,2013-04-17,1,South,Form 1 South,2026,Farai Chidzikwe,Father,+263785024269,"2848 Belvedere, Harare",Active
+STU20260069,Farai,Moyo,M,2012-08-18,1,South,Form 1 South,2026,Nyasha Moyo,Mother,+263715743227,"7439 Budiriro, Harare",Active
+STU20260070,Tanaka,Chinyanga,M,2013-08-06,1,South,Form 1 South,2026,Simbarashe Chinyanga,Father,+263785456573,"2331 Budiriro, Harare",Active
+STU20260071,Farai,Chabata,M,2013-11-01,1,South,Form 1 South,2026,Patience Chabata,Mother,+263717752972,"4461 Kambuzuma, Harare",Active
+STU20260072,Tadiwa,Mapfumo,F,2013-08-10,1,South,Form 1 South,2026,Fadzai Mapfumo,Mother,+263774840714,"9425 Chitungwiza, Harare",Active
+STU20260073,Itai,Tagwireyi,M,2013-10-23,1,South,Form 1 South,2026,Tonderai Tagwireyi,Father,+263739706768,"7246 Dzivarasekwa, Harare",Active
+STU20260074,Munyaradzi,Chirwa,M,2012-02-16,1,South,Form 1 South,2026,Memory Chirwa,Mother,+263712754894,"2635 Avondale, Harare",Active
+STU20260075,Ratidzo,Madzima,F,2013-12-06,1,South,Form 1 South,2026,Precious Madzima,Mother,+263778630712,"1443 Avondale, Harare",Active
+STU20260076,Tanyaradzwa,Gumbo,F,2012-09-20,1,South,Form 1 South,2026,Innocent Gumbo,Guardian,+263731909393,"3074 Kambuzuma, Harare",Active
+STU20260077,Shamiso,Mashingaidze,F,2012-11-16,1,South,Form 1 South,2026,Netsai Mashingaidze,Mother,+263713198037,"4720 Waterfalls, Harare",Active
+STU20260078,Chiedza,Ncube,F,2013-12-30,1,South,Form 1 South,2026,Farai Ncube,Father,+263732563790,"3682 Glen View, Harare",Active
+STU20260079,Anotidaishe,Gumbo,F,2013-09-13,1,South,Form 1 South,2026,Sekai Gumbo,Mother,+263739094999,"7737 Tafara, Harare",Active
+STU20260080,Chipo,Chinamasa,F,2012-04-07,1,South,Form 1 South,2026,Givemore Chinamasa,Father,+263736702160,"8319 Dzivarasekwa, Harare",Active
+STU20260081,Tendai,Sibanda,M,2013-10-28,1,South,Form 1 South,2026,Precious Sibanda,Mother,+263736790218,"5447 Belvedere, Harare",Active
+STU20260082,Tadiwa,Chimedza,F,2013-04-07,1,South,Form 1 South,2026,Takesure Chimedza,Father,+263731732280,"5214 Mufakose, Harare",Active
+STU20260083,Rufaro,Makumbe,F,2013-09-11,1,South,Form 1 South,2026,Tendai Makumbe,Father,+263712683838,"7214 Glen View, Harare",Active
+STU20260084,Rumbidzai,Sibanda,F,2013-07-29,1,South,Form 1 South,2026,Godfrey Sibanda,Father,+263716680114,"6513 Budiriro, Harare",Active
+STU20260085,Paidamoyo,Tagwireyi,F,2012-06-11,1,East,Form 1 East,2026,Precious Tagwireyi,Mother,+263774938791,"4709 Tafara, Harare",Active
+STU20260086,Kundai,Marufu,M,2013-08-16,1,East,Form 1 East,2026,Munyaradzi Marufu,Father,+263771771600,"5315 Highfield, Harare",Active
+STU20260087,Mufaro,Chitepo,F,2012-03-15,1,East,Form 1 East,2026,Simbarashe Chitepo,Father,+263783851852,"2869 Budiriro, Harare",Active
+STU20260088,Shamiso,Tagwireyi,F,2013-09-12,1,East,Form 1 East,2026,Stanley Tagwireyi,Father,+263718710313,"4184 Mbare, Harare",Active
+STU20260089,Kumbirai,Nyamande,F,2013-02-07,1,East,Form 1 East,2026,Memory Nyamande,Grandmother,+263735195951,"7485 Epworth, Harare",Active
+STU20260090,Tinotenda,Chitsiga,M,2012-02-24,1,East,Form 1 East,2026,Tapiwa Chitsiga,Father,+263715953150,"360 Greendale, Harare",Active
+STU20260091,Rumbidzai,Muzondo,F,2013-11-07,1,East,Form 1 East,2026,Precious Muzondo,Grandmother,+263786910964,"3589 Mabvuku, Harare",Active
+STU20260092,Nyarai,Mashingaidze,F,2013-11-18,1,East,Form 1 East,2026,Kudzai Mashingaidze,Father,+263776183033,"7223 Highfield, Harare",Active
+STU20260093,Tsungai,Zvobgo,F,2013-06-01,1,East,Form 1 East,2026,Tariro Zvobgo,Mother,+263783217273,"8838 Marlborough, Harare",Active
+STU20260094,Anotida,Mugabe,F,2013-09-04,1,East,Form 1 East,2026,Tariro Mugabe,Uncle,+263732263313,"2307 Tafara, Harare",Active
+STU20260095,Anotidaishe,Chitsiga,F,2013-02-16,1,East,Form 1 East,2026,Rudo Chitsiga,Mother,+263778630043,"6039 Dzivarasekwa, Harare",Active
+STU20260096,Anotida,Matanda,F,2013-02-25,1,East,Form 1 East,2026,Chengetai Matanda,Father,+263714713925,"1036 Waterfalls, Harare",Active
+STU20260097,Tinevimbo,Murambiwa,F,2013-03-13,1,East,Form 1 East,2026,Tichafa Murambiwa,Father,+263732948178,"1593 Tafara, Harare",Active
+STU20260098,Tinotenda,Mupfumi,M,2013-12-10,1,East,Form 1 East,2026,Fadzai Mupfumi,Mother,+263787960607,"1623 Mufakose, Harare",Active
+STU20260099,Anotidaishe,Makoni,F,2013-12-20,1,East,Form 1 East,2026,Shuvai Makoni,Mother,+263787084862,"1628 Marlborough, Harare",Active
+STU20260100,Ruvimbo,Mandaza,F,2013-04-08,1,East,Form 1 East,2026,Givemore Mandaza,Father,+263774558545,"9784 Mbare, Harare",Active
+STU20260101,Tafara,Shumba,M,2013-03-06,1,East,Form 1 East,2026,Godfrey Shumba,Father,+263784623062,"3818 Avondale, Harare",Active
+STU20260102,Tafara,Kanengoni,M,2013-05-22,1,East,Form 1 East,2026,Tendai Kanengoni,Father,+263782844258,"423 Warren Park, Harare",Active
+STU20260103,Tonderai,Chabata,M,2013-10-29,1,East,Form 1 East,2026,Rudo Chabata,Mother,+263773126655,"6898 Kambuzuma, Harare",Active
+STU20260104,Tendekai,Chiweshe,M,2012-08-17,1,East,Form 1 East,2026,Sekai Chiweshe,Mother,+263739453010,"3630 Borrowdale, Harare",Active
+STU20260105,Tendekai,Chabata,M,2013-08-23,1,East,Form 1 East,2026,Tichafa Chabata,Guardian,+263732811298,"8033 Waterfalls, Harare",Active
+STU20260106,Dzikamai,Mapfumo,M,2013-11-08,1,East,Form 1 East,2026,Godfrey Mapfumo,Father,+263717390515,"9788 Kambuzuma, Harare",Active
+STU20260107,Tadiwa,Chakanyuka,F,2012-02-20,1,East,Form 1 East,2026,Givemore Chakanyuka,Father,+263788215376,"7399 Tafara, Harare",Active
+STU20260108,Tanyaradzwa,Nyamayaro,F,2012-07-23,1,East,Form 1 East,2026,Tariro Nyamayaro,Mother,+263736243275,"4177 Marlborough, Harare",Active
+STU20260109,Mukudzei,Chimedza,M,2012-02-04,1,East,Form 1 East,2026,Givemore Chimedza,Father,+263732620082,"6106 Warren Park, Harare",Active
+STU20260110,Munyaradzi,Zhou,M,2013-12-10,1,East,Form 1 East,2026,Tapiwa Zhou,Father,+263731863121,"4713 Borrowdale, Harare",Active
+STU20260111,Mufaro,Marufu,F,2013-03-21,1,East,Form 1 East,2026,Shuvai Marufu,Mother,+263717166651,"1883 Dzivarasekwa, Harare",Active
+STU20260112,Tafara,Chirwa,M,2013-11-08,1,East,Form 1 East,2026,Rudo Chirwa,Mother,+263716701311,"5752 Mbare, Harare",Active
+STU20260113,Anesu,Chinamasa,M,2012-02-05,1,East,Form 1 East,2026,Munyaradzi Chinamasa,Father,+263772539438,"8692 Mabvuku, Harare",Active
+STU20260114,Kudzai,Mupfumi,F,2013-03-22,1,East,Form 1 East,2026,Nyasha Mupfumi,Mother,+263771882629,"2550 Kuwadzana, Harare",Active
+STU20260115,Mukudzei,Mapfumo,M,2013-08-15,1,East,Form 1 East,2026,Patience Mapfumo,Mother,+263735582979,"3532 Kambuzuma, Harare",Active
+STU20260116,Tonderai,Chirwa,M,2013-05-26,1,East,Form 1 East,2026,Sekai Chirwa,Mother,+263774699685,"6476 Borrowdale, Harare",Active
+STU20260117,Tatenda,Mhlanga,M,2013-04-19,1,East,Form 1 East,2026,Tonderai Mhlanga,Father,+263713013003,"127 Mufakose, Harare",Active
+STU20260118,Rutendo,Zvobgo,F,2012-09-29,1,East,Form 1 East,2026,Simbarashe Zvobgo,Father,+263712209226,"6506 Highfield, Harare",Active
+STU20260119,Rumbidzai,Mupfumi,F,2013-06-10,1,East,Form 1 East,2026,Fadzai Mupfumi,Mother,+263735857259,"1888 Greendale, Harare",Active
+STU20260120,Panashe,Mugabe,M,2012-12-19,1,East,Form 1 East,2026,Chipo Mugabe,Mother,+263775082173,"7139 Chitungwiza, Harare",Active
+STU20260121,Tsitsi,Mapfumo,F,2012-06-07,1,East,Form 1 East,2026,Shuvai Mapfumo,Mother,+263782281433,"8364 Glen View, Harare",Active
+STU20260122,Dzikamai,Mbiriri,M,2013-06-29,1,East,Form 1 East,2026,Stanley Mbiriri,Father,+263714309671,"2843 Borrowdale, Harare",Active
+STU20260123,Itai,Mashingaidze,M,2013-04-01,1,East,Form 1 East,2026,Patience Mashingaidze,Mother,+263736422534,"5180 Warren Park, Harare",Active
+STU20260124,Nyasha,Gwatidzo,F,2012-11-19,1,East,Form 1 East,2026,Netsai Gwatidzo,Mother,+263776904610,"8313 Budiriro, Harare",Active
+STU20260125,Tadiwa,Nhamo,F,2013-01-30,1,East,Form 1 East,2026,Precious Nhamo,Mother,+263779507186,"6300 Waterfalls, Harare",Active
+STU20260126,Takunda,Mukaro,M,2013-06-14,1,East,Form 1 East,2026,Sekai Mukaro,Mother,+263778558523,"1696 Avondale, Harare",Active
+STU20260127,Shingirai,Hove,M,2012-01-21,2,North,Form 2 North,2025,Munyaradzi Hove,Father,+263739792411,"8565 Borrowdale, Harare",Active
+STU20260128,Tonderai,Chitepo,M,2012-07-17,2,North,Form 2 North,2025,Netsai Chitepo,Mother,+263776614484,"1080 Avondale, Harare",Active
+STU20260129,Tichaona,Tagwireyi,M,2011-05-26,2,North,Form 2 North,2025,Tariro Tagwireyi,Aunt,+263712367376,"9548 Warren Park, Harare",Active
+STU20260130,Ropafadzo,Hove,F,2011-03-08,2,North,Form 2 North,2025,Farai Hove,Father,+263713144023,"8625 Budiriro, Harare",Active
+STU20260131,Tsitsi,Chitepo,F,2012-07-04,2,North,Form 2 North,2025,Tsitsi Chitepo,Grandmother,+263734221313,"3712 Warren Park, Harare",Active
+STU20260132,Tinashe,Nyamande,M,2012-09-16,2,North,Form 2 North,2025,Innocent Nyamande,Father,+263787320310,"2528 Kuwadzana, Harare",Active
+STU20260133,Munashe,Chingwaru,M,2012-08-12,2,North,Form 2 North,2025,Tapiwa Chingwaru,Father,+263788452417,"4669 Waterfalls, Harare",Active
+STU20260134,Tichaona,Mutambara,M,2012-08-28,2,North,Form 2 North,2025,Lovemore Mutambara,Father,+263738745704,"4617 Greendale, Harare",Active
+STU20260135,Anotidaishe,Mugabe,F,2012-11-05,2,North,Form 2 North,2025,Givemore Mugabe,Father,+263737227905,"9086 Glen View, Harare",Active
+STU20260136,Tendai,Mapfumo,M,2012-05-19,2,North,Form 2 North,2025,Mavis Mapfumo,Mother,+263732538698,"3638 Waterfalls, Harare",Active
+STU20260137,Tafadzwa,Ncube,F,2011-01-28,2,North,Form 2 North,2025,Sekai Ncube,Mother,+263732369112,"6143 Tafara, Harare",Active
+STU20260138,Panashe,Chimedza,M,2012-11-28,2,North,Form 2 North,2025,Netsai Chimedza,Mother,+263775813037,"7741 Warren Park, Harare",Active
+STU20260139,Tadiwa,Mavhunga,F,2012-02-10,2,North,Form 2 North,2025,Farai Mavhunga,Father,+263789854536,"6935 Glen View, Harare",Active
+STU20260140,Fadzai,Chigumba,F,2012-01-25,2,North,Form 2 North,2025,Tapiwa Chigumba,Father,+263732053729,"1817 Mufakose, Harare",Active
+STU20260141,Kupakwashe,Chakanyuka,M,2012-03-14,2,North,Form 2 North,2025,Rutendo Chakanyuka,Mother,+263715035998,"9350 Hatfield, Harare",Active
+STU20260142,Mukudzei,Makumbe,M,2012-09-25,2,North,Form 2 North,2025,Chipo Makumbe,Uncle,+263738887557,"714 Greendale, Harare",Active
+STU20260143,Mazvita,Chidzikwe,F,2012-07-01,2,North,Form 2 North,2025,Lovemore Chidzikwe,Father,+263776578736,"2186 Highfield, Harare",Active
+STU20260144,Chipo,Shumba,F,2012-12-16,2,North,Form 2 North,2025,Tariro Shumba,Mother,+263783262450,"1034 Waterfalls, Harare",Active
+STU20260145,Tendai,Chimombe,M,2012-04-12,2,North,Form 2 North,2025,Lovemore Chimombe,Guardian,+263735249899,"600 Mabvuku, Harare",Active
+STU20260146,Mufaro,Maposa,F,2012-12-01,2,North,Form 2 North,2025,Nyasha Maposa,Mother,+263718330827,"6554 Waterfalls, Harare",Active
+STU20260147,Tanyaradzwa,Tsvangirai,F,2011-12-21,2,North,Form 2 North,2025,Memory Tsvangirai,Grandmother,+263778121922,"1294 Hatfield, Harare",Active
+STU20260148,Tichaona,Nyamande,M,2012-02-22,2,North,Form 2 North,2025,Lovemore Nyamande,Father,+263718481225,"9874 Hatfield, Harare",Active
+STU20260149,Kuzivakwashe,Nhamo,M,2012-08-16,2,North,Form 2 North,2025,Munyaradzi Nhamo,Grandmother,+263735606274,"940 Budiriro, Harare",Active
+STU20260150,Mufaro,Chakanyuka,F,2012-01-16,2,North,Form 2 North,2025,Givemore Chakanyuka,Father,+263731583829,"2069 Budiriro, Harare",Active
+STU20260151,Itai,Hove,M,2012-07-04,2,North,Form 2 North,2025,Fadzai Hove,Mother,+263788548448,"6078 Marlborough, Harare",Active
+STU20260152,Makanaka,Chiweshe,F,2012-09-28,2,North,Form 2 North,2025,Rutendo Chiweshe,Mother,+263715187788,"1859 Mbare, Harare",Active
+STU20260153,Ngonidzashe,Mukanya,M,2011-10-15,2,North,Form 2 North,2025,Farai Mukanya,Father,+263734599894,"4679 Mufakose, Harare",Active
+STU20260154,Takudzwa,Zvobgo,M,2012-08-19,2,North,Form 2 North,2025,Kudzai Zvobgo,Father,+263776361793,"5693 Budiriro, Harare",Active
+STU20260155,Kumbirai,Chigumba,F,2012-12-30,2,North,Form 2 North,2025,Tonderai Chigumba,Father,+263783036124,"3293 Warren Park, Harare",Active
+STU20260156,Tafara,Madzima,M,2012-07-03,2,North,Form 2 North,2025,Patience Madzima,Mother,+263782446455,"1078 Epworth, Harare",Active
+STU20260157,Ratidzo,Sibanda,F,2011-09-27,2,North,Form 2 North,2025,Netsai Sibanda,Mother,+263773102634,"5195 Budiriro, Harare",Active
+STU20260158,Tadiwa,Tagwireyi,F,2012-03-06,2,North,Form 2 North,2025,Tonderai Tagwireyi,Guardian,+263773083077,"8489 Warren Park, Harare",Active
+STU20260159,Rutendo,Mugabe,F,2012-12-29,2,North,Form 2 North,2025,Lovemore Mugabe,Grandmother,+263775204459,"3217 Belvedere, Harare",Active
+STU20260160,Vimbai,Matanda,F,2012-11-10,2,North,Form 2 North,2025,Simbarashe Matanda,Father,+263783872269,"9915 Avondale, Harare",Active
+STU20260161,Munashe,Maposa,M,2012-02-11,2,North,Form 2 North,2025,Innocent Maposa,Father,+263714536777,"9374 Hatfield, Harare",Active
+STU20260162,Ngonidzashe,Muchemwa,M,2012-11-24,2,North,Form 2 North,2025,Patience Muchemwa,Mother,+263735990112,"7431 Budiriro, Harare",Active
+STU20260163,Farai,Nhamo,M,2011-09-05,2,North,Form 2 North,2025,Shuvai Nhamo,Mother,+263786244264,"5232 Marlborough, Harare",Active
+STU20260164,Vimbai,Mashingaidze,F,2012-09-20,2,North,Form 2 North,2025,Lovemore Mashingaidze,Father,+263775487430,"7367 Tafara, Harare",Active
+STU20260165,Takudzwa,Mutasa,M,2012-07-15,2,North,Form 2 North,2025,Shuvai Mutasa,Aunt,+263716246485,"3111 Kuwadzana, Harare",Active
+STU20260166,Tsitsi,Mupfumi,F,2011-06-07,2,North,Form 2 North,2025,Rudo Mupfumi,Mother,+263739479950,"7492 Tafara, Harare",Active
+STU20260167,Munyaradzi,Mlambo,M,2012-01-26,2,North,Form 2 North,2025,Patience Mlambo,Mother,+263735794062,"8794 Mbare, Harare",Active
+STU20260168,Kundai,Zvobgo,M,2012-07-06,2,North,Form 2 North,2025,Memory Zvobgo,Mother,+263774265774,"5940 Belvedere, Harare",Active
+STU20260169,Nyasha,Machingura,F,2011-10-09,2,South,Form 2 South,2025,Precious Machingura,Uncle,+263782622046,"6454 Marlborough, Harare",Active
+STU20260170,Chipo,Chitepo,F,2012-04-11,2,South,Form 2 South,2025,Sekai Chitepo,Mother,+263773299088,"5457 Mufakose, Harare",Active
+STU20260171,Vimbai,Mazarura,F,2012-06-16,2,South,Form 2 South,2025,Tsitsi Mazarura,Mother,+263716643410,"8312 Kambuzuma, Harare",Active
+STU20260172,Ratidzo,Muzondo,F,2012-08-31,2,South,Form 2 South,2025,Lovemore Muzondo,Father,+263777988386,"9564 Epworth, Harare",Active
+STU20260173,Tapiwanashe,Gwatidzo,M,2012-12-01,2,South,Form 2 South,2025,Munyaradzi Gwatidzo,Father,+263733860717,"8590 Borrowdale, Harare",Active
+STU20260174,Vimbai,Nyamayaro,F,2012-01-17,2,South,Form 2 South,2025,Stanley Nyamayaro,Father,+263718025967,"2482 Hatfield, Harare",Active
+STU20260175,Kundai,Chakanyuka,M,2011-02-01,2,South,Form 2 South,2025,Simbarashe Chakanyuka,Father,+263719025733,"8610 Greendale, Harare",Active
+STU20260176,Anotidaishe,Tsvangirai,F,2011-09-30,2,South,Form 2 South,2025,Sekai Tsvangirai,Mother,+263719123194,"3151 Tafara, Harare",Active
+STU20260177,Chipo,Chigumba,F,2012-06-01,2,South,Form 2 South,2025,Tariro Chigumba,Mother,+263736319061,"7862 Marlborough, Harare",Active
+STU20260178,Ropafadzo,Gumbo,F,2011-07-22,2,South,Form 2 South,2025,Netsai Gumbo,Mother,+263711705758,"4713 Budiriro, Harare",Active
+STU20260179,Tafadzwa,Nhamo,F,2012-09-02,2,South,Form 2 South,2025,Stanley Nhamo,Father,+263715557052,"2250 Glen View, Harare",Active
+STU20260180,Simbarashe,Mutasa,M,2012-11-22,2,South,Form 2 South,2025,Tichafa Mutasa,Father,+263718925622,"1648 Warren Park, Harare",Active
+STU20260181,Tichaona,Chimedza,M,2012-07-27,2,South,Form 2 South,2025,Patience Chimedza,Mother,+263716388299,"4677 Highfield, Harare",Active
+STU20260182,Kupakwashe,Muzondo,M,2012-09-30,2,South,Form 2 South,2025,Kudzai Muzondo,Guardian,+263781609681,"6505 Mufakose, Harare",Active
+STU20260183,Tanaka,Chidzikwe,M,2012-01-20,2,South,Form 2 South,2025,Farai Chidzikwe,Father,+263776621073,"4663 Waterfalls, Harare",Active
+STU20260184,Kumbirai,Zvobgo,F,2011-05-20,2,South,Form 2 South,2025,Tonderai Zvobgo,Father,+263788699307,"4216 Kuwadzana, Harare",Active
+STU20260185,Tendekai,Shumba,M,2012-10-17,2,South,Form 2 South,2025,Tendai Shumba,Father,+263738175669,"8443 Avondale, Harare",Active
+STU20260186,Tinotenda,Makumbe,M,2012-04-04,2,South,Form 2 South,2025,Chengetai Makumbe,Father,+263781114590,"4273 Greendale, Harare",Active
+STU20260187,Takunda,Mashingaidze,M,2012-06-17,2,South,Form 2 South,2025,Fadzai Mashingaidze,Mother,+263775388133,"5891 Tafara, Harare",Active
+STU20260188,Mukudzei,Gumbo,M,2011-06-07,2,South,Form 2 South,2025,Tapiwa Gumbo,Father,+263712969909,"4834 Marlborough, Harare",Active
+STU20260189,Simbarashe,Zvobgo,M,2011-03-20,2,South,Form 2 South,2025,Tariro Zvobgo,Grandmother,+263738899184,"8807 Mabvuku, Harare",Active
+STU20260190,Mukudzei,Mashingaidze,M,2012-09-26,2,South,Form 2 South,2025,Sekai Mashingaidze,Mother,+263772882551,"1012 Belvedere, Harare",Active
+STU20260191,Munyaradzi,Nyakudya,M,2012-03-25,2,South,Form 2 South,2025,Precious Nyakudya,Mother,+263774446065,"9555 Mufakose, Harare",Active
+STU20260192,Dzikamai,Chakanyuka,M,2011-01-29,2,South,Form 2 South,2025,Tsitsi Chakanyuka,Mother,+263731968662,"9156 Waterfalls, Harare",Active
+STU20260193,Tsungai,Ncube,F,2011-05-11,2,South,Form 2 South,2025,Munyaradzi Ncube,Father,+263771759836,"6942 Marlborough, Harare",Active
+STU20260194,Tichaona,Mutasa,M,2012-08-29,2,South,Form 2 South,2025,Farai Mutasa,Father,+263788052503,"6136 Greendale, Harare",Active
+STU20260195,Paidamoyo,Mukaro,F,2011-07-12,2,South,Form 2 South,2025,Innocent Mukaro,Aunt,+263712990334,"2925 Belvedere, Harare",Active
+STU20260196,Tsitsi,Zvobgo,F,2012-01-02,2,South,Form 2 South,2025,Farai Zvobgo,Father,+263739924365,"6215 Tafara, Harare",Active
+STU20260197,Takunda,Mlambo,M,2012-05-21,2,South,Form 2 South,2025,Kudzai Mlambo,Uncle,+263778033690,"257 Tafara, Harare",Active
+STU20260198,Tinashe,Marufu,M,2012-08-16,2,South,Form 2 South,2025,Stanley Marufu,Father,+263738364573,"3840 Belvedere, Harare",Active
+STU20260199,Itai,Maposa,M,2012-03-12,2,South,Form 2 South,2025,Shuvai Maposa,Mother,+263716379867,"3882 Epworth, Harare",Active
+STU20260200,Mukudzei,Mukanya,M,2012-07-30,2,South,Form 2 South,2025,Nyasha Mukanya,Mother,+263788167236,"9108 Mufakose, Harare",Active
+STU20260201,Tonderai,Hove,M,2011-09-26,2,South,Form 2 South,2025,Tariro Hove,Mother,+263786031294,"6168 Kuwadzana, Harare",Active
+STU20260202,Fadzai,Chitsiga,F,2012-06-02,2,South,Form 2 South,2025,Tonderai Chitsiga,Father,+263777923579,"6825 Belvedere, Harare",Active
+STU20260203,Tinotenda,Mutambara,M,2012-04-14,2,South,Form 2 South,2025,Ruvimbo Mutambara,Mother,+263737225647,"1515 Belvedere, Harare",Active
+STU20260204,Tafadzwa,Makoni,M,2011-12-11,2,South,Form 2 South,2025,Givemore Makoni,Father,+263789042900,"3423 Avondale, Harare",Active
+STU20260205,Anotidaishe,Mukaro,F,2012-04-18,2,South,Form 2 South,2025,Munyaradzi Mukaro,Father,+263735070038,"9903 Mabvuku, Harare",Active
+STU20260206,Tafadzwa,Mutambara,F,2012-05-24,2,South,Form 2 South,2025,Patience Mutambara,Mother,+263716174467,"4286 Marlborough, Harare",Active
+STU20260207,Tadiwa,Marufu,F,2011-06-13,2,South,Form 2 South,2025,Lovemore Marufu,Father,+263774712363,"2391 Mbare, Harare",Active
+STU20260208,Chipo,Chimedza,F,2011-06-01,2,South,Form 2 South,2025,Stanley Chimedza,Father,+263735122665,"8181 Belvedere, Harare",Active
+STU20260209,Mazvita,Mashingaidze,F,2011-11-25,2,South,Form 2 South,2025,Patience Mashingaidze,Mother,+263713839807,"2294 Belvedere, Harare",Active
+STU20260210,Rutendo,Mukaro,F,2012-09-25,2,South,Form 2 South,2025,Givemore Mukaro,Father,+263771107102,"6757 Warren Park, Harare",Active
+STU20260211,Tinashe,Munyoro,M,2012-01-05,2,East,Form 2 East,2025,Simbarashe Munyoro,Father,+263779106820,"7994 Mbare, Harare",Active
+STU20260212,Tichaona,Zhou,M,2011-01-07,2,East,Form 2 East,2025,Simbarashe Zhou,Father,+263711287605,"8229 Hatfield, Harare",Active
+STU20260213,Takudzwa,Mukaro,M,2012-09-25,2,East,Form 2 East,2025,Stanley Mukaro,Father,+263716946534,"4380 Greendale, Harare",Active
+STU20260214,Tonderai,Mandaza,M,2011-10-17,2,East,Form 2 East,2025,Munyaradzi Mandaza,Father,+263771531577,"1532 Greendale, Harare",Active
+STU20260215,Rufaro,Zhou,F,2011-01-29,2,East,Form 2 East,2025,Munyaradzi Zhou,Father,+263738279795,"5428 Chitungwiza, Harare",Active
+STU20260216,Dzikamai,Mukanya,M,2012-04-27,2,East,Form 2 East,2025,Kudzai Mukanya,Guardian,+263711781180,"1219 Dzivarasekwa, Harare",Active
+STU20260217,Farai,Chimedza,M,2012-01-09,2,East,Form 2 East,2025,Takesure Chimedza,Father,+263732290796,"4904 Kuwadzana, Harare",Active
+STU20260218,Munyaradzi,Mudzingwa,M,2011-12-13,2,East,Form 2 East,2025,Rutendo Mudzingwa,Mother,+263782315798,"8205 Marlborough, Harare",Active
+STU20260219,Takudzwa,Chirwa,M,2012-02-08,2,East,Form 2 East,2025,Fadzai Chirwa,Mother,+263736475691,"486 Dzivarasekwa, Harare",Active
+STU20260220,Nokutenda,Musekiwa,F,2012-10-10,2,East,Form 2 East,2025,Rutendo Musekiwa,Mother,+263732437708,"4840 Tafara, Harare",Active
+STU20260221,Tinashe,Makoni,M,2012-07-13,2,East,Form 2 East,2025,Munyaradzi Makoni,Father,+263712787627,"1500 Mbare, Harare",Active
+STU20260222,Tadiwa,Chitepo,F,2012-02-22,2,East,Form 2 East,2025,Godfrey Chitepo,Father,+263739597330,"6686 Glen View, Harare",Active
+STU20260223,Tinashe,Mlambo,M,2012-11-01,2,East,Form 2 East,2025,Precious Mlambo,Mother,+263717942580,"6354 Budiriro, Harare",Active
+STU20260224,Munyaradzi,Mukanya,M,2012-12-16,2,East,Form 2 East,2025,Tsitsi Mukanya,Mother,+263715503118,"8080 Warren Park, Harare",Active
+STU20260225,Farai,Chirwa,M,2012-08-03,2,East,Form 2 East,2025,Patience Chirwa,Mother,+263715222820,"4041 Mufakose, Harare",Active
+STU20260226,Takunda,Marufu,M,2012-06-04,2,East,Form 2 East,2025,Tapiwa Marufu,Father,+263736528792,"7213 Avondale, Harare",Active
+STU20260227,Anotida,Nyamayaro,F,2012-06-02,2,East,Form 2 East,2025,Fadzai Nyamayaro,Aunt,+263736271120,"2911 Greendale, Harare",Active
+STU20260228,Ropafadzo,Chidzikwe,F,2011-10-22,2,East,Form 2 East,2025,Lovemore Chidzikwe,Father,+263737123944,"1866 Chitungwiza, Harare",Active
+STU20260229,Munyaradzi,Nyakudya,M,2012-12-15,2,East,Form 2 East,2025,Munyaradzi Nyakudya,Father,+263788356053,"4774 Budiriro, Harare",Active
+STU20260230,Nyarai,Madzima,F,2012-11-20,2,East,Form 2 East,2025,Shuvai Madzima,Mother,+263788098909,"6177 Budiriro, Harare",Active
+STU20260231,Shamiso,Gwatidzo,F,2011-10-01,2,East,Form 2 East,2025,Sekai Gwatidzo,Mother,+263712425760,"1792 Tafara, Harare",Active
+STU20260232,Rutendo,Hove,F,2012-10-15,2,East,Form 2 East,2025,Netsai Hove,Mother,+263732777454,"173 Glen View, Harare",Active
+STU20260233,Fadzai,Chakanyuka,F,2012-08-16,2,East,Form 2 East,2025,Rutendo Chakanyuka,Mother,+263786787592,"403 Mufakose, Harare",Active
+STU20260234,Tendai,Murambiwa,M,2012-02-29,2,East,Form 2 East,2025,Lovemore Murambiwa,Father,+263734470657,"8538 Mufakose, Harare",Active
+STU20260235,Nokutenda,Marufu,F,2011-12-23,2,East,Form 2 East,2025,Memory Marufu,Mother,+263772930810,"371 Avondale, Harare",Active
+STU20260236,Mukudzei,Mutsvangwa,M,2012-05-04,2,East,Form 2 East,2025,Simbarashe Mutsvangwa,Father,+263738751982,"3799 Greendale, Harare",Active
+STU20260237,Farai,Matanda,M,2011-07-22,2,East,Form 2 East,2025,Munyaradzi Matanda,Father,+263788542617,"9703 Hatfield, Harare",Active
+STU20260238,Rumbidzai,Munyoro,F,2012-04-15,2,East,Form 2 East,2025,Netsai Munyoro,Mother,+263772707116,"8797 Kuwadzana, Harare",Active
+STU20260239,Tanyaradzwa,Chimombe,F,2011-02-28,2,East,Form 2 East,2025,Ruvimbo Chimombe,Grandmother,+263737585795,"9618 Glen View, Harare",Active
+STU20260240,Mufaro,Chitsiga,F,2011-11-13,2,East,Form 2 East,2025,Givemore Chitsiga,Father,+263712421902,"2195 Avondale, Harare",Active
+STU20260241,Simbarashe,Chigumba,M,2012-04-03,2,East,Form 2 East,2025,Tariro Chigumba,Mother,+263738016887,"9772 Warren Park, Harare",Active
+STU20260242,Kudzai,Tsvangirai,F,2011-11-22,2,East,Form 2 East,2025,Simbarashe Tsvangirai,Father,+263713353785,"3066 Avondale, Harare",Active
+STU20260243,Shamiso,Mutasa,F,2012-01-05,2,East,Form 2 East,2025,Tsitsi Mutasa,Mother,+263739479842,"8110 Hatfield, Harare",Active
+STU20260244,Kudzai,Munyoro,F,2011-09-08,2,East,Form 2 East,2025,Godfrey Munyoro,Father,+263785900455,"536 Dzivarasekwa, Harare",Active
+STU20260245,Tichaona,Nyamande,M,2012-08-22,2,East,Form 2 East,2025,Sekai Nyamande,Mother,+263775494430,"8899 Marlborough, Harare",Active
+STU20260246,Itai,Sibanda,M,2011-10-07,2,East,Form 2 East,2025,Tapiwa Sibanda,Father,+263785994727,"529 Waterfalls, Harare",Active
+STU20260247,Mufaro,Maposa,F,2012-08-12,2,East,Form 2 East,2025,Tonderai Maposa,Father,+263786882609,"9999 Hatfield, Harare",Active
+STU20260248,Tapiwanashe,Zvobgo,M,2012-04-15,2,East,Form 2 East,2025,Takesure Zvobgo,Father,+263713824903,"5303 Epworth, Harare",Active
+STU20260249,Rudo,Makoni,F,2012-03-10,2,East,Form 2 East,2025,Mavis Makoni,Mother,+263713128830,"2175 Tafara, Harare",Active
+STU20260250,Kuzivakwashe,Dube,M,2012-12-12,2,East,Form 2 East,2025,Patience Dube,Mother,+263717949543,"6147 Waterfalls, Harare",Active
+STU20260251,Kupakwashe,Chabata,M,2012-07-25,2,East,Form 2 East,2025,Tariro Chabata,Grandmother,+263739188027,"5363 Chitungwiza, Harare",Active
+STU20260252,Anesu,Mbiriri,M,2012-08-22,2,East,Form 2 East,2025,Precious Mbiriri,Mother,+263734654579,"7040 Mabvuku, Harare",Active
+STU20260253,Mazvita,Dube,F,2011-06-22,3,North,Form 3 North,2024,Takesure Dube,Grandmother,+263771770794,"1632 Waterfalls, Harare",Active
+STU20260254,Takudzwa,Chimedza,M,2011-08-14,3,North,Form 3 North,2024,Rudo Chimedza,Guardian,+263783213134,"4946 Kuwadzana, Harare",Active
+STU20260255,Nyasha,Hove,F,2011-05-09,3,North,Form 3 North,2024,Lovemore Hove,Father,+263781868846,"6494 Epworth, Harare",Active
+STU20260256,Kundai,Hove,M,2011-12-27,3,North,Form 3 North,2024,Tichafa Hove,Father,+263773226333,"9727 Tafara, Harare",Active
+STU20260257,Rumbidzai,Moyo,F,2011-03-03,3,North,Form 3 North,2024,Tariro Moyo,Mother,+263774841091,"6277 Budiriro, Harare",Active
+STU20260258,Takudzwa,Dube,M,2011-06-03,3,North,Form 3 North,2024,Tapiwa Dube,Father,+263783396676,"1121 Kambuzuma, Harare",Active
+STU20260259,Tapiwanashe,Hove,M,2011-08-14,3,North,Form 3 North,2024,Tariro Hove,Mother,+263787907345,"7249 Mabvuku, Harare",Active
+STU20260260,Dzikamai,Marufu,M,2011-03-05,3,North,Form 3 North,2024,Memory Marufu,Grandmother,+263785157165,"4538 Budiriro, Harare",Active
+STU20260261,Tichaona,Mazarura,M,2011-12-20,3,North,Form 3 North,2024,Givemore Mazarura,Father,+263714446807,"8483 Borrowdale, Harare",Active
+STU20260262,Tendekai,Mandaza,M,2011-11-27,3,North,Form 3 North,2024,Tonderai Mandaza,Aunt,+263737474085,"1848 Tafara, Harare",Active
+STU20260263,Tinevimbo,Mazarura,F,2011-09-28,3,North,Form 3 North,2024,Lovemore Mazarura,Aunt,+263738060918,"5987 Belvedere, Harare",Active
+STU20260264,Itai,Gwatidzo,M,2011-01-09,3,North,Form 3 North,2024,Tichafa Gwatidzo,Father,+263772014499,"6521 Kambuzuma, Harare",Active
+STU20260265,Tinevimbo,Munyoro,F,2010-08-05,3,North,Form 3 North,2024,Chipo Munyoro,Mother,+263785655136,"1370 Epworth, Harare",Active
+STU20260266,Shingirai,Mukaro,M,2011-03-21,3,North,Form 3 North,2024,Rutendo Mukaro,Mother,+263776203780,"7168 Tafara, Harare",Active
+STU20260267,Simbarashe,Mapfumo,M,2010-03-01,3,North,Form 3 North,2024,Fadzai Mapfumo,Mother,+263713946849,"1957 Mbare, Harare",Active
+STU20260268,Kuzivakwashe,Moyo,M,2011-09-12,3,North,Form 3 North,2024,Sekai Moyo,Mother,+263713801173,"6093 Warren Park, Harare",Active
+STU20260269,Tsungai,Muchemwa,F,2011-01-16,3,North,Form 3 North,2024,Netsai Muchemwa,Mother,+263775411563,"9448 Budiriro, Harare",Active
+STU20260270,Tadiwa,Chakanyuka,F,2011-01-29,3,North,Form 3 North,2024,Precious Chakanyuka,Mother,+263713639223,"4180 Glen View, Harare",Active
+STU20260271,Simbarashe,Chidzikwe,M,2011-01-23,3,North,Form 3 North,2024,Stanley Chidzikwe,Father,+263717425329,"2459 Kuwadzana, Harare",Active
+STU20260272,Tichaona,Mutsvangwa,M,2010-04-25,3,North,Form 3 North,2024,Shuvai Mutsvangwa,Mother,+263715550953,"1277 Chitungwiza, Harare",Active
+STU20260273,Chiedza,Chakanyuka,F,2011-04-02,3,North,Form 3 North,2024,Tonderai Chakanyuka,Father,+263777726402,"1130 Waterfalls, Harare",Active
+STU20260274,Makanaka,Chitsiga,F,2011-06-17,3,North,Form 3 North,2024,Simbarashe Chitsiga,Father,+263714366703,"4778 Chitungwiza, Harare",Active
+STU20260275,Tsungai,Mavhunga,F,2011-08-26,3,North,Form 3 North,2024,Fadzai Mavhunga,Aunt,+263783526084,"105 Hatfield, Harare",Active
+STU20260276,Simbarashe,Nyakudya,M,2011-11-22,3,North,Form 3 North,2024,Lovemore Nyakudya,Father,+263736159172,"1704 Mabvuku, Harare",Active
+STU20260277,Kundai,Madzima,M,2011-03-14,3,North,Form 3 North,2024,Chipo Madzima,Mother,+263789720112,"6768 Marlborough, Harare",Active
+STU20260278,Tsungai,Mapfumo,F,2011-09-16,3,North,Form 3 North,2024,Innocent Mapfumo,Father,+263772044933,"7127 Warren Park, Harare",Active
+STU20260279,Tendai,Chinyanga,M,2011-07-21,3,North,Form 3 North,2024,Memory Chinyanga,Mother,+263782253047,"3322 Warren Park, Harare",Active
+STU20260280,Kudakwashe,Marufu,M,2011-08-19,3,North,Form 3 North,2024,Memory Marufu,Mother,+263714483557,"7405 Epworth, Harare",Active
+STU20260281,Mazvita,Chitsiga,F,2011-02-16,3,North,Form 3 North,2024,Tonderai Chitsiga,Father,+263774607450,"5371 Warren Park, Harare",Active
+STU20260282,Kuzivakwashe,Mutambara,M,2011-07-22,3,North,Form 3 North,2024,Innocent Mutambara,Father,+263781521470,"6626 Waterfalls, Harare",Active
+STU20260283,Takudzwa,Mupfumi,M,2011-03-13,3,North,Form 3 North,2024,Tichafa Mupfumi,Father,+263783193037,"3247 Greendale, Harare",Active
+STU20260284,Nyarai,Matanda,F,2011-10-26,3,North,Form 3 North,2024,Mavis Matanda,Mother,+263772081661,"3240 Waterfalls, Harare",Active
+STU20260285,Tinashe,Kanengoni,M,2011-03-04,3,North,Form 3 North,2024,Chengetai Kanengoni,Father,+263737626978,"8129 Mbare, Harare",Active
+STU20260286,Nyarai,Chirwa,F,2011-07-01,3,North,Form 3 North,2024,Kudzai Chirwa,Father,+263718482830,"2436 Highfield, Harare",Active
+STU20260287,Kupakwashe,Nyamande,M,2010-07-30,3,North,Form 3 North,2024,Rudo Nyamande,Mother,+263733302438,"6869 Mabvuku, Harare",Active
+STU20260288,Kupakwashe,Mutsvangwa,M,2011-07-15,3,North,Form 3 North,2024,Patience Mutsvangwa,Mother,+263736771934,"9268 Kambuzuma, Harare",Active
+STU20260289,Rufaro,Makoni,F,2011-01-14,3,North,Form 3 North,2024,Fadzai Makoni,Mother,+263711982997,"7729 Kambuzuma, Harare",Active
+STU20260290,Makanaka,Chari,F,2011-03-23,3,North,Form 3 North,2024,Stanley Chari,Father,+263719953825,"917 Tafara, Harare",Active
+STU20260291,Mufaro,Chimedza,F,2011-04-01,3,North,Form 3 North,2024,Takesure Chimedza,Father,+263711473227,"5762 Chitungwiza, Harare",Active
+STU20260292,Munyaradzi,Chimombe,M,2010-10-05,3,North,Form 3 North,2024,Tsitsi Chimombe,Mother,+263771942342,"3812 Borrowdale, Harare",Active
+STU20260293,Tatenda,Mukanya,M,2010-01-01,3,North,Form 3 North,2024,Mavis Mukanya,Mother,+263786716988,"2908 Avondale, Harare",Active
+STU20260294,Tatenda,Chinamasa,M,2011-02-26,3,North,Form 3 North,2024,Chipo Chinamasa,Mother,+263732695038,"5515 Epworth, Harare",Active
+STU20260295,Vimbai,Mugabe,F,2010-11-24,3,South,Form 3 South,2024,Ruvimbo Mugabe,Mother,+263714745298,"9650 Kuwadzana, Harare",Active
+STU20260296,Ropafadzo,Sibanda,F,2011-03-07,3,South,Form 3 South,2024,Munyaradzi Sibanda,Father,+263731543292,"2984 Borrowdale, Harare",Active
+STU20260297,Tafadzwa,Mutsvangwa,F,2011-11-24,3,South,Form 3 South,2024,Kudzai Mutsvangwa,Father,+263712305378,"3900 Marlborough, Harare",Active
+STU20260298,Rutendo,Matanda,F,2011-12-29,3,South,Form 3 South,2024,Patience Matanda,Mother,+263785186600,"1111 Marlborough, Harare",Active
+STU20260299,Rutendo,Marufu,F,2011-01-25,3,South,Form 3 South,2024,Patience Marufu,Mother,+263787946088,"8079 Greendale, Harare",Active
+STU20260300,Chipo,Machingura,F,2011-09-03,3,South,Form 3 South,2024,Tendai Machingura,Father,+263775947745,"329 Avondale, Harare",Active
+STU20260301,Anotidaishe,Marufu,F,2011-06-25,3,South,Form 3 South,2024,Kudzai Marufu,Father,+263772562037,"5537 Borrowdale, Harare",Active
+STU20260302,Ratidzo,Ncube,F,2010-12-01,3,South,Form 3 South,2024,Takesure Ncube,Aunt,+263772698824,"5425 Mabvuku, Harare",Active
+STU20260303,Kundai,Chingwaru,M,2011-12-05,3,South,Form 3 South,2024,Nyasha Chingwaru,Mother,+263777591805,"9368 Belvedere, Harare",Active
+STU20260304,Vimbai,Mutasa,F,2011-01-02,3,South,Form 3 South,2024,Chipo Mutasa,Mother,+263734349987,"1590 Mbare, Harare",Active
+STU20260305,Farai,Matanda,M,2011-02-11,3,South,Form 3 South,2024,Precious Matanda,Mother,+263738901136,"8014 Dzivarasekwa, Harare",Active
+STU20260306,Kupakwashe,Nyakudya,M,2010-04-05,3,South,Form 3 South,2024,Mavis Nyakudya,Mother,+263788478868,"732 Dzivarasekwa, Harare",Active
+STU20260307,Tadiwa,Chinyanga,F,2011-05-18,3,South,Form 3 South,2024,Tendai Chinyanga,Father,+263772437930,"5633 Belvedere, Harare",Active
+STU20260308,Makanaka,Chari,F,2011-10-11,3,South,Form 3 South,2024,Givemore Chari,Father,+263739984440,"7780 Chitungwiza, Harare",Active
+STU20260309,Ngonidzashe,Chigumba,M,2011-07-22,3,South,Form 3 South,2024,Simbarashe Chigumba,Father,+263783017994,"7358 Kuwadzana, Harare",Active
+STU20260310,Tapiwa,Mutsvangwa,M,2011-03-06,3,South,Form 3 South,2024,Tapiwa Mutsvangwa,Father,+263734387643,"2423 Borrowdale, Harare",Active
+STU20260311,Tanyaradzwa,Mukaro,F,2011-02-14,3,South,Form 3 South,2024,Sekai Mukaro,Mother,+263715633880,"8515 Waterfalls, Harare",Active
+STU20260312,Tafara,Chingwaru,M,2010-02-27,3,South,Form 3 South,2024,Tsitsi Chingwaru,Mother,+263772772258,"9220 Glen View, Harare",Active
+STU20260313,Paidamoyo,Nyakudya,F,2011-07-30,3,South,Form 3 South,2024,Rutendo Nyakudya,Mother,+263731628569,"2822 Dzivarasekwa, Harare",Active
+STU20260314,Vimbai,Mavhunga,F,2010-01-20,3,South,Form 3 South,2024,Mavis Mavhunga,Aunt,+263778972838,"4401 Marlborough, Harare",Active
+STU20260315,Panashe,Nyamayaro,M,2011-06-09,3,South,Form 3 South,2024,Precious Nyamayaro,Mother,+263774824490,"2202 Epworth, Harare",Active
+STU20260316,Makanaka,Nyamayaro,F,2011-05-18,3,South,Form 3 South,2024,Fadzai Nyamayaro,Mother,+263788410774,"3464 Hatfield, Harare",Active
+STU20260317,Makanaka,Mukanya,F,2011-01-29,3,South,Form 3 South,2024,Godfrey Mukanya,Father,+263733275826,"8590 Chitungwiza, Harare",Active
+STU20260318,Farai,Chimombe,M,2011-01-30,3,South,Form 3 South,2024,Tichafa Chimombe,Father,+263714340507,"4489 Marlborough, Harare",Active
+STU20260319,Tsitsi,Mandaza,F,2011-12-15,3,South,Form 3 South,2024,Stanley Mandaza,Father,+263733979359,"7776 Chitungwiza, Harare",Active
+STU20260320,Mufaro,Mugabe,F,2011-12-19,3,South,Form 3 South,2024,Farai Mugabe,Father,+263773733132,"9376 Mabvuku, Harare",Active
+STU20260321,Kupakwashe,Musekiwa,M,2011-05-18,3,South,Form 3 South,2024,Sekai Musekiwa,Mother,+263778954031,"2168 Kuwadzana, Harare",Active
+STU20260322,Simbarashe,Chinyanga,M,2011-12-31,3,South,Form 3 South,2024,Rutendo Chinyanga,Grandmother,+263735227836,"3576 Waterfalls, Harare",Active
+STU20260323,Nyarai,Mukanya,F,2010-10-27,3,South,Form 3 South,2024,Tichafa Mukanya,Father,+263715742531,"4891 Glen View, Harare",Active
+STU20260324,Nyasha,Shumba,F,2011-11-24,3,South,Form 3 South,2024,Precious Shumba,Mother,+263714160157,"2457 Kambuzuma, Harare",Active
+STU20260325,Dzikamai,Mutasa,M,2010-12-05,3,South,Form 3 South,2024,Ruvimbo Mutasa,Mother,+263779344531,"4844 Dzivarasekwa, Harare",Active
+STU20260326,Rufaro,Machingura,F,2011-10-26,3,South,Form 3 South,2024,Lovemore Machingura,Father,+263789969688,"7795 Marlborough, Harare",Active
+STU20260327,Paidamoyo,Mugabe,F,2011-05-31,3,South,Form 3 South,2024,Chengetai Mugabe,Father,+263714071377,"5500 Budiriro, Harare",Active
+STU20260328,Tonderai,Musekiwa,M,2011-08-04,3,South,Form 3 South,2024,Memory Musekiwa,Mother,+263718780612,"1930 Mufakose, Harare",Active
+STU20260329,Anesu,Matanda,M,2011-08-30,3,South,Form 3 South,2024,Simbarashe Matanda,Father,+263739889215,"4889 Hatfield, Harare",Active
+STU20260330,Anesu,Chitsiga,M,2011-03-12,3,South,Form 3 South,2024,Lovemore Chitsiga,Father,+263733402902,"5184 Kuwadzana, Harare",Active
+STU20260331,Ngonidzashe,Shumba,M,2011-06-10,3,South,Form 3 South,2024,Tichafa Shumba,Father,+263783828735,"9442 Kuwadzana, Harare",Active
+STU20260332,Rutendo,Mashingaidze,F,2011-03-08,3,South,Form 3 South,2024,Ruvimbo Mashingaidze,Mother,+263739009447,"6281 Mbare, Harare",Active
+STU20260333,Tichaona,Chimombe,M,2011-01-08,3,South,Form 3 South,2024,Netsai Chimombe,Mother,+263781300582,"68 Tafara, Harare",Active
+STU20260334,Kuzivakwashe,Muchemwa,M,2011-06-09,3,South,Form 3 South,2024,Godfrey Muchemwa,Father,+263713802133,"1070 Highfield, Harare",Active
+STU20260335,Anotidaishe,Nyamande,F,2010-09-24,3,South,Form 3 South,2024,Rutendo Nyamande,Aunt,+263719223833,"5886 Mabvuku, Harare",Active
+STU20260336,Tanaka,Mukaro,M,2010-01-10,3,South,Form 3 South,2024,Stanley Mukaro,Father,+263784543184,"360 Chitungwiza, Harare",Active
+STU20260337,Takudzwa,Chitepo,M,2011-07-12,3,East,Form 3 East,2024,Netsai Chitepo,Mother,+263771804641,"1772 Mbare, Harare",Active
+STU20260338,Kuzivakwashe,Gumbo,M,2010-08-16,3,East,Form 3 East,2024,Chipo Gumbo,Mother,+263733569046,"3367 Mbare, Harare",Active
+STU20260339,Kudzai,Makumbe,F,2011-12-06,3,East,Form 3 East,2024,Fadzai Makumbe,Mother,+263788026730,"1719 Kambuzuma, Harare",Active
+STU20260340,Tendai,Gumbo,M,2011-09-12,3,East,Form 3 East,2024,Takesure Gumbo,Father,+263719776935,"3305 Marlborough, Harare",Active
+STU20260341,Ropafadzo,Mugabe,F,2011-10-08,3,East,Form 3 East,2024,Mavis Mugabe,Mother,+263736546608,"3843 Mbare, Harare",Active
+STU20260342,Mukudzei,Mapfumo,M,2011-10-21,3,East,Form 3 East,2024,Tsitsi Mapfumo,Uncle,+263775293157,"3788 Waterfalls, Harare",Active
+STU20260343,Mazvita,Mupfumi,F,2011-02-21,3,East,Form 3 East,2024,Givemore Mupfumi,Father,+263717043399,"5124 Hatfield, Harare",Active
+STU20260344,Takudzwa,Chitsiga,M,2011-01-05,3,East,Form 3 East,2024,Innocent Chitsiga,Father,+263716998314,"7172 Borrowdale, Harare",Active
+STU20260345,Kumbirai,Sibanda,F,2011-07-10,3,East,Form 3 East,2024,Tsitsi Sibanda,Mother,+263738659448,"4454 Greendale, Harare",Active
+STU20260346,Rutendo,Murambiwa,F,2011-02-27,3,East,Form 3 East,2024,Munyaradzi Murambiwa,Father,+263782740017,"6817 Chitungwiza, Harare",Active
+STU20260347,Rutendo,Muzondo,F,2010-04-03,3,East,Form 3 East,2024,Netsai Muzondo,Mother,+263773192032,"7915 Mufakose, Harare",Active
+STU20260348,Dzikamai,Murambiwa,M,2010-01-24,3,East,Form 3 East,2024,Farai Murambiwa,Father,+263779804983,"9448 Chitungwiza, Harare",Active
+STU20260349,Mukudzei,Maposa,M,2011-09-23,3,East,Form 3 East,2024,Tapiwa Maposa,Father,+263789085438,"5665 Greendale, Harare",Active
+STU20260350,Munashe,Nyamayaro,M,2011-01-06,3,East,Form 3 East,2024,Simbarashe Nyamayaro,Father,+263733775016,"1227 Mufakose, Harare",Active
+STU20260351,Fadzai,Shumba,F,2011-01-26,3,East,Form 3 East,2024,Simbarashe Shumba,Father,+263734942645,"1292 Waterfalls, Harare",Active
+STU20260352,Rutendo,Muzondo,F,2010-02-15,3,East,Form 3 East,2024,Patience Muzondo,Mother,+263731298116,"1682 Greendale, Harare",Active
+STU20260353,Ruvimbo,Zhou,F,2011-02-16,3,East,Form 3 East,2024,Mavis Zhou,Mother,+263788653898,"5585 Marlborough, Harare",Active
+STU20260354,Munashe,Musekiwa,M,2010-06-19,3,East,Form 3 East,2024,Tariro Musekiwa,Mother,+263732912994,"1597 Tafara, Harare",Active
+STU20260355,Panashe,Mlambo,M,2011-10-08,3,East,Form 3 East,2024,Tariro Mlambo,Mother,+263789261472,"2302 Hatfield, Harare",Active
+STU20260356,Tawanda,Mavhunga,M,2011-04-07,3,East,Form 3 East,2024,Kudzai Mavhunga,Aunt,+263734197381,"5537 Glen View, Harare",Active
+STU20260357,Ruvimbo,Chimedza,F,2011-08-19,3,East,Form 3 East,2024,Ruvimbo Chimedza,Mother,+263789368955,"72 Kambuzuma, Harare",Active
+STU20260358,Tichaona,Chimedza,M,2010-10-27,3,East,Form 3 East,2024,Mavis Chimedza,Mother,+263783913368,"2104 Glen View, Harare",Active
+STU20260359,Nyarai,Mazarura,F,2011-09-16,3,East,Form 3 East,2024,Rutendo Mazarura,Aunt,+263717675150,"5618 Epworth, Harare",Active
+STU20260360,Rutendo,Zvobgo,F,2011-07-31,3,East,Form 3 East,2024,Precious Zvobgo,Mother,+263714646403,"3292 Mabvuku, Harare",Active
+STU20260361,Nyarai,Mlambo,F,2011-12-30,3,East,Form 3 East,2024,Simbarashe Mlambo,Father,+263712936178,"5772 Belvedere, Harare",Active
+STU20260362,Rudo,Muzondo,F,2010-12-12,3,East,Form 3 East,2024,Mavis Muzondo,Mother,+263779769953,"1745 Mbare, Harare",Active
+STU20260363,Vimbai,Mutasa,F,2011-04-13,3,East,Form 3 East,2024,Netsai Mutasa,Mother,+263715203716,"2400 Highfield, Harare",Active
+STU20260364,Tariro,Mashingaidze,F,2011-07-03,3,East,Form 3 East,2024,Chipo Mashingaidze,Mother,+263787524435,"3893 Kambuzuma, Harare",Active
+STU20260365,Ratidzo,Makumbe,F,2011-07-15,3,East,Form 3 East,2024,Rutendo Makumbe,Grandmother,+263771217520,"4118 Mabvuku, Harare",Active
+STU20260366,Anotida,Musekiwa,F,2011-10-29,3,East,Form 3 East,2024,Tonderai Musekiwa,Father,+263785935483,"7354 Kuwadzana, Harare",Active
+STU20260367,Farai,Tsvangirai,M,2011-07-13,3,East,Form 3 East,2024,Tapiwa Tsvangirai,Father,+263713182154,"2637 Chitungwiza, Harare",Active
+STU20260368,Rumbidzai,Shumba,F,2010-12-30,3,East,Form 3 East,2024,Tichafa Shumba,Father,+263711853212,"4935 Mufakose, Harare",Active
+STU20260369,Nyasha,Chabata,F,2011-09-27,3,East,Form 3 East,2024,Tendai Chabata,Father,+263787978168,"8898 Belvedere, Harare",Active
+STU20260370,Nyasha,Mlambo,F,2011-04-20,3,East,Form 3 East,2024,Memory Mlambo,Mother,+263789900294,"7781 Belvedere, Harare",Active
+STU20260371,Takudzwa,Makumbe,M,2011-08-17,3,East,Form 3 East,2024,Kudzai Makumbe,Father,+263781669029,"5259 Greendale, Harare",Active
+STU20260372,Tinotenda,Chinyanga,M,2011-01-13,3,East,Form 3 East,2024,Sekai Chinyanga,Mother,+263739167227,"719 Epworth, Harare",Active
+STU20260373,Panashe,Chakanyuka,M,2011-02-19,3,East,Form 3 East,2024,Tonderai Chakanyuka,Father,+263772098434,"3454 Mabvuku, Harare",Active
+STU20260374,Anotida,Marufu,F,2011-10-03,3,East,Form 3 East,2024,Ruvimbo Marufu,Mother,+263773579573,"390 Waterfalls, Harare",Active
+STU20260375,Ruvimbo,Mapfumo,F,2011-01-28,3,East,Form 3 East,2024,Tonderai Mapfumo,Father,+263774819259,"4238 Hatfield, Harare",Active
+STU20260376,Tadiwa,Matanda,F,2010-08-10,3,East,Form 3 East,2024,Rudo Matanda,Mother,+263779973031,"97 Borrowdale, Harare",Active
+STU20260377,Itai,Chidzikwe,M,2011-12-25,3,East,Form 3 East,2024,Lovemore Chidzikwe,Uncle,+263716055825,"9938 Budiriro, Harare",Active
+STU20260378,Makanaka,Chimedza,F,2009-07-15,4,North,Form 4 North,2023,Precious Chimedza,Mother,+263733622672,"8741 Tafara, Harare",Active
+STU20260379,Tendekai,Mandaza,M,2010-11-21,4,North,Form 4 North,2023,Farai Mandaza,Father,+263711187069,"9069 Belvedere, Harare",Active
+STU20260380,Takudzwa,Chikore,M,2010-10-21,4,North,Form 4 North,2023,Sekai Chikore,Mother,+263776111869,"3442 Marlborough, Harare",Active
+STU20260381,Kundai,Kanengoni,M,2010-03-24,4,North,Form 4 North,2023,Stanley Kanengoni,Father,+263714260252,"1878 Kuwadzana, Harare",Active
+STU20260382,Anesu,Mashingaidze,M,2009-11-27,4,North,Form 4 North,2023,Farai Mashingaidze,Father,+263712647562,"3235 Chitungwiza, Harare",Active
+STU20260383,Anotidaishe,Shumba,F,2010-03-07,4,North,Form 4 North,2023,Godfrey Shumba,Father,+263774246367,"5207 Mufakose, Harare",Active
+STU20260384,Tanyaradzwa,Mavhunga,F,2010-12-22,4,North,Form 4 North,2023,Takesure Mavhunga,Father,+263718185805,"2763 Mbare, Harare",Active
+STU20260385,Fadzai,Chabata,F,2010-12-31,4,North,Form 4 North,2023,Nyasha Chabata,Mother,+263786562703,"7864 Waterfalls, Harare",Active
+STU20260386,Mufaro,Mbiriri,F,2010-09-07,4,North,Form 4 North,2023,Tendai Mbiriri,Father,+263775707954,"2294 Belvedere, Harare",Active
+STU20260387,Tawanda,Sibanda,M,2010-02-08,4,North,Form 4 North,2023,Givemore Sibanda,Father,+263777797028,"9668 Mabvuku, Harare",Active
+STU20260388,Tichaona,Chinyanga,M,2009-12-01,4,North,Form 4 North,2023,Lovemore Chinyanga,Father,+263713246154,"7614 Kambuzuma, Harare",Active
+STU20260389,Tinotenda,Chitepo,M,2010-12-06,4,North,Form 4 North,2023,Givemore Chitepo,Aunt,+263788486336,"2609 Kuwadzana, Harare",Active
+STU20260390,Tendekai,Sibanda,M,2009-07-03,4,North,Form 4 North,2023,Stanley Sibanda,Father,+263782054635,"4332 Marlborough, Harare",Active
+STU20260391,Tafadzwa,Makumbe,M,2010-09-23,4,North,Form 4 North,2023,Rutendo Makumbe,Mother,+263731779091,"654 Avondale, Harare",Active
+STU20260392,Kuzivakwashe,Mukanya,M,2010-05-15,4,North,Form 4 North,2023,Tapiwa Mukanya,Father,+263712305896,"8466 Dzivarasekwa, Harare",Active
+STU20260393,Tafadzwa,Musekiwa,F,2009-06-30,4,North,Form 4 North,2023,Patience Musekiwa,Mother,+263779419427,"2277 Waterfalls, Harare",Active
+STU20260394,Simbarashe,Chiweshe,M,2010-04-19,4,North,Form 4 North,2023,Tendai Chiweshe,Father,+263774864570,"6794 Avondale, Harare",Active
+STU20260395,Ngonidzashe,Tagwireyi,M,2009-09-03,4,North,Form 4 North,2023,Takesure Tagwireyi,Father,+263731376582,"3993 Highfield, Harare",Active
+STU20260396,Munyaradzi,Chari,M,2010-03-10,4,North,Form 4 North,2023,Kudzai Chari,Father,+263773790745,"4232 Kuwadzana, Harare",Active
+STU20260397,Shamiso,Muzondo,F,2010-12-05,4,North,Form 4 North,2023,Chipo Muzondo,Mother,+263739081054,"2795 Tafara, Harare",Active
+STU20260398,Shamiso,Chinamasa,F,2010-11-16,4,North,Form 4 North,2023,Tsitsi Chinamasa,Mother,+263718607966,"9774 Chitungwiza, Harare",Active
+STU20260399,Simbarashe,Machingura,M,2009-03-09,4,North,Form 4 North,2023,Tichafa Machingura,Father,+263733509220,"9921 Glen View, Harare",Active
+STU20260400,Ngonidzashe,Kanengoni,M,2010-09-30,4,North,Form 4 North,2023,Godfrey Kanengoni,Father,+263781020136,"7070 Kambuzuma, Harare",Active
+STU20260401,Mufaro,Maposa,F,2010-12-24,4,North,Form 4 North,2023,Shuvai Maposa,Guardian,+263736880713,"9651 Chitungwiza, Harare",Active
+STU20260402,Kundai,Zvobgo,M,2010-09-02,4,North,Form 4 North,2023,Kudzai Zvobgo,Grandmother,+263735325249,"3097 Mbare, Harare",Active
+STU20260403,Munyaradzi,Mukanya,M,2010-09-24,4,North,Form 4 North,2023,Tapiwa Mukanya,Father,+263717859282,"5936 Glen View, Harare",Active
+STU20260404,Kundai,Hove,M,2010-05-14,4,North,Form 4 North,2023,Fadzai Hove,Mother,+263717668174,"3338 Hatfield, Harare",Active
+STU20260405,Rutendo,Chitepo,F,2009-05-10,4,North,Form 4 North,2023,Fadzai Chitepo,Mother,+263733316405,"1952 Tafara, Harare",Active
+STU20260406,Rutendo,Chingwaru,F,2010-02-21,4,North,Form 4 North,2023,Simbarashe Chingwaru,Father,+263711873301,"2634 Greendale, Harare",Active
+STU20260407,Tafara,Mapfumo,M,2010-08-30,4,North,Form 4 North,2023,Chipo Mapfumo,Mother,+263787221581,"1312 Borrowdale, Harare",Active
+STU20260408,Tendekai,Machingura,M,2009-11-11,4,North,Form 4 North,2023,Tariro Machingura,Uncle,+263789294125,"7193 Mbare, Harare",Active
+STU20260409,Anesu,Makumbe,M,2010-04-10,4,North,Form 4 North,2023,Tonderai Makumbe,Father,+263783843451,"591 Marlborough, Harare",Active
+STU20260410,Kupakwashe,Moyo,M,2010-02-14,4,North,Form 4 North,2023,Netsai Moyo,Mother,+263737802338,"9603 Mabvuku, Harare",Active
+STU20260411,Tendekai,Munyoro,M,2010-02-16,4,North,Form 4 North,2023,Tariro Munyoro,Mother,+263716829664,"4531 Tafara, Harare",Active
+STU20260412,Takunda,Chimedza,M,2009-10-22,4,North,Form 4 North,2023,Farai Chimedza,Father,+263772214435,"8244 Epworth, Harare",Active
+STU20260413,Anotidaishe,Gumbo,F,2010-10-03,4,North,Form 4 North,2023,Tariro Gumbo,Mother,+263739113963,"3986 Avondale, Harare",Active
+STU20260414,Nyarai,Mupfumi,F,2010-09-04,4,North,Form 4 North,2023,Farai Mupfumi,Father,+263784857587,"5173 Hatfield, Harare",Active
+STU20260415,Tsitsi,Nyakudya,F,2010-12-25,4,North,Form 4 North,2023,Shuvai Nyakudya,Mother,+263736737688,"1246 Belvedere, Harare",Active
+STU20260416,Ngonidzashe,Dube,M,2010-04-22,4,North,Form 4 North,2023,Tsitsi Dube,Aunt,+263734349848,"3848 Tafara, Harare",Active
+STU20260417,Tariro,Musekiwa,F,2010-05-08,4,North,Form 4 North,2023,Tsitsi Musekiwa,Mother,+263772316802,"8072 Borrowdale, Harare",Active
+STU20260418,Itai,Chitsiga,M,2010-09-04,4,North,Form 4 North,2023,Fadzai Chitsiga,Mother,+263719234347,"2997 Kambuzuma, Harare",Active
+STU20260419,Rufaro,Musekiwa,F,2010-01-28,4,South,Form 4 South,2023,Patience Musekiwa,Uncle,+263717605473,"2864 Waterfalls, Harare",Active
+STU20260420,Kuzivakwashe,Mukanya,M,2009-06-11,4,South,Form 4 South,2023,Tichafa Mukanya,Father,+263732690268,"5332 Marlborough, Harare",Active
+STU20260421,Rutendo,Zhou,F,2010-05-02,4,South,Form 4 South,2023,Patience Zhou,Grandmother,+263714085559,"8172 Hatfield, Harare",Active
+STU20260422,Kundai,Chingwaru,M,2010-07-06,4,South,Form 4 South,2023,Nyasha Chingwaru,Mother,+263784834713,"1637 Dzivarasekwa, Harare",Active
+STU20260423,Tichaona,Chirwa,M,2009-04-11,4,South,Form 4 South,2023,Tonderai Chirwa,Aunt,+263731163448,"2894 Hatfield, Harare",Active
+STU20260424,Vimbai,Kanengoni,F,2010-09-07,4,South,Form 4 South,2023,Nyasha Kanengoni,Mother,+263777684074,"1622 Kuwadzana, Harare",Active
+STU20260425,Tapiwa,Nyamayaro,M,2010-09-01,4,South,Form 4 South,2023,Chengetai Nyamayaro,Father,+263717055937,"5904 Belvedere, Harare",Active
+STU20260426,Mufaro,Ncube,F,2009-03-04,4,South,Form 4 South,2023,Precious Ncube,Mother,+263783928275,"4664 Marlborough, Harare",Active
+STU20260427,Nyarai,Chakanyuka,F,2009-08-17,4,South,Form 4 South,2023,Tapiwa Chakanyuka,Father,+263733430151,"2746 Avondale, Harare",Active
+STU20260428,Tinevimbo,Mavhunga,F,2009-02-06,4,South,Form 4 South,2023,Tendai Mavhunga,Father,+263716316334,"4774 Dzivarasekwa, Harare",Active
+STU20260429,Mazvita,Muchemwa,F,2009-07-05,4,South,Form 4 South,2023,Rutendo Muchemwa,Mother,+263773097821,"3845 Dzivarasekwa, Harare",Active
+STU20260430,Tapiwa,Mugabe,M,2009-02-22,4,South,Form 4 South,2023,Godfrey Mugabe,Guardian,+263771442329,"6505 Kambuzuma, Harare",Active
+STU20260431,Takudzwa,Chinyanga,M,2010-02-13,4,South,Form 4 South,2023,Nyasha Chinyanga,Mother,+263718434998,"2072 Warren Park, Harare",Active
+STU20260432,Tatenda,Chikore,M,2010-06-16,4,South,Form 4 South,2023,Patience Chikore,Grandmother,+263733266851,"8836 Kuwadzana, Harare",Active
+STU20260433,Tinevimbo,Chidzikwe,F,2009-09-26,4,South,Form 4 South,2023,Mavis Chidzikwe,Mother,+263782502467,"7240 Epworth, Harare",Active
+STU20260434,Kudzai,Chinyanga,F,2010-06-05,4,South,Form 4 South,2023,Tichafa Chinyanga,Father,+263786769431,"4699 Mufakose, Harare",Active
+STU20260435,Kuzivakwashe,Chimedza,M,2009-09-02,4,South,Form 4 South,2023,Rudo Chimedza,Mother,+263714879150,"119 Belvedere, Harare",Active
+STU20260436,Tariro,Murambiwa,F,2009-07-22,4,South,Form 4 South,2023,Tendai Murambiwa,Father,+263737347794,"3615 Dzivarasekwa, Harare",Active
+STU20260437,Kundai,Matanda,M,2010-09-22,4,South,Form 4 South,2023,Nyasha Matanda,Mother,+263717927377,"3081 Budiriro, Harare",Active
+STU20260438,Kudakwashe,Nyamande,M,2010-11-23,4,South,Form 4 South,2023,Fadzai Nyamande,Mother,+263734150584,"5254 Mbare, Harare",Active
+STU20260439,Tafadzwa,Nyakudya,M,2010-04-06,4,South,Form 4 South,2023,Farai Nyakudya,Father,+263731137641,"3815 Budiriro, Harare",Active
+STU20260440,Tatenda,Madzima,M,2010-06-25,4,South,Form 4 South,2023,Nyasha Madzima,Mother,+263737231009,"7598 Highfield, Harare",Active
+STU20260441,Nyasha,Mudzingwa,F,2010-01-29,4,South,Form 4 South,2023,Netsai Mudzingwa,Mother,+263734046805,"3149 Dzivarasekwa, Harare",Active
+STU20260442,Anotida,Moyo,F,2010-05-08,4,South,Form 4 South,2023,Netsai Moyo,Aunt,+263774341683,"7551 Glen View, Harare",Active
+STU20260443,Ngonidzashe,Machingura,M,2010-06-15,4,South,Form 4 South,2023,Innocent Machingura,Father,+263775249882,"7885 Epworth, Harare",Active
+STU20260444,Tonderai,Muchemwa,M,2010-12-08,4,South,Form 4 South,2023,Godfrey Muchemwa,Father,+263736444432,"247 Kuwadzana, Harare",Active
+STU20260445,Rudo,Gumbo,F,2009-05-05,4,South,Form 4 South,2023,Tichafa Gumbo,Father,+263733600333,"6085 Budiriro, Harare",Active
+STU20260446,Farai,Madzima,M,2010-12-18,4,South,Form 4 South,2023,Mavis Madzima,Uncle,+263776964596,"2522 Belvedere, Harare",Active
+STU20260447,Kudakwashe,Madzima,M,2010-06-12,4,South,Form 4 South,2023,Netsai Madzima,Aunt,+263777337911,"5869 Warren Park, Harare",Active
+STU20260448,Kumbirai,Chikore,F,2009-12-28,4,South,Form 4 South,2023,Sekai Chikore,Mother,+263734183910,"9285 Kuwadzana, Harare",Active
+STU20260449,Tanyaradzwa,Sibanda,F,2009-05-21,4,South,Form 4 South,2023,Godfrey Sibanda,Father,+263735960564,"4315 Belvedere, Harare",Active
+STU20260450,Tadiwa,Moyo,F,2009-04-05,4,South,Form 4 South,2023,Takesure Moyo,Aunt,+263712062698,"8831 Greendale, Harare",Active
+STU20260451,Shingirai,Tagwireyi,M,2009-10-10,4,South,Form 4 South,2023,Takesure Tagwireyi,Father,+263736402667,"1810 Glen View, Harare",Active
+STU20260452,Tafadzwa,Mudzingwa,M,2010-04-02,4,South,Form 4 South,2023,Stanley Mudzingwa,Father,+263782656810,"522 Chitungwiza, Harare",Active
+STU20260453,Nyarai,Madzima,F,2010-01-26,4,South,Form 4 South,2023,Shuvai Madzima,Mother,+263771219548,"3420 Mufakose, Harare",Active
+STU20260454,Takunda,Mutsvangwa,M,2010-07-04,4,South,Form 4 South,2023,Precious Mutsvangwa,Mother,+263775459646,"8668 Highfield, Harare",Active
+STU20260455,Munashe,Chigumba,M,2010-04-21,4,South,Form 4 South,2023,Godfrey Chigumba,Father,+263734178618,"3165 Kambuzuma, Harare",Active
+STU20260456,Munyaradzi,Matanda,M,2010-10-13,4,South,Form 4 South,2023,Tariro Matanda,Mother,+263718696054,"6998 Glen View, Harare",Active
+STU20260457,Tafara,Tsvangirai,M,2009-09-16,4,South,Form 4 South,2023,Ruvimbo Tsvangirai,Mother,+263736911017,"5164 Belvedere, Harare",Active
+STU20260458,Paidamoyo,Chitepo,F,2009-11-21,4,South,Form 4 South,2023,Precious Chitepo,Mother,+263784589118,"6146 Belvedere, Harare",Active
+STU20260459,Mufaro,Nhamo,F,2009-07-23,4,South,Form 4 South,2023,Munyaradzi Nhamo,Father,+263711273509,"8481 Warren Park, Harare",Active
+STU20260460,Rumbidzai,Chigumba,F,2010-04-20,4,East,Form 4 East,2023,Rudo Chigumba,Mother,+263719577712,"9115 Chitungwiza, Harare",Active
+STU20260461,Takudzwa,Chikore,M,2009-07-02,4,East,Form 4 East,2023,Tendai Chikore,Father,+263784908993,"4199 Epworth, Harare",Active
+STU20260462,Munyaradzi,Mandaza,M,2010-02-09,4,East,Form 4 East,2023,Netsai Mandaza,Mother,+263732599943,"9753 Epworth, Harare",Active
+STU20260463,Tendekai,Mutsvangwa,M,2009-02-10,4,East,Form 4 East,2023,Kudzai Mutsvangwa,Father,+263718286418,"6825 Glen View, Harare",Active
+STU20260464,Tendekai,Hove,M,2010-11-21,4,East,Form 4 East,2023,Rudo Hove,Mother,+263776357242,"8847 Chitungwiza, Harare",Active
+STU20260465,Panashe,Chakanyuka,M,2010-03-20,4,East,Form 4 East,2023,Innocent Chakanyuka,Father,+263738476199,"9751 Chitungwiza, Harare",Active
+STU20260466,Simbarashe,Chirwa,M,2010-07-21,4,East,Form 4 East,2023,Tendai Chirwa,Father,+263731827302,"8981 Greendale, Harare",Active
+STU20260467,Nyasha,Mandaza,F,2009-12-24,4,East,Form 4 East,2023,Tonderai Mandaza,Father,+263789184951,"6477 Chitungwiza, Harare",Active
+STU20260468,Tichaona,Mavhunga,M,2010-05-05,4,East,Form 4 East,2023,Farai Mavhunga,Father,+263712503148,"1844 Hatfield, Harare",Active
+STU20260469,Mufaro,Mlambo,F,2010-06-14,4,East,Form 4 East,2023,Fadzai Mlambo,Mother,+263713839632,"5730 Borrowdale, Harare",Active
+STU20260470,Shamiso,Chinamasa,F,2009-01-23,4,East,Form 4 East,2023,Stanley Chinamasa,Father,+263782439727,"1842 Highfield, Harare",Active
+STU20260471,Tapiwanashe,Chimedza,M,2010-05-28,4,East,Form 4 East,2023,Lovemore Chimedza,Father,+263776119031,"7374 Mufakose, Harare",Active
+STU20260472,Panashe,Mhlanga,M,2010-04-15,4,East,Form 4 East,2023,Sekai Mhlanga,Mother,+263781308508,"6171 Chitungwiza, Harare",Active
+STU20260473,Tawanda,Mugabe,M,2010-05-26,4,East,Form 4 East,2023,Tonderai Mugabe,Father,+263711890622,"7618 Mbare, Harare",Active
+STU20260474,Tinotenda,Makumbe,M,2010-12-06,4,East,Form 4 East,2023,Precious Makumbe,Mother,+263717484783,"3788 Greendale, Harare",Active
+STU20260475,Dzikamai,Dube,M,2009-11-02,4,East,Form 4 East,2023,Tendai Dube,Father,+263731360516,"652 Tafara, Harare",Active
+STU20260476,Tanyaradzwa,Madzima,F,2009-03-22,4,East,Form 4 East,2023,Lovemore Madzima,Father,+263716072192,"3870 Kambuzuma, Harare",Active
+STU20260477,Rutendo,Mutasa,F,2010-07-18,4,East,Form 4 East,2023,Simbarashe Mutasa,Aunt,+263786734220,"6437 Warren Park, Harare",Active
+STU20260478,Tendekai,Machingura,M,2010-08-02,4,East,Form 4 East,2023,Takesure Machingura,Father,+263716524481,"7360 Belvedere, Harare",Active
+STU20260479,Tapiwa,Hove,M,2010-10-25,4,East,Form 4 East,2023,Givemore Hove,Father,+263788215281,"2379 Chitungwiza, Harare",Active
+STU20260480,Panashe,Chiweshe,M,2010-04-05,4,East,Form 4 East,2023,Precious Chiweshe,Uncle,+263717946441,"6738 Epworth, Harare",Active
+STU20260481,Tsungai,Chimedza,F,2010-03-19,4,East,Form 4 East,2023,Godfrey Chimedza,Father,+263775477211,"9923 Chitungwiza, Harare",Active
+STU20260482,Tapiwanashe,Musekiwa,M,2010-12-18,4,East,Form 4 East,2023,Lovemore Musekiwa,Father,+263733249600,"8231 Borrowdale, Harare",Active
+STU20260483,Ratidzo,Hove,F,2010-04-05,4,East,Form 4 East,2023,Patience Hove,Mother,+263784242361,"3708 Highfield, Harare",Active
+STU20260484,Makanaka,Moyo,F,2010-07-31,4,East,Form 4 East,2023,Munyaradzi Moyo,Father,+263784431982,"1084 Kuwadzana, Harare",Active
+STU20260485,Paidamoyo,Mavhunga,F,2009-12-19,4,East,Form 4 East,2023,Precious Mavhunga,Mother,+263788173194,"6634 Highfield, Harare",Active
+STU20260486,Tsungai,Dube,F,2009-11-10,4,East,Form 4 East,2023,Simbarashe Dube,Father,+263731711620,"4026 Kambuzuma, Harare",Active
+STU20260487,Tsungai,Chikore,F,2009-09-22,4,East,Form 4 East,2023,Stanley Chikore,Father,+263736109570,"4685 Waterfalls, Harare",Active
+STU20260488,Kundai,Nyamande,M,2010-12-20,4,East,Form 4 East,2023,Chengetai Nyamande,Father,+263732517344,"8203 Glen View, Harare",Active
+STU20260489,Itai,Chari,M,2010-07-21,4,East,Form 4 East,2023,Memory Chari,Mother,+263788611499,"9672 Mabvuku, Harare",Active
+STU20260490,Nyasha,Chinyanga,F,2010-12-21,4,East,Form 4 East,2023,Munyaradzi Chinyanga,Father,+263772915369,"7363 Marlborough, Harare",Active
+STU20260491,Shingirai,Munyoro,M,2009-09-19,4,East,Form 4 East,2023,Tapiwa Munyoro,Father,+263773866974,"5492 Chitungwiza, Harare",Active
+STU20260492,Farai,Maposa,M,2010-04-02,4,East,Form 4 East,2023,Tapiwa Maposa,Father,+263735844933,"2961 Glen View, Harare",Active
+STU20260493,Tapiwa,Moyo,M,2010-01-07,4,East,Form 4 East,2023,Patience Moyo,Uncle,+263734990936,"3554 Chitungwiza, Harare",Active
+STU20260494,Tadiwa,Murambiwa,F,2009-02-10,4,East,Form 4 East,2023,Stanley Murambiwa,Grandmother,+263781820721,"3029 Warren Park, Harare",Active
+STU20260495,Kupakwashe,Mlambo,M,2010-03-16,4,East,Form 4 East,2023,Innocent Mlambo,Father,+263716555122,"1437 Highfield, Harare",Active
+STU20260496,Kundai,Tsvangirai,M,2010-12-11,4,East,Form 4 East,2023,Fadzai Tsvangirai,Mother,+263788639301,"9486 Marlborough, Harare",Active
+STU20260497,Tinashe,Mbiriri,M,2010-06-15,4,East,Form 4 East,2023,Mavis Mbiriri,Mother,+263778169304,"9019 Budiriro, Harare",Active
+STU20260498,Nokutenda,Zvobgo,F,2010-12-22,4,East,Form 4 East,2023,Memory Zvobgo,Mother,+263784507293,"954 Glen View, Harare",Active
+STU20260499,Ngonidzashe,Sibanda,M,2010-08-07,4,East,Form 4 East,2023,Nyasha Sibanda,Mother,+263713176225,"9219 Mufakose, Harare",Active
+STU20260500,Nokutenda,Mutsvangwa,F,2010-11-09,4,East,Form 4 East,2023,Munyaradzi Mutsvangwa,Father,+263781026523,"1937 Mbare, Harare",Active
