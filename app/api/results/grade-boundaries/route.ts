@@ -1,11 +1,11 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { apiSuccess, apiUnauthorized, parseBody } from '@/lib/api';
+import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
 import { canManageGradeBoundaries } from '@/lib/permissions';
 import { SaveBoundariesSchema } from '@/lib/validations/results';
 import type { SessionUser } from '@/types';
 
-export async function GET() {
+async function _GET() {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
@@ -24,7 +24,7 @@ export async function GET() {
   });
 }
 
-export async function POST(req: Request) {
+async function _POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
@@ -58,3 +58,7 @@ export async function POST(req: Request) {
     })),
   });
 }
+
+type H = (req: Request, ctx?: unknown) => Promise<Response>;
+export const GET  = withApi('GET /api/results/grade-boundaries',  _GET  as H);
+export const POST = withApi('POST /api/results/grade-boundaries', _POST as H);

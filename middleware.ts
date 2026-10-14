@@ -51,7 +51,8 @@ function startsWithAny(pathname: string, prefixes: string[]): boolean {
 const VOID_API_PATTERN = /^\/api\/accounting\/(payments|expenses)\/[^/]+\/void$/;
 
 const ROLE_ALLOWED: Record<UserRole, (pathname: string) => boolean> = {
-  ADMIN: (p) => startsWithAny(p, ['/admin', '/api/admin']),
+  // Admin subjects page manages grade boundaries via the results API.
+  ADMIN: (p) => startsWithAny(p, ['/admin', '/api/admin', '/api/results/grade-boundaries']),
 
   DIRECTOR: (p) =>
     startsWithAny(p, ['/director', '/accounting/dashboard', '/api/accounting/dashboard', '/api/accounting/requests']) ||
@@ -68,7 +69,10 @@ const ROLE_ALLOWED: Record<UserRole, (pathname: string) => boolean> = {
       '/assets',
       '/api/accounting',
       '/api/results',
-    ]),
+      '/api/assets',
+    ]) ||
+    // Bulk fee modal previews the student list from the admin students API.
+    p === '/api/admin/students',
 
   BURSAR: (p) =>
     startsWithAny(p, [
