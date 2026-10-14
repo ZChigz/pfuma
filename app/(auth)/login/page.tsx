@@ -40,14 +40,14 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/accounting');
+    router.push('/');
     router.refresh();
   };
 
   return (
     <>
-      <h1 className="mb-1 text-2xl font-bold text-[#065f46]">Sign in</h1>
-      <p className="mb-8 text-sm text-stone-500">Enter your credentials to access your account.</p>
+      <h1 className="mb-1 text-3xl font-bold tracking-tight text-[#14301f]">Sign in</h1>
+      <p className="mb-8 text-sm text-[#6b7a70]">Enter your credentials to access your account.</p>
 
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -57,7 +57,7 @@ export default function LoginPage() {
       >
         {/* Email */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-sm font-medium text-stone-700">
+          <label htmlFor="email" className="text-sm font-medium text-[#14301f]">
             Email
           </label>
           <input
@@ -68,7 +68,7 @@ export default function LoginPage() {
             placeholder="you@school.ac.zw"
             aria-invalid={!!errors.email}
             aria-describedby={errors.email ? 'email-error' : undefined}
-            className="rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#065f46]/40 aria-[invalid=true]:border-red-500"
+            className="min-h-[48px] rounded-xl border border-[#e3e9e4] bg-[#f4f6f4] px-4 text-sm text-[#14301f] placeholder:text-[#8a968e] focus:outline-none focus:border-[#14613f] focus:bg-white focus:ring-2 focus:ring-[#14613f]/30 aria-[invalid=true]:border-red-500"
           />
           {errors.email && (
             <p id="email-error" role="alert" className="text-xs text-red-600">
@@ -79,7 +79,7 @@ export default function LoginPage() {
 
         {/* Password */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="password" className="text-sm font-medium text-stone-700">
+          <label htmlFor="password" className="text-sm font-medium text-[#14301f]">
             Password
           </label>
           <input
@@ -90,7 +90,7 @@ export default function LoginPage() {
             placeholder="••••••••"
             aria-invalid={!!errors.password}
             aria-describedby={errors.password ? 'password-error' : undefined}
-            className="rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#065f46]/40 aria-[invalid=true]:border-red-500"
+            className="min-h-[48px] rounded-xl border border-[#e3e9e4] bg-[#f4f6f4] px-4 text-sm text-[#14301f] placeholder:text-[#8a968e] focus:outline-none focus:border-[#14613f] focus:bg-white focus:ring-2 focus:ring-[#14613f]/30 aria-[invalid=true]:border-red-500"
           />
           {errors.password && (
             <p id="password-error" role="alert" className="text-xs text-red-600">
@@ -101,7 +101,7 @@ export default function LoginPage() {
 
         {/* Auth-level error */}
         {authError && (
-          <div role="alert" aria-live="assertive" className="rounded-md bg-red-50 px-4 py-3">
+          <div role="alert" aria-live="assertive" className="rounded-xl bg-red-50 px-4 py-3">
             <p className="text-sm text-red-700">{authError}</p>
           </div>
         )}
@@ -109,7 +109,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-1 flex min-h-[44px] w-full items-center justify-center rounded-md bg-[#065f46] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#047857] focus:outline-none focus:ring-2 focus:ring-[#065f46] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-2 flex min-h-[48px] w-full items-center justify-center rounded-full bg-[#14613f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0f4d32] focus:outline-none focus:ring-2 focus:ring-[#14613f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting ? (
             <>

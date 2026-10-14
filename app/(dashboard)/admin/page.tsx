@@ -221,7 +221,7 @@ export default async function AdminDashboard() {
             <ul className="flex flex-col gap-1">
               {nextSteps.map((n) => (
                 <li key={n.text}>
-                  <Link href={n.href} className="flex items-start gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-[#f4f6f4] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14613f]/40">
+                  <Link href={n.href} className="flex items-start gap-3 rounded-2xl px-2 py-2.5 transition-colors hover:bg-[#f4f6f4] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14613f]/40">
                     <span className={cn('mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full', n.tone)} aria-hidden="true" />
                     <span className="text-sm leading-snug text-[#14301f]">{n.text}</span>
                   </Link>

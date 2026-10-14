@@ -43,8 +43,8 @@ export default async function AdminStudentsPage({ searchParams }: Props) {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#292524]">Students</h1>
-          <p className="mt-0.5 text-sm text-[#78716c]">Manage student records and class assignments</p>
+          <h1 className="text-2xl font-bold text-[#14301f]">Students</h1>
+          <p className="mt-0.5 text-sm text-[#6b7a70]">Manage student records and class assignments</p>
         </div>
         <div className="flex items-center gap-2">
           <ImportStudentsModal />

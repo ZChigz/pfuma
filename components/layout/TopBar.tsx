@@ -90,7 +90,7 @@ export function TopBar({ schoolName, currentTerm, role }: TopBarProps) {
           aria-controls="jump-list"
           className="h-11 w-full rounded-full bg-white pl-10 pr-16 text-sm text-[#14301f] placeholder:text-[#8a968e] focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
         />
-        <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md bg-[#eef1ee] px-1.5 py-0.5 text-[11px] font-medium text-[#6b7a70] sm:block">
+        <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-xl bg-[#eef1ee] px-1.5 py-0.5 text-[11px] font-medium text-[#6b7a70] sm:block">
           Ctrl K
         </kbd>
         {open && (
@@ -100,7 +100,7 @@ export function TopBar({ schoolName, currentTerm, role }: TopBarProps) {
               <li key={r.href} role="option" aria-selected={i === cursor}>
                 <button
                   onMouseDown={(e) => { e.preventDefault(); go(r.href); }}
-                  className={cn('flex min-h-[40px] w-full items-center gap-3 rounded-xl px-3 text-left text-sm text-[#14301f]', i === cursor && 'bg-[#eef4ef]')}
+                  className={cn('flex min-h-[40px] w-full items-center gap-3 rounded-2xl px-3 text-left text-sm text-[#14301f]', i === cursor && 'bg-[#eef4ef]')}
                 >
                   <svg className="h-4 w-4 text-[#14613f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={icons[r.icon]} /></svg>
                   {r.label}

@@ -172,12 +172,12 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
       <div>
         <Link
           href="/teacher/marks"
-          className="mb-2 inline-block text-sm font-medium text-[#065f46] hover:underline focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+          className="mb-2 inline-block text-sm font-medium text-[#14613f] hover:underline focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
         >
           ← Back to my assignments
         </Link>
-        <h1 className="text-2xl font-bold text-[#292524]">Subject: {subjectName} | Class: {className} | Max: {maxMark}</h1>
-        <p className="mt-0.5 text-sm text-[#78716c]">{term}</p>
+        <h1 className="text-2xl font-bold text-[#14301f]">Subject: {subjectName} | Class: {className} | Max: {maxMark}</h1>
+        <p className="mt-0.5 text-sm text-[#6b7a70]">{term}</p>
       </div>
 
       {isLocked && (
@@ -194,40 +194,40 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
       {!loading && students.length > 0 && (
         <div className="h-2 w-full overflow-hidden rounded-full bg-stone-100">
           <div
-            className="h-full bg-[#065f46] transition-all"
+            className="h-full bg-[#14613f] transition-all"
             style={{ width: `${(enteredCount / students.length) * 100}%` }}
           />
         </div>
       )}
       {!loading && students.length > 0 && (
-        <p className="-mt-4 text-xs text-[#78716c]">{enteredCount} / {students.length} marks entered</p>
+        <p className="-mt-4 text-xs text-[#6b7a70]">{enteredCount} / {students.length} marks entered</p>
       )}
 
       {loading ? (
-        <p className="py-8 text-center text-sm text-[#78716c]">Loading marks…</p>
+        <p className="py-8 text-center text-sm text-[#6b7a70]">Loading marks…</p>
       ) : students.length === 0 ? (
-        <p className="rounded-xl border border-[#e7e5e4] bg-white px-4 py-10 text-center text-sm text-[#78716c]">
+        <p className="rounded-2xl bg-white px-4 py-10 text-center text-sm text-[#6b7a70]">
           No active students found for this class.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[#e7e5e4]">
-          <table className="w-full text-left text-sm text-[#292524]">
-            <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+        <div className="overflow-x-auto rounded-2xl border border-[#e3e9e4]">
+          <table className="w-full text-left text-sm text-[#14301f]">
+            <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
               <tr>
                 {['No.', 'Student Name', 'Mark', '%', 'Grade'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                  <th key={h} className="px-4 py-3 text-xs font-semibold   text-[#6b7a70]">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e7e5e4] bg-white">
+            <tbody className="divide-y divide-[#e3e9e4] bg-white">
               {students.map((s, idx) => {
                 const cell = marks[s.id];
                 const invalid = cell?.status === 'error' && isInvalid(cell.raw);
                 return (
                   <tr key={s.id} className="hover:bg-[#fafaf9]">
-                    <td className="w-10 px-4 py-3 text-[#78716c]">{idx + 1}</td>
+                    <td className="w-10 px-4 py-3 text-[#6b7a70]">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium">{s.fullName}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -249,12 +249,12 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
                             }))
                           }
                           onBlur={() => handleBlur(s.id)}
-                          className={`w-24 rounded-md border bg-white px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#065f46]/30 disabled:cursor-not-allowed disabled:opacity-60 ${
-                            invalid ? 'border-red-500' : 'border-[#e7e5e4]'
+                          className={`w-24 rounded-xl border bg-white px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#14613f]/30 disabled:cursor-not-allowed disabled:opacity-60 ${
+                            invalid ? 'border-red-500' : 'border-[#e3e9e4]'
                           }`}
                         />
                         {cell?.status === 'saving' && (
-                          <svg className="h-4 w-4 animate-spin text-[#78716c]" viewBox="0 0 24 24" fill="none">
+                          <svg className="h-4 w-4 animate-spin text-[#6b7a70]" viewBox="0 0 24 24" fill="none">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                           </svg>
@@ -275,7 +275,7 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 tabular-nums text-[#78716c]">
+                    <td className="px-4 py-3 tabular-nums text-[#6b7a70]">
                       {cell?.pct != null ? `${cell.pct.toFixed(1)}%` : '—'}
                     </td>
                     <td className="px-4 py-3">
@@ -284,7 +284,7 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
                           {cell.grade}
                         </span>
                       ) : (
-                        <span className="text-[#78716c]">—</span>
+                        <span className="text-[#6b7a70]">—</span>
                       )}
                     </td>
                   </tr>
@@ -324,10 +324,10 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
       >
         {missingModal && (
           <>
-            <p className="text-sm text-[#292524]">
+            <p className="text-sm text-[#14301f]">
               {missingModal.count} student{missingModal.count !== 1 ? 's have' : ' has'} no mark entered. Submit anyway?
             </p>
-            <ul className="mt-3 max-h-48 list-disc overflow-y-auto pl-5 text-sm text-[#78716c]">
+            <ul className="mt-3 max-h-48 list-disc overflow-y-auto pl-5 text-sm text-[#6b7a70]">
               {missingModal.names.map((name) => (
                 <li key={name}>{name}</li>
               ))}

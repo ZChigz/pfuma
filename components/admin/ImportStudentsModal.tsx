@@ -62,7 +62,7 @@ export function ImportStudentsModal() {
         footer={<Button onClick={handleClose}>Done</Button>}
       >
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-[#78716c]">
+          <p className="text-sm text-[#6b7a70]">
             Upload a CSV file with the columns: <code className="font-mono text-xs">fullName, parentName, parentPhone, class</code>.
             The <code className="font-mono text-xs">class</code> value must match an existing class name exactly (e.g. &quot;Form 4A&quot;).
           </p>
@@ -75,12 +75,12 @@ export function ImportStudentsModal() {
               const file = e.target.files?.[0];
               if (file) handleFile(file);
             }}
-            className="block w-full text-sm text-[#292524] file:mr-4 file:min-h-[44px] file:rounded-md file:border-0 file:bg-[#065f46] file:px-4 file:text-sm file:font-medium file:text-white hover:file:bg-[#047857]"
+            className="block w-full text-sm text-[#14301f] file:mr-4 file:min-h-[44px] file:rounded-xl file:border-0 file:bg-[#14613f] file:px-4 file:text-sm file:font-medium file:text-white hover:file:bg-[#0f4d32]"
           />
-          {busy && <p className="text-sm text-[#78716c]">Importing…</p>}
+          {busy && <p className="text-sm text-[#6b7a70]">Importing…</p>}
           {result && (
-            <div className="rounded-lg border border-[#e7e5e4] bg-[#fafaf9] p-4 text-sm">
-              <p className="font-medium text-[#292524]">
+            <div className="rounded-lg border border-[#e3e9e4] bg-[#fafaf9] p-4 text-sm">
+              <p className="font-medium text-[#14301f]">
                 Imported {result.imported} student(s), skipped {result.skipped}.
               </p>
               {result.errors.length > 0 && (

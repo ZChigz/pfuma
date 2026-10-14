@@ -174,7 +174,7 @@ export function DisposeModal({ assetId, assetName, open, onClose, onSuccess }: P
             You are about to permanently dispose of <strong>{assetName}</strong>. This cannot be undone.
           </div>
 
-          <div className="divide-y divide-[#e7e5e4] rounded-lg border border-[#e7e5e4]">
+          <div className="divide-y divide-[#e3e9e4] rounded-lg border border-[#e3e9e4]">
             {[
               { label: 'Asset',    value: assetName },
               { label: 'Method',   value: formValues.method },
@@ -188,8 +188,8 @@ export function DisposeModal({ assetId, assetName, open, onClose, onSuccess }: P
               },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between px-4 py-2.5">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">{label}</span>
-                <span className="text-sm font-medium text-[#292524]">{value}</span>
+                <span className="text-xs font-semibold   text-[#6b7a70]">{label}</span>
+                <span className="text-sm font-medium text-[#14301f]">{value}</span>
               </div>
             ))}
           </div>

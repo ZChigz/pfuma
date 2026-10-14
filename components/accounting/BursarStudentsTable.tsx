@@ -53,7 +53,7 @@ export function BursarStudentsTable({ students }: Props) {
       render: (row) => (
         <button
           onClick={() => setPaymentStudent(row)}
-          className="min-h-[36px] rounded-md bg-[#065f46] px-2.5 text-xs font-medium text-white transition-colors hover:bg-[#047857] focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+          className="min-h-[36px] rounded-xl bg-[#14613f] px-2.5 text-xs font-medium text-white transition-colors hover:bg-[#0f4d32] focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
         >
           Record Payment
         </button>

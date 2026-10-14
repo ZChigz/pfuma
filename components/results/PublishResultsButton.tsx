@@ -62,10 +62,10 @@ export function PublishResultsButton({ classId, className, term, disabled }: Pro
           </>
         }
       >
-        <p className="text-sm text-[#292524]">
+        <p className="text-sm text-[#14301f]">
           Are you sure you want to publish results for <strong>{className}</strong> — <strong>{term}</strong>?
         </p>
-        <p className="mt-2 text-sm text-[#78716c]">
+        <p className="mt-2 text-sm text-[#6b7a70]">
           This will calculate totals and class positions, lock all marks, and make results visible on student portals.
           This action cannot be undone.
         </p>

@@ -143,21 +143,21 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
       <div className="flex flex-col gap-5">
         {/* Member search */}
         <div className="relative flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-[#292524]">
+          <label className="text-sm font-medium text-[#14301f]">
             Member <span className="text-[#b91c1c]">*</span>
           </label>
           {selectedMember ? (
-            <div className="flex items-center justify-between rounded-md border border-[#065f46] bg-[#f0fdf4] px-3 py-2">
+            <div className="flex items-center justify-between rounded-xl border border-[#14613f] bg-[#f0fdf4] px-3 py-2">
               <div>
-                <p className="text-sm font-medium text-[#292524]">{selectedMember.user.fullName}</p>
-                <p className="text-xs text-[#78716c]">
+                <p className="text-sm font-medium text-[#14301f]">{selectedMember.user.fullName}</p>
+                <p className="text-xs text-[#6b7a70]">
                   {selectedMember._count.borrowings} active borrowing{selectedMember._count.borrowings !== 1 ? 's' : ''}
                   {selectedMember.borrowingSuspended && ' · ⚠ Suspended'}
                 </p>
               </div>
               <button
                 onClick={() => { setSelectedMember(null); setMemberQ(''); setMemberResults([]); }}
-                className="text-xs text-[#78716c] hover:text-[#292524]"
+                className="text-xs text-[#6b7a70] hover:text-[#14301f]"
               >
                 Change
               </button>
@@ -171,9 +171,9 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
                 onChange={(e) => setMemberQ(e.target.value)}
               />
               {(memberResults.length > 0 || memberLoading) && (
-                <div className="absolute top-full z-10 mt-1 w-full rounded-lg border border-[#e7e5e4] bg-white shadow-lg">
+                <div className="absolute top-full z-10 mt-1 w-full rounded-lg border border-[#e3e9e4] bg-white shadow-lg">
                   {memberLoading ? (
-                    <p className="px-4 py-3 text-sm text-[#78716c]">Searching…</p>
+                    <p className="px-4 py-3 text-sm text-[#6b7a70]">Searching…</p>
                   ) : (
                     memberResults.map((m) => (
                       <button
@@ -181,8 +181,8 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
                         onClick={() => { setSelectedMember(m); setMemberResults([]); }}
                         className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-stone-50"
                       >
-                        <span className="font-medium text-[#292524]">{m.user.fullName}</span>
-                        <span className="text-xs text-[#78716c]">{m.user.role}</span>
+                        <span className="font-medium text-[#14301f]">{m.user.fullName}</span>
+                        <span className="text-xs text-[#6b7a70]">{m.user.role}</span>
                       </button>
                     ))
                   )}
@@ -194,20 +194,20 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
 
         {/* Book search */}
         <div className="relative flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-[#292524]">
+          <label className="text-sm font-medium text-[#14301f]">
             Book <span className="text-[#b91c1c]">*</span>
           </label>
           {selectedBook ? (
-            <div className="flex items-center justify-between rounded-md border border-[#065f46] bg-[#f0fdf4] px-3 py-2">
+            <div className="flex items-center justify-between rounded-xl border border-[#14613f] bg-[#f0fdf4] px-3 py-2">
               <div>
-                <p className="text-sm font-medium text-[#292524]">{selectedBook.title}</p>
-                <p className="text-xs text-[#78716c]">
+                <p className="text-sm font-medium text-[#14301f]">{selectedBook.title}</p>
+                <p className="text-xs text-[#6b7a70]">
                   {selectedBook.availableCopiesCount} available cop{selectedBook.availableCopiesCount !== 1 ? 'ies' : 'y'}
                 </p>
               </div>
               <button
                 onClick={() => { setSelectedBook(null); setBookQ(''); setBookResults([]); setSelectedCopyId(''); }}
-                className="text-xs text-[#78716c] hover:text-[#292524]"
+                className="text-xs text-[#6b7a70] hover:text-[#14301f]"
               >
                 Change
               </button>
@@ -221,11 +221,11 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
                 onChange={(e) => setBookQ(e.target.value)}
               />
               {(bookResults.length > 0 || bookLoading) && (
-                <div className="absolute top-full z-10 mt-1 w-full rounded-lg border border-[#e7e5e4] bg-white shadow-lg">
+                <div className="absolute top-full z-10 mt-1 w-full rounded-lg border border-[#e3e9e4] bg-white shadow-lg">
                   {bookLoading ? (
-                    <p className="px-4 py-3 text-sm text-[#78716c]">Searching…</p>
+                    <p className="px-4 py-3 text-sm text-[#6b7a70]">Searching…</p>
                   ) : bookResults.length === 0 ? (
-                    <p className="px-4 py-3 text-sm text-[#78716c]">No available books found.</p>
+                    <p className="px-4 py-3 text-sm text-[#6b7a70]">No available books found.</p>
                   ) : (
                     bookResults.map((b) => (
                       <button
@@ -233,8 +233,8 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
                         onClick={() => { setSelectedBook(b); setBookResults([]); }}
                         className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-stone-50"
                       >
-                        <span className="font-medium text-[#292524]">{b.title}</span>
-                        <span className="text-xs text-[#78716c]">{b.availableCopiesCount} available</span>
+                        <span className="font-medium text-[#14301f]">{b.title}</span>
+                        <span className="text-xs text-[#6b7a70]">{b.availableCopiesCount} available</span>
                       </button>
                     ))
                   )}

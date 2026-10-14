@@ -1,5 +1,6 @@
 'use client';
 
+import { StatCard } from '@/components/ui/StatCard';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -40,8 +41,8 @@ export function LibraryOverviewClient({ stats, overdueList, userRole }: Props) {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#292524]">Library</h1>
-          <p className="mt-0.5 text-sm text-[#78716c]">Book catalog and borrowing management</p>
+          <h1 className="text-2xl font-bold text-[#14301f]">Library</h1>
+          <p className="mt-0.5 text-sm text-[#6b7a70]">Book catalog and borrowing management</p>
         </div>
         {canManage && (
           <div className="flex gap-2">
@@ -57,22 +58,15 @@ export function LibraryOverviewClient({ stats, overdueList, userRole }: Props) {
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: 'Total Titles',       value: stats.totalTitles, color: '#292524' },
-          { label: 'Available Copies',   value: stats.available,   color: '#065f46' },
-          { label: 'Currently Borrowed', value: stats.borrowed,    color: '#d97706' },
-          { label: 'Overdue',            value: stats.overdue,     color: stats.overdue > 0 ? '#b91c1c' : '#78716c' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="rounded-xl border border-[#e7e5e4] bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">{label}</p>
-            <p className="mt-2 text-3xl font-bold tabular-nums" style={{ color }}>{value}</p>
-          </div>
-        ))}
+        <StatCard label="Available copies" value={stats.available} hero />
+        <StatCard label="Titles in catalog" value={stats.totalTitles} href="/library/catalog" />
+        <StatCard label="Currently borrowed" value={stats.borrowed} href="/library/borrowing" />
+        <StatCard label="Overdue" value={stats.overdue} tone={stats.overdue > 0 ? 'danger' : 'default'} note={stats.overdue > 0 ? 'Follow up with members' : 'Nothing overdue'} />
       </div>
 
       {/* Overdue alert */}
       {overdueList.length > 0 && (
-        <div className="rounded-xl border border-[#fde68a] bg-[#fffbeb] p-4">
+        <div className="rounded-2xl border border-[#fde68a] bg-[#fffbeb] p-4">
           <div className="mb-3 flex items-center gap-2">
             <svg className="h-5 w-5 flex-shrink-0 text-[#d97706]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
@@ -86,7 +80,7 @@ export function LibraryOverviewClient({ stats, overdueList, userRole }: Props) {
               <thead>
                 <tr className="border-b border-[#fde68a]">
                   {['Member', 'Book', 'Accession', 'Due Date', 'Days Overdue'].map((h) => (
-                    <th key={h} className="pb-2 pr-4 text-left text-xs font-semibold uppercase tracking-wide">{h}</th>
+                    <th key={h} className="pb-2 pr-4 text-left text-xs font-semibold  ">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -108,7 +102,7 @@ export function LibraryOverviewClient({ stats, overdueList, userRole }: Props) {
 
       {/* Quick access */}
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#78716c]">Quick Access</p>
+        <p className="mb-3 text-xs font-semibold   text-[#6b7a70]">Quick Access</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {[
             { href: '/library/catalog',   label: 'Book Catalog',  desc: 'Browse and manage books'    },
@@ -117,10 +111,10 @@ export function LibraryOverviewClient({ stats, overdueList, userRole }: Props) {
             <button
               key={href}
               onClick={() => router.push(href)}
-              className="rounded-xl border border-[#e7e5e4] bg-white p-4 text-left transition-shadow hover:shadow-md"
+              className="rounded-2xl bg-white p-4 text-left transition-shadow hover:shadow-md"
             >
-              <p className="font-semibold text-[#292524]">{label}</p>
-              <p className="mt-0.5 text-xs text-[#78716c]">{desc}</p>
+              <p className="font-semibold text-[#14301f]">{label}</p>
+              <p className="mt-0.5 text-xs text-[#6b7a70]">{desc}</p>
             </button>
           ))}
         </div>

@@ -137,7 +137,7 @@ export function ReturnModal({ borrowing: propBorrowing, open, onClose, onSuccess
       {!activeBorrowing ? (
         /* ── Search step ─────────────────────────────────────────── */
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-[#78716c]">
+          <p className="text-sm text-[#6b7a70]">
             Enter the accession number printed on the book to look up the active borrowing.
           </p>
           <Input
@@ -156,7 +156,7 @@ export function ReturnModal({ borrowing: propBorrowing, open, onClose, onSuccess
         /* ── Return form ──────────────────────────────────────────── */
         <div className="flex flex-col gap-4">
           {/* Borrowing info */}
-          <div className="divide-y divide-[#e7e5e4] rounded-lg border border-[#e7e5e4]">
+          <div className="divide-y divide-[#e3e9e4] rounded-lg border border-[#e3e9e4]">
             {[
               { label: 'Book',        value: activeBorrowing.copy.book.title           },
               { label: 'Accession',   value: activeBorrowing.copy.accessionNumber      },
@@ -165,8 +165,8 @@ export function ReturnModal({ borrowing: propBorrowing, open, onClose, onSuccess
               { label: 'Due Date',    value: formatDate(activeBorrowing.dueDate)       },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between px-4 py-2.5">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">{label}</span>
-                <span className="text-sm text-[#292524]">{value}</span>
+                <span className="text-xs font-semibold   text-[#6b7a70]">{label}</span>
+                <span className="text-sm text-[#14301f]">{value}</span>
               </div>
             ))}
           </div>
@@ -202,9 +202,9 @@ export function ReturnModal({ borrowing: propBorrowing, open, onClose, onSuccess
                 type="checkbox"
                 checked={fineSettled}
                 onChange={(e) => setFineSettled(e.target.checked)}
-                className="h-4 w-4 rounded border-[#e7e5e4] accent-[#065f46]"
+                className="h-4 w-4 rounded border-[#e3e9e4] accent-[#14613f]"
               />
-              <span className="text-sm text-[#292524]">Fine of ${estimatedFine.toFixed(2)} has been settled</span>
+              <span className="text-sm text-[#14301f]">Fine of ${estimatedFine.toFixed(2)} has been settled</span>
             </label>
           )}
         </div>

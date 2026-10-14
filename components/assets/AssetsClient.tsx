@@ -108,14 +108,14 @@ export function AssetsClient({ initialAssets, categories, stats, overdueAssets, 
       key: 'tagNumber',
       label: 'Tag',
       render: (row: AssetRow) => (
-        <span className="font-mono text-xs text-[#78716c]">{row.tagNumber}</span>
+        <span className="font-mono text-xs text-[#6b7a70]">{row.tagNumber}</span>
       ),
     },
     {
       key: 'name',
       label: 'Name',
       render: (row: AssetRow) => (
-        <span className="font-medium text-[#292524]">{row.name}</span>
+        <span className="font-medium text-[#14301f]">{row.name}</span>
       ),
     },
     {
@@ -144,7 +144,7 @@ export function AssetsClient({ initialAssets, categories, stats, overdueAssets, 
       render: (row: AssetRow) => (
         <button
           onClick={(e) => { e.stopPropagation(); router.push(`/assets/${row.id}`); }}
-          className="text-xs font-medium text-[#065f46] hover:underline"
+          className="text-xs font-medium text-[#14613f] hover:underline"
         >
           View
         </button>
@@ -159,8 +159,8 @@ export function AssetsClient({ initialAssets, categories, stats, overdueAssets, 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#292524]">Asset Register</h1>
-          <p className="mt-0.5 text-sm text-[#78716c]">Track and manage school assets</p>
+          <h1 className="text-2xl font-bold text-[#14301f]">Asset Register</h1>
+          <p className="mt-0.5 text-sm text-[#6b7a70]">Track and manage school assets</p>
         </div>
         {canManage && (
           <AddAssetModal categories={categories} />
@@ -170,12 +170,12 @@ export function AssetsClient({ initialAssets, categories, stats, overdueAssets, 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          { label: 'Active',            value: stats.activeCount,       color: '#065f46' },
+          { label: 'Active',            value: stats.activeCount,       color: '#14613f' },
           { label: 'Under Maintenance', value: stats.maintenanceCount,  color: '#d97706' },
-          { label: 'Disposed (Term)',   value: stats.disposedThisTerm,  color: '#78716c' },
+          { label: 'Disposed (Term)',   value: stats.disposedThisTerm,  color: '#6b7a70' },
         ].map(({ label, value, color }) => (
-          <div key={label} className="rounded-xl border border-[#e7e5e4] bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#78716c]">{label}</p>
+          <div key={label} className="rounded-2xl bg-white p-5">
+            <p className="text-xs font-semibold   text-[#6b7a70]">{label}</p>
             <p className="mt-2 text-3xl font-bold tabular-nums" style={{ color }}>{value}</p>
           </div>
         ))}
@@ -183,7 +183,7 @@ export function AssetsClient({ initialAssets, categories, stats, overdueAssets, 
 
       {/* Overdue maintenance banner */}
       {overdueAssets.length > 0 && (
-        <div className="rounded-xl border border-[#fde68a] bg-[#fffbeb] p-4">
+        <div className="rounded-2xl border border-[#fde68a] bg-[#fffbeb] p-4">
           <div className="flex items-start gap-3">
             <svg className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#d97706]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />

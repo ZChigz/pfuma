@@ -10,8 +10,8 @@ import {
 } from 'recharts';
 
 const SLICE_COLORS = [
-  '#065f46',
-  '#047857',
+  '#14613f',
+  '#0f4d32',
   '#059669',
   '#10b981',
   '#f59e0b',
@@ -32,7 +32,7 @@ interface Props {
 export function ExpensePieChart({ data, currency }: Props) {
   if (data.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-[#78716c]">
+      <div className="flex h-64 items-center justify-center text-sm text-[#6b7a70]">
         No expense data for this currency
       </div>
     );
@@ -83,14 +83,14 @@ export function ExpensePieChart({ data, currency }: Props) {
           formatter={(v: number, name: string) => [fmtVal(v), name]}
           contentStyle={{
             borderRadius: '8px',
-            border: '1px solid #e7e5e4',
+            border: '1px solid #e3e9e4',
             fontSize: '12px',
           }}
         />
         <Legend
           iconType="circle"
           iconSize={8}
-          wrapperStyle={{ fontSize: '11px', color: '#78716c' }}
+          wrapperStyle={{ fontSize: '11px', color: '#6b7a70' }}
         />
       </PieChart>
     </ResponsiveContainer>

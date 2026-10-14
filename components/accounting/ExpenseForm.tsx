@@ -78,17 +78,17 @@ export function ExpenseForm({ onSuccess }: Props) {
 
       {/* Currency toggle */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-[#292524]">Currency</span>
+        <span className="text-sm font-medium text-[#14301f]">Currency</span>
         <div className="flex gap-2">
           {(['USD', 'ZIG'] as const).map((c) => (
             <button
               key={c}
               type="button"
               onClick={() => setValue('currency', c, { shouldValidate: true })}
-              className={`min-h-[44px] flex-1 rounded-md border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#065f46]/40 ${
+              className={`min-h-[44px] flex-1 rounded-xl border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#14613f]/40 ${
                 currency === c
-                  ? 'border-[#065f46] bg-[#065f46] text-white'
-                  : 'border-[#e7e5e4] bg-white text-[#78716c] hover:border-[#065f46]/50 hover:bg-stone-50'
+                  ? 'border-[#14613f] bg-[#14613f] text-white'
+                  : 'border-[#e3e9e4] bg-white text-[#6b7a70] hover:border-[#14613f]/50 hover:bg-stone-50'
               }`}
             >
               {c === 'USD' ? 'USD' : 'ZiG'}
@@ -119,15 +119,15 @@ export function ExpenseForm({ onSuccess }: Props) {
       />
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="note" className="text-sm font-medium text-[#292524]">
+        <label htmlFor="note" className="text-sm font-medium text-[#14301f]">
           Note{' '}
-          <span className="font-normal text-[#78716c]">(optional)</span>
+          <span className="font-normal text-[#6b7a70]">(optional)</span>
         </label>
         <textarea
           id="note"
           rows={3}
           placeholder="Additional details…"
-          className="rounded-md border border-[#e7e5e4] bg-white px-3 py-2 text-sm text-[#292524] placeholder:text-[#78716c] focus:outline-none focus:ring-2 focus:ring-[#065f46]/30"
+          className="rounded-xl border border-[#e3e9e4] bg-white px-3 py-2 text-sm text-[#14301f] placeholder:text-[#6b7a70] focus:outline-none focus:ring-2 focus:ring-[#14613f]/30"
           {...register('note')}
         />
       </div>

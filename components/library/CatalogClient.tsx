@@ -61,7 +61,7 @@ export function CatalogClient({ initialBooks, userRole }: Props) {
       key: 'title',
       label: 'Title',
       render: (row: BookRow) => (
-        <span className="font-medium text-[#292524]">{row.title}</span>
+        <span className="font-medium text-[#14301f]">{row.title}</span>
       ),
     },
     {
@@ -91,8 +91,8 @@ export function CatalogClient({ initialBooks, userRole }: Props) {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#292524]">Book Catalog</h1>
-          <p className="mt-0.5 text-sm text-[#78716c]">
+          <h1 className="text-2xl font-bold text-[#14301f]">Book Catalog</h1>
+          <p className="mt-0.5 text-sm text-[#6b7a70]">
             {initialBooks.length} title{initialBooks.length !== 1 ? 's' : ''} in collection
           </p>
         </div>

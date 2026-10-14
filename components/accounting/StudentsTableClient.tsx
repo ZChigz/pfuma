@@ -58,7 +58,7 @@ export function StudentsTableClient({ students, canManage }: Props) {
         row.overdueDays > 0 ? (
           <span className="font-medium text-[#b91c1c]">{row.overdueDays}d</span>
         ) : (
-          <span className="text-[#78716c]">—</span>
+          <span className="text-[#6b7a70]">—</span>
         ),
     },
     {
@@ -69,14 +69,14 @@ export function StudentsTableClient({ students, canManage }: Props) {
           {canManage && (
             <button
               onClick={() => setPaymentStudent(row)}
-              className="min-h-[36px] rounded-md bg-[#065f46] px-2.5 text-xs font-medium text-white transition-colors hover:bg-[#047857] focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+              className="min-h-[36px] rounded-xl bg-[#14613f] px-2.5 text-xs font-medium text-white transition-colors hover:bg-[#0f4d32] focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
             >
               Record Payment
             </button>
           )}
           <button
             onClick={() => router.push(`/accounting/students/${row.id}`)}
-            className="rounded px-2 py-1 text-xs font-medium text-[#065f46] hover:underline focus:outline-none focus:ring-2 focus:ring-[#065f46]/40"
+            className="rounded px-2 py-1 text-xs font-medium text-[#14613f] hover:underline focus:outline-none focus:ring-2 focus:ring-[#14613f]/40"
           >
             View →
           </button>

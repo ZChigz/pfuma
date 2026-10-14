@@ -116,7 +116,7 @@ export function Sidebar({ currentTerm }: { currentTerm?: string }) {
         </nav>
 
         {/* Term card: the one dark surface in the chrome */}
-        <div className="term-card relative overflow-hidden rounded-xl p-4 text-white">
+        <div className="term-card relative overflow-hidden rounded-2xl p-4 text-white">
           <p className="relative text-xs text-emerald-100/80">Current term</p>
           <p className="relative mt-1 text-base font-semibold leading-snug">
             {currentTerm || 'Not set yet'}

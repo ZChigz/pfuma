@@ -59,17 +59,17 @@ export function ReceiptModal({ open, receipt, onClose }: Props) {
         </>
       }
     >
-      <div className="rounded-xl border border-[#e7e5e4] bg-[#f5f5f4] p-5">
+      <div className="rounded-2xl border border-[#e3e9e4] bg-[#f4f6f4] p-5">
         {/* School name header */}
-        <p className="mb-4 text-center text-xs font-bold uppercase tracking-widest text-[#065f46]">
+        <p className="mb-4 text-center text-xs font-bold   text-[#14613f]">
           {receipt.schoolName}
         </p>
 
         {/* Student + status */}
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <p className="font-semibold text-[#292524]">{receipt.studentFullName}</p>
-            <p className="text-sm text-[#78716c]">{receipt.studentGrade}</p>
+            <p className="font-semibold text-[#14301f]">{receipt.studentFullName}</p>
+            <p className="text-sm text-[#6b7a70]">{receipt.studentGrade}</p>
           </div>
           <Badge
             variant={receipt.status === 'VERIFIED' ? 'success' : 'warning'}
@@ -78,7 +78,7 @@ export function ReceiptModal({ open, receipt, onClose }: Props) {
         </div>
 
         {/* Line items */}
-        <div className="divide-y divide-[#e7e5e4]">
+        <div className="divide-y divide-[#e3e9e4]">
           <ReceiptRow label="Fee" value={receipt.feeLabel} />
           <ReceiptRow label="Amount" value={amountStr} bold />
           <ReceiptRow label="Method" value={receipt.method} />
@@ -92,16 +92,16 @@ export function ReceiptModal({ open, receipt, onClose }: Props) {
             <p className="text-xs font-semibold text-[#92400e]">Payment received in ZiG</p>
             <div className="mt-1.5 space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-[#78716c]">ZiG received</span>
-                <span className="font-medium text-[#292524]">{formatZiG(receipt.zigAmountPaid)}</span>
+                <span className="text-[#6b7a70]">ZiG received</span>
+                <span className="font-medium text-[#14301f]">{formatZiG(receipt.zigAmountPaid)}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-[#78716c]">Exchange rate</span>
-                <span className="font-medium text-[#292524]">1 USD = ZiG {receipt.exchangeRateUsed.toFixed(2)}</span>
+                <span className="text-[#6b7a70]">Exchange rate</span>
+                <span className="font-medium text-[#14301f]">1 USD = ZiG {receipt.exchangeRateUsed.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-[#78716c]">USD equivalent</span>
-                <span className="font-medium text-[#292524]">{formatUSD(receipt.amount)}</span>
+                <span className="text-[#6b7a70]">USD equivalent</span>
+                <span className="font-medium text-[#14301f]">{formatUSD(receipt.amount)}</span>
               </div>
             </div>
           </div>
@@ -120,16 +120,16 @@ export function ReceiptModal({ open, receipt, onClose }: Props) {
 function ReceiptRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
     <div className="flex items-center justify-between py-2">
-      <span className="text-sm text-[#78716c]">{label}</span>
-      <span className={`text-sm ${bold ? 'font-bold text-[#292524]' : 'text-[#292524]'}`}>{value}</span>
+      <span className="text-sm text-[#6b7a70]">{label}</span>
+      <span className={`text-sm ${bold ? 'font-bold text-[#14301f]' : 'text-[#14301f]'}`}>{value}</span>
     </div>
   );
 }
 
 function BalanceCard({ label, value, isOwing }: { label: string; value: string; isOwing: boolean }) {
   return (
-    <div className="rounded-lg border border-[#e7e5e4] bg-white p-3 text-center">
-      <p className="text-xs text-[#78716c]">{label}</p>
+    <div className="rounded-lg border border-[#e3e9e4] bg-white p-3 text-center">
+      <p className="text-xs text-[#6b7a70]">{label}</p>
       <p className={`mt-0.5 font-bold tabular-nums ${isOwing ? 'text-[#b91c1c]' : 'text-[#15803d]'}`}>
         {value}
       </p>

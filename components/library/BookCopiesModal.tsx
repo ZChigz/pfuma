@@ -68,39 +68,39 @@ export function BookCopiesModal({ book, onClose }: Props) {
             { label: 'ISBN',      value: book.isbn ?? '—' },
           ].map(({ label, value }) => (
             <div key={label} className="flex gap-2">
-              <span className="w-20 flex-shrink-0 text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+              <span className="w-20 flex-shrink-0 text-xs font-semibold   text-[#6b7a70]">
                 {label}
               </span>
-              <span className="text-[#292524]">{value}</span>
+              <span className="text-[#14301f]">{value}</span>
             </div>
           ))}
         </div>
 
-        <hr className="border-[#e7e5e4]" />
+        <hr className="border-[#e3e9e4]" />
 
         {/* Copies */}
         <div>
-          <p className="mb-3 text-sm font-semibold text-[#292524]">
+          <p className="mb-3 text-sm font-semibold text-[#14301f]">
             Copies — {book.availableCopiesCount} of {book.copies.length} available
           </p>
           {book.copies.length === 0 ? (
-            <p className="text-sm text-[#78716c]">No copies registered.</p>
+            <p className="text-sm text-[#6b7a70]">No copies registered.</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-[#e7e5e4]">
+            <div className="overflow-x-auto rounded-lg border border-[#e3e9e4]">
               <table className="w-full text-sm">
-                <thead className="border-b border-[#e7e5e4] bg-[#f5f5f4]">
+                <thead className="border-b border-[#e3e9e4] bg-[#f4f6f4]">
                   <tr>
                     {['Accession', 'Condition', 'Status'].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#78716c]">
+                      <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold   text-[#6b7a70]">
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#e7e5e4]">
+                <tbody className="divide-y divide-[#e3e9e4]">
                   {book.copies.map((copy) => (
                     <tr key={copy.id} className="bg-white">
-                      <td className="px-4 py-2.5 font-mono text-xs text-[#78716c]">
+                      <td className="px-4 py-2.5 font-mono text-xs text-[#6b7a70]">
                         {copy.accessionNumber}
                       </td>
                       <td className="px-4 py-2.5">{conditionBadge(copy.condition)}</td>
