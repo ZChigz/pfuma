@@ -14,7 +14,8 @@ type BorrowingData = {
   dueDate: string;
   fineAmount: number;
   daysOverdue: number;
-  member: { user: { fullName: string } };
+  member: { user?: { fullName: string } | null; student?: { fullName: string } | null };
+  memberName?: string;
   copy: {
     accessionNumber: string;
     book: { title: string };
@@ -160,7 +161,7 @@ export function ReturnModal({ borrowing: propBorrowing, open, onClose, onSuccess
             {[
               { label: 'Book',        value: activeBorrowing.copy.book.title           },
               { label: 'Accession',   value: activeBorrowing.copy.accessionNumber      },
-              { label: 'Member',      value: activeBorrowing.member.user.fullName      },
+              { label: 'Member',      value: activeBorrowing.memberName ?? activeBorrowing.member.user?.fullName ?? activeBorrowing.member.student?.fullName ?? '' },
               { label: 'Checked Out', value: formatDate(activeBorrowing.checkoutDate)  },
               { label: 'Due Date',    value: formatDate(activeBorrowing.dueDate)       },
             ].map(({ label, value }) => (

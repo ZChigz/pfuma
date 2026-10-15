@@ -42,7 +42,7 @@ export type DisposalMethod = 'SOLD' | 'SCRAPPED' | 'DONATED';
 
 export type CopyCondition = 'NEW' | 'GOOD' | 'FAIR' | 'DAMAGED';
 
-export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'LOST';
+export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'LOST' | 'DAMAGED' | 'WITHDRAWN';
 
 export type AuditAction =
   | 'RECORD_PAYMENT'

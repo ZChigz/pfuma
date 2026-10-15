@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { CheckoutModal } from '@/components/library/CheckoutModal';
 import { ReturnModal } from '@/components/library/ReturnModal';
+import { LibrarySettings } from '@/components/library/LibrarySettings';
 import { formatDate } from '@/lib/utils';
 import type { UserRole } from '@/types';
 
@@ -27,9 +28,10 @@ interface Props {
   };
   overdueList: OverdueItem[];
   userRole:    UserRole;
+  settings:    { libraryFineLimit: number; studentLoanLimit: number; staffLoanLimit: number };
 }
 
-export function LibraryOverviewClient({ stats, overdueList, userRole }: Props) {
+export function LibraryOverviewClient({ stats, overdueList, userRole, settings }: Props) {
   const router = useRouter();
   const [showCheckout, setShowCheckout] = useState(false);
   const [showReturn,   setShowReturn]   = useState(false);
@@ -119,6 +121,8 @@ export function LibraryOverviewClient({ stats, overdueList, userRole }: Props) {
           ))}
         </div>
       </div>
+
+      {canManage && <LibrarySettings {...settings} />}
 
       {/* Modals */}
       <CheckoutModal

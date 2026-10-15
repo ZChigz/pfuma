@@ -1,6 +1,7 @@
 // Server-only helpers for admission (form + CSV import) and classes.
 import { Prisma } from '@prisma/client';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
+import { ensureStudentMember } from '@/lib/library';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { classDisplayName } from '@/lib/academic/rules';
@@ -193,6 +194,9 @@ export async function admitStudent(
       currentClassId:         opts.classId,
     },
   });
+
+  // Every admitted student can borrow books.
+  await ensureStudentMember(tx, schoolId, actorId, student.id);
 
   const term = await tx.academicTerm.findUniqueOrThrow({ where: { id: opts.termId } });
   const admitted = dateOnly(data.admissionDate);

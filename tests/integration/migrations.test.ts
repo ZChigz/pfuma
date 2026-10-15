@@ -51,6 +51,7 @@ beforeAll(async () => {
     '20261018000000_results_corrections',
     '20261019000000_absences_and_averages',
     '20261020000000_report_cards',
+    '20261021000000_library_members_and_copies',
   ]) await applyMigration(pg, m);
 }, 300_000);
 
@@ -112,6 +113,18 @@ describe('migrations on top of the live demo data', () => {
     expect(cols).toHaveLength(2);
     const unscoped = await one<{ n: string }>(`SELECT count(*) AS n FROM "GradeBoundary" WHERE "levelId" IS NOT NULL OR "termId" IS NOT NULL`);
     expect(Number(unscoped.n)).toBe(0); // existing boundaries stay school-wide
+  });
+
+  it('give every current student a library membership and keep staff members', async () => {
+    const students = await one<{ n: string }>(`SELECT count(*) AS n FROM "LibraryMember" WHERE "memberType" = 'STUDENT' AND "studentId" IS NOT NULL AND "userId" IS NULL AND NOT "borrowingSuspended"`);
+    expect(Number(students.n)).toBe(500);
+    const bad = await one<{ n: string }>(`SELECT count(*) AS n FROM "LibraryMember" WHERE ("userId" IS NOT NULL) = ("studentId" IS NOT NULL)`);
+    expect(Number(bad.n)).toBe(0);
+    const school = await one<{ libraryFineLimit: string; studentLoanLimit: number; staffLoanLimit: number }>(`SELECT "libraryFineLimit","studentLoanLimit","staffLoanLimit" FROM "School" LIMIT 1`);
+    expect(Number(school.libraryFineLimit)).toBe(5);
+    expect([school.studentLoanLimit, school.staffLoanLimit]).toEqual([2, 5]);
+    const cols = await all(`SELECT 1 FROM information_schema.columns WHERE table_name = 'Book' AND column_name = 'totalCopies'`);
+    expect(cols).toHaveLength(0);
   });
 
   it('give existing users safe defaults', async () => {

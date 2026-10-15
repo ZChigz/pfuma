@@ -6,6 +6,7 @@ import { canManageLibrary } from '@/lib/permissions';
 import { parseBody, apiSuccess, apiError, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { ReturnSchema } from '@/lib/validations/library';
 import { getDaysOverdue } from '@/lib/utils';
+import { memberName } from '@/lib/library';
 import type { SessionUser } from '@/types';
 
 async function _POST(
@@ -23,7 +24,7 @@ async function _POST(
     where:   { id: params.id, schoolId: user.schoolId },
     include: {
       copy:   { include: { book: { select: { title: true } } } },
-      member: { include: { user: { select: { fullName: true } } } },
+      member: { include: { user: { select: { fullName: true } }, student: { select: { fullName: true, admissionNumber: true } } } },
     },
   });
   if (!existing)          return apiNotFound('Borrowing');
@@ -36,7 +37,8 @@ async function _POST(
   const dailyRate   = parseFloat(process.env.DAILY_FINE_RATE || '0');
   const fineAmount  = daysOverdue * dailyRate;
 
-  const newCopyStatus = parsed.data.conditionOnReturn === 'DAMAGED' ? 'AVAILABLE' : 'AVAILABLE';
+  // A copy handed back damaged is not lent out again until it has been repaired.
+  const newCopyStatus = parsed.data.conditionOnReturn === 'DAMAGED' ? 'DAMAGED' : 'AVAILABLE';
 
   const borrowing = await db.$tx(async (tx) => {
     const b = await tx.borrowing.update({
@@ -59,7 +61,7 @@ async function _POST(
         action:     'RETURN_BOOK',
         entityType: 'Borrowing',
         entityId:   params.id,
-        detail:     `${existing.copy.book.title} returned by ${existing.member.user.fullName}${fineAmount > 0 ? ` — fine $${fineAmount.toFixed(2)}` : ''}`,
+        detail:     `${existing.copy.book.title} returned by ${memberName(existing.member)}${fineAmount > 0 ? ` — fine $${fineAmount.toFixed(2)}` : ''}`,
       },
       tx,
     );

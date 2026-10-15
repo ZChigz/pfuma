@@ -44,7 +44,7 @@ describe('assets', () => {
 
 describe('library', () => {
   it('add a book, check a copy out, list, return it, change a copy', async () => {
-    const book = await call('library/books', 'POST', { as: A.users.LIBRARIAN, body: { title: 'Physics 1', author: 'Newton', totalCopies: 2 } });
+    const book = await call('library/books', 'POST', { as: A.users.LIBRARIAN, body: { title: 'Physics 1', author: 'Newton', copies: 2 } });
     expect(book.status).toBe(201);
     const bookId = book.json.data.book.id;
     const copies = await prisma.bookCopy.findMany({ where: { bookId }, orderBy: { accessionNumber: 'asc' } });

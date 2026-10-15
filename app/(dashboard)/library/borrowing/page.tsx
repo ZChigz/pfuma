@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { SettleFineButton } from '@/components/library/SettleFineButton';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Table } from '@/components/ui/Table';
@@ -16,7 +17,8 @@ type BorrowingRow = {
   fineSettled: boolean;
   daysOverdue: number;
   conditionOnReturn: string | null;
-  member: { user: { fullName: string }; id: string };
+  member: { user?: { fullName: string } | null; student?: { fullName: string } | null; id: string };
+  memberName?: string;
   copy: { accessionNumber: string; book: { id: string; title: string } };
   [key: string]: unknown;
 };
@@ -76,7 +78,7 @@ export default function BorrowingPage() {
     {
       key: 'member',
       label: 'Member',
-      render: (row: BorrowingRow) => (row.member as BorrowingRow['member']).user.fullName,
+      render: (row: BorrowingRow) => row.memberName ?? row.member.user?.fullName ?? row.member.student?.fullName ?? '',
     },
     {
       key: 'book',
@@ -140,6 +142,16 @@ export default function BorrowingPage() {
               ${row.fineAmount.toFixed(2)}
             </span>
           ) : '—',
+      },
+    ] : []),
+    ...(tab === 'history' ? [
+      {
+        key: 'settle',
+        label: '',
+        render: (row: BorrowingRow) =>
+          row.returnDate && row.fineAmount > 0 && !row.fineSettled ? (
+            <SettleFineButton borrowingId={row.id} onDone={fetchHistory} />
+          ) : null,
       },
     ] : []),
     ...(tab !== 'history' ? [

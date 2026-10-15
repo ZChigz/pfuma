@@ -165,6 +165,13 @@ enum CopyStatus {
   AVAILABLE
   BORROWED
   LOST
+  DAMAGED   // in the library but not lendable until repaired
+  WITHDRAWN // taken out of circulation
+}
+
+enum MemberType {
+  STAFF
+  STUDENT
 }
 
 enum AuditAction {
@@ -232,6 +239,11 @@ enum AuditAction {
   EXCUSE_ABSENCE
   UPDATE_GRADE_BOUNDARIES
   UPDATE_REPORT_CARD
+  CREATE_LIBRARY_MEMBER
+  SUSPEND_LIBRARY_MEMBER
+  UPDATE_BOOK_COPY
+  SETTLE_LIBRARY_FINE
+  UPDATE_LIBRARY_SETTINGS
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
@@ -246,6 +258,11 @@ model School {
   passGrade    String   @default("C")
   // O Level classes: rank by average percentage, or by number of passes then average.
   oLevelRanking RankingMode @default(AVERAGE)
+  // Library: checkout is blocked above this much unpaid fines (in the fine currency),
+  // and each kind of member has its own loan limit.
+  libraryFineLimit  Decimal @default(5) @db.Decimal(14, 2)
+  studentLoanLimit  Int     @default(2)
+  staffLoanLimit    Int     @default(5)
   createdAt    DateTime @default(now())
   // Legacy column "currentTerm" still exists in the database until the
   // contract migration; the current term is now the OPEN AcademicTerm.
@@ -492,6 +509,7 @@ model Student {
   marks        Mark[]
   termResults  TermResult[]
   portalViews  PortalAccessLog[]
+  libraryMember LibraryMember?
 
   @@unique([schoolId, admissionNumber])
   @@unique([schoolId, birthCertificateNumber])
@@ -983,7 +1001,10 @@ model Book {
   year          Int?
   shelfLocation String?
   coverUrl      String?
-  totalCopies   Int     @default(1)
+  // What a student is charged when they lose a copy (Part 2.7 charge).
+  replacementCost     Decimal?  @db.Decimal(14, 2)
+  replacementCurrency Currency  @default(USD)
+  // Copy counts are not stored: they are counted from BookCopy (lib/library.ts).
 
   school School     @relation(fields: [schoolId], references: [id])
   copies BookCopy[]
@@ -1007,15 +1028,21 @@ model BookCopy {
   @@index([schoolId])
 }
 
+// Exactly one of userId (STAFF) and studentId (STUDENT) is set — enforced by the
+// check constraints "LibraryMember_exactly_one_person" and "LibraryMember_type_matches"
+// (SQL only; keep them when writing migrations).
 model LibraryMember {
-  id                 String  @id @default(cuid())
+  id                 String     @id @default(cuid())
   schoolId           String
-  userId             String  @unique
-  borrowingSuspended Boolean @default(false)
+  memberType         MemberType @default(STAFF)
+  userId             String?    @unique
+  studentId          String?    @unique
+  borrowingSuspended Boolean    @default(false)
   suspensionReason   String?
 
   school     School      @relation(fields: [schoolId], references: [id])
-  user       User        @relation(fields: [userId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
+  student    Student?    @relation(fields: [studentId], references: [id])
   borrowings Borrowing[]
 
   @@index([schoolId])

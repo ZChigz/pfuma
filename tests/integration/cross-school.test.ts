@@ -189,12 +189,15 @@ const ATTACKS: Attack[] = [
   { name: "read B's book", file: 'library/books/[id]', method: 'GET', as: 'LIBRARIAN', params: () => ({ id: b().bookId }), expect: 404 },
   { name: "edit B's book", file: 'library/books/[id]', method: 'PATCH', as: 'LIBRARIAN', params: () => ({ id: b().bookId }), body: () => ({ title: 'Hacked' }), expect: 404 },
   { name: 'books (list)', file: 'library/books', method: 'GET', as: 'LIBRARIAN', expect: 'ok' },
-  { name: 'book create (own school)', file: 'library/books', method: 'POST', as: 'LIBRARIAN', body: () => ({ title: 'Geometry', author: 'Jones', totalCopies: 1 }), expect: 'ok' },
+  { name: 'book create (own school)', file: 'library/books', method: 'POST', as: 'LIBRARIAN', body: () => ({ title: 'Geometry', author: 'Jones', copies: 1 }), expect: 'ok' },
   { name: "return B's borrowing", file: 'library/borrowing/[id]/return', method: 'POST', as: 'LIBRARIAN', params: () => ({ id: b().borrowingId }), body: () => ({ conditionOnReturn: 'GOOD' }), expect: 404 },
   { name: 'borrowing (list)', file: 'library/borrowing', method: 'GET', as: 'LIBRARIAN', url: () => `?history=true&memberId=${b().memberId}`, expect: 'ok' },
   { name: "check out B's copy", file: 'library/borrowing', method: 'POST', as: 'LIBRARIAN', body: () => ({ copyId: b().copyId, memberId: a().memberId }), expect: 404 },
   { name: 'check out to a B member', file: 'library/borrowing', method: 'POST', as: 'LIBRARIAN', body: () => ({ copyId: a().copyId, memberId: b().memberId }), expect: 404 },
   { name: "edit B's copy", file: 'library/copies/[id]', method: 'PATCH', as: 'LIBRARIAN', params: () => ({ id: b().copyId }), body: () => ({ condition: 'DAMAGED' }), expect: 404 },
+  { name: 'library settings (read own)', file: 'library/settings', method: 'GET', as: 'LIBRARIAN', expect: 'ok' },
+  { name: 'library settings (change own)', file: 'library/settings', method: 'PATCH', as: 'LIBRARIAN', body: () => ({ studentLoanLimit: 2 }), expect: 'ok' },
+  { name: 'settle fine of B', file: 'library/borrowing/[id]/settle-fine', method: 'POST', as: 'LIBRARIAN', params: () => ({ id: b().borrowingId }), expect: 404 },
   { name: 'library members (list)', file: 'library/members', method: 'GET', as: 'LIBRARIAN', expect: 'ok' },
 
   // ── Parent portal links ──
