@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { canManageAssets } from '@/lib/permissions';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
@@ -14,8 +14,9 @@ async function _GET(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const asset = await prisma.asset.findFirst({
+  const asset = await db.asset.findFirst({
     where: { id: params.id, schoolId: user.schoolId },
     include: {
       category:    { select: { id: true, name: true } },
@@ -40,10 +41,11 @@ async function _PATCH(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageAssets(user.role); } catch (res) { return res as Response; }
 
-  const existing = await prisma.asset.findFirst({
+  const existing = await db.asset.findFirst({
     where: { id: params.id, schoolId: user.schoolId },
   });
   if (!existing) return apiNotFound('Asset');
@@ -51,7 +53,7 @@ async function _PATCH(
   const parsed = await parseBody(req, UpdateAssetSchema);
   if ('error' in parsed) return parsed.error;
 
-  const asset = await prisma.$transaction(async (tx) => {
+  const asset = await db.$tx(async (tx) => {
     const a = await tx.asset.update({
       where: { id: params.id },
       data: {

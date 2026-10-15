@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Permission } from '@/lib/permissions';
@@ -15,12 +15,13 @@ export default async function ReportsPage({
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const levelId = searchParams.levelId ?? '';
   const termId  = searchParams.termId  ?? '';
   const [levels, terms] = await Promise.all([
-    prisma.level.findMany({ where: { schoolId: user.schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
-    listTerms(user.schoolId),
+    db.level.findMany({ where: { schoolId: user.schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
+    listTerms(user.schoolId, db),
   ]);
   const grade = levels.find((l) => l.id === levelId)?.name ?? '';
   const term  = terms.find((t) => t.id === termId)?.name ?? '';
@@ -44,7 +45,7 @@ export default async function ReportsPage({
   let pendingMarkCount = 0;
 
   if (grade && term) {
-    const gradeBoundaries = await prisma.gradeBoundary.findMany({
+    const gradeBoundaries = await db.gradeBoundary.findMany({
       where: { schoolId: user.schoolId },
     });
 
@@ -56,12 +57,12 @@ export default async function ReportsPage({
     };
 
     // Students in that level FOR THAT TERM (from Enrollment), not their level today.
-    const enrolled = await prisma.enrollment.findMany({
+    const enrolled = await db.enrollment.findMany({
       where: { schoolId: user.schoolId, termId, class: { levelId } },
       select: { studentId: true, class: { select: { name: true } } },
     });
     const classByStudent = new Map(enrolled.map((e) => [e.studentId, e.class.name]));
-    const rows = await prisma.termResult.findMany({
+    const rows = await db.termResult.findMany({
       where: { schoolId: user.schoolId, termId, studentId: { in: Array.from(classByStudent.keys()) } },
       include: { student: { select: { fullName: true } } },
       orderBy: [{ classPosition: 'asc' }, { student: { fullName: 'asc' } }],
@@ -81,7 +82,7 @@ export default async function ReportsPage({
     isPublished = results.some((r) => r.published);
 
     if (results.length === 0) {
-      pendingMarkCount = await prisma.mark.count({
+      pendingMarkCount = await db.mark.count({
         where: { schoolId: user.schoolId, termId, studentId: { in: Array.from(classByStudent.keys()) } },
       });
     }

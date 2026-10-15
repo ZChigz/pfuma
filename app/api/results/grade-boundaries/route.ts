@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
 import { canManageGradeBoundaries } from '@/lib/permissions';
 import { SaveBoundariesSchema } from '@/lib/validations/results';
@@ -9,8 +9,9 @@ async function _GET() {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const boundaries = await prisma.gradeBoundary.findMany({
+  const boundaries = await db.gradeBoundary.findMany({
     where: { schoolId: user.schoolId },
     orderBy: { minPercent: 'desc' },
   });
@@ -28,6 +29,7 @@ async function _POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try {
     canManageGradeBoundaries(user.role);
@@ -38,14 +40,14 @@ async function _POST(req: Request) {
   const parsed = await parseBody(req, SaveBoundariesSchema);
   if ('error' in parsed) return parsed.error;
 
-  await prisma.$transaction(async (tx) => {
+  await db.$tx(async (tx) => {
     await tx.gradeBoundary.deleteMany({ where: { schoolId: user.schoolId } });
     await tx.gradeBoundary.createMany({
       data: parsed.data.boundaries.map((b) => ({ ...b, schoolId: user.schoolId })),
     });
   });
 
-  const boundaries = await prisma.gradeBoundary.findMany({
+  const boundaries = await db.gradeBoundary.findMany({
     where: { schoolId: user.schoolId },
     orderBy: { minPercent: 'desc' },
   });

@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/Badge';
@@ -17,12 +17,13 @@ export default async function AdminClassDetailPage({ params }: Props) {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageClasses(user.role); } catch { redirect('/accounting'); }
 
-  const openTerm = await getOpenTerm(user.schoolId);
+  const openTerm = await getOpenTerm(user.schoolId, db);
   const [schoolClass, teachers, levels] = await Promise.all([
-    prisma.schoolClass.findUnique({
+    db.schoolClass.findUnique({
       where: { id: params.id },
       include: {
         level: { select: { name: true } },
@@ -36,12 +37,12 @@ export default async function AdminClassDetailPage({ params }: Props) {
         },
       },
     }),
-    prisma.user.findMany({
+    db.user.findMany({
       where: { schoolId: user.schoolId, role: 'TEACHER', active: true },
       select: { id: true, fullName: true },
       orderBy: { fullName: 'asc' },
     }),
-    prisma.level.findMany({ where: { schoolId: user.schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
+    db.level.findMany({ where: { schoolId: user.schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
   ]);
 
   if (!schoolClass || schoolClass.schoolId !== user.schoolId) notFound();

@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canManageStudents } from '@/lib/permissions';
@@ -15,8 +15,9 @@ async function _GET(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const student = await prisma.student.findUnique({
+  const student = await db.student.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
     include: {
       charges: { orderBy: { issuedAt: 'desc' } },
@@ -44,6 +45,7 @@ async function _PATCH(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const parsed = await parseBody(req, UpdateStudentSchema);
   if ('error' in parsed) return parsed.error;
@@ -55,7 +57,7 @@ async function _PATCH(
     throw e;
   }
 
-  const existing = await prisma.student.findUnique({
+  const existing = await db.student.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
     select: { id: true, firstName: true, surname: true },
   });
@@ -64,7 +66,7 @@ async function _PATCH(
   const firstName = parsed.data.firstName ? normalizeName(parsed.data.firstName) : existing.firstName;
   const surname = parsed.data.surname ? normalizeName(parsed.data.surname) : existing.surname;
 
-  const student = await prisma.$transaction(async (tx) => {
+  const student = await db.$tx(async (tx) => {
     const s = await tx.student.update({
       where: { id: params.id },
       data: { ...parsed.data, firstName, surname, fullName: `${firstName} ${surname}`.trim() },

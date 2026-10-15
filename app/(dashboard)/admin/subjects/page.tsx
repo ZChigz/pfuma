@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/Badge';
 import { AddSubjectModal } from '@/components/admin/AddSubjectModal';
@@ -15,31 +15,32 @@ export default async function AdminSubjectsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageSubjects(user.role); } catch { redirect('/'); }
 
   const { schoolId } = user;
 
   const [subjects, classes, teachers, openTerm] = await Promise.all([
-    prisma.subject.findMany({
+    db.subject.findMany({
       where: { schoolId },
       orderBy: { name: 'asc' },
     }),
-    prisma.schoolClass.findMany({
+    db.schoolClass.findMany({
       where: { schoolId, active: true },
       orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }],
     }),
-    prisma.user.findMany({
+    db.user.findMany({
       where: { schoolId, role: 'TEACHER', active: true },
       select: { id: true, fullName: true },
       orderBy: { fullName: 'asc' },
     }),
-    getOpenTerm(schoolId),
+    getOpenTerm(schoolId, db),
   ]);
 
   const currentTerm = openTerm?.name ?? '';
 
-  const assignments = !openTerm ? [] : await prisma.subjectAssignment.findMany({
+  const assignments = !openTerm ? [] : await db.subjectAssignment.findMany({
     where: { schoolId, termId: openTerm.id },
     include: {
       subject: { select: { id: true, name: true, code: true } },

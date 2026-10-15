@@ -9,7 +9,7 @@ import { z } from 'zod';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string().min(1, 'Enter your password'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -35,6 +35,10 @@ export default function LoginPage() {
       redirect: false,
     });
 
+    if (result?.code === 'account_locked') {
+      setAuthError('Too many failed attempts. Please wait 15 minutes before trying again.');
+      return;
+    }
     if (result?.error) {
       setAuthError('Invalid email or password. Please try again.');
       return;

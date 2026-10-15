@@ -21,6 +21,8 @@
     "@prisma/client": "^5.22.0",
     "@react-pdf/renderer": "^4.5.1",
     "@uploadthing/react": "^7.3.3",
+    "@upstash/ratelimit": "^2.2.0",
+    "@upstash/redis": "^1.39.0",
     "autoprefixer": "^10.5.0",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.4.0",
@@ -40,6 +42,8 @@
     "seed": "ts-node -r dotenv/config --project tsconfig.seed.json prisma/seed.ts"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
+    "@electric-sql/pglite-socket": "^0.2.13",
     "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

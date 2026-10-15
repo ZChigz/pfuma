@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { canManageEnrollment } from '@/lib/permissions';
 import { PromotionsClient } from '@/components/admin/PromotionsClient';
@@ -9,10 +9,11 @@ export default async function PromotionsPage({ searchParams }: { searchParams: {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   try { await canManageEnrollment(user.role); } catch { redirect('/'); }
 
   // Promotion happens from the last term (Term 3) of a year.
-  const finalTerms = await prisma.academicTerm.findMany({
+  const finalTerms = await db.academicTerm.findMany({
     where: { schoolId: user.schoolId, termNumber: 3, status: { in: ['OPEN', 'CLOSED'] } },
     include: { academicYear: { select: { year: true } } },
     orderBy: { startDate: 'desc' },
@@ -20,13 +21,13 @@ export default async function PromotionsPage({ searchParams }: { searchParams: {
   const source = finalTerms.find((t) => t.id === searchParams.termId) ?? finalTerms[0];
 
   const nextYearTerm1 = source
-    ? await prisma.academicTerm.findFirst({
+    ? await db.academicTerm.findFirst({
         where: { schoolId: user.schoolId, termNumber: 1, academicYear: { year: source.academicYear.year + 1 } },
       })
     : null;
 
   const enrollments = source
-    ? await prisma.enrollment.findMany({
+    ? await db.enrollment.findMany({
         where: { termId: source.id },
         include: {
           student: { select: { id: true, fullName: true, admissionNumber: true, status: true } },

@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, withApi } from '@/lib/api';
 import { canManageEnrollment } from '@/lib/permissions';
 import { dateOnly, requireOpenTerm } from '@/lib/academic/terms';
@@ -35,11 +35,12 @@ async function _POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   const { schoolId } = user;
 
   try { await canManageEnrollment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
-  const term = await requireOpenTerm(schoolId);
+  const term = await requireOpenTerm(schoolId, db);
 
   const rows = parseCsv(await req.text());
   if (rows.length < 2) return apiError('The CSV must have a header row and at least one student row', 422);
@@ -81,15 +82,15 @@ async function _POST(req: Request) {
 
   // 2. Conflicts with students already in the school.
   const [existingByDob, existingNumbers, existingCerts] = await Promise.all([
-    valid.length ? prisma.student.findMany({
+    valid.length ? db.student.findMany({
       where: { schoolId, dateOfBirth: { in: Array.from(new Set(valid.map((v) => v.data.dateOfBirth))).map(dobToDate) } },
       select: { firstName: true, surname: true, dateOfBirth: true, admissionNumber: true, fullName: true, currentClass: { select: { name: true } } },
     }) : [],
-    prisma.student.findMany({
+    db.student.findMany({
       where: { schoolId, admissionNumber: { in: valid.flatMap((v) => (v.data.admissionNumber ? [v.data.admissionNumber] : [])) } },
       select: { admissionNumber: true, fullName: true },
     }),
-    prisma.student.findMany({
+    db.student.findMany({
       where: { schoolId, birthCertificateNumber: { in: valid.flatMap((v) => (v.data.birthCertificateNumber ? [v.data.birthCertificateNumber] : [])) } },
       select: { birthCertificateNumber: true, fullName: true },
     }),
@@ -109,13 +110,13 @@ async function _POST(req: Request) {
   });
 
   // 3. Class capacity, counted cumulatively across the file.
-  const school = await prisma.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } });
+  const school = await db.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } });
   const occupancy = new Map<string, { name: string; count: number; capacity: number }>();
   for (const v of toImport) {
     const key = `${v.data.level}|${lower(v.data.stream)}`;
     if (!occupancy.has(key)) {
-      const c = await findClass(schoolId, v.data.level, v.data.stream);
-      occupancy.set(key, { name: c?.name ?? v.data.className, count: await classOccupancy(c?.id, term.id), capacity: c?.capacity ?? school?.maxClassSize ?? 45 });
+      const c = await findClass(schoolId, v.data.level, v.data.stream, db);
+      occupancy.set(key, { name: c?.name ?? v.data.className, count: await classOccupancy(c?.id, term.id, db), capacity: c?.capacity ?? school?.maxClassSize ?? 45 });
     }
     const o = occupancy.get(key)!;
     if (o.count + 1 > o.capacity) v.warnings.push(classFullMessage(o.name, o.count, o.capacity));
@@ -125,7 +126,7 @@ async function _POST(req: Request) {
   // 4. Admit every remaining row in one transaction.
   let numbers = new Map<number, string>();
   if (toImport.length > 0) {
-    numbers = await withAdmissionNumberRetry(() => prisma.$transaction(async (tx) => {
+    numbers = await withAdmissionNumberRetry(() => db.$tx(async (tx) => {
       const classIds = new Map<string, string>();
       for (const v of toImport) {
         const key = `${v.data.level}|${lower(v.data.stream)}`;
@@ -175,7 +176,6 @@ async function _POST(req: Request) {
           address:                v.data.address,
           status:                 'ACTIVE',
           currentClassId:         classIds.get(`${v.data.level}|${lower(v.data.stream)}`)!,
-          portalToken:            crypto.randomUUID(),
         })),
         select: { id: true, admissionNumber: true },
       });

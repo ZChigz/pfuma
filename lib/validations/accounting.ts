@@ -42,7 +42,8 @@ export const CreatePaymentSchema = z
     method: z.enum(['CASH', 'ECOCASH', 'SWIPE', 'ZIPIT']),
     reference: z.string().optional(),
     feeLabel: z.string().min(1, 'Fee label is required'),
-    popUrl: z.string().optional(),
+    // Private upload key from /api/upload (proofOfPayment); checked against the school in the route.
+    popKey: z.string().max(200).optional(),
     paidInZig:        z.boolean(),
     zigAmountPaid:    z.number().positive().optional(),
     exchangeRateUsed: z.number().positive().optional(),

@@ -6,6 +6,9 @@ export interface ReportCardData {
   grade:         string;
   term:          string;
   classPosition: number | null;
+  rankedOutOf:   number | null;
+  subjectsSat:   number | null;
+  subjectsOffered: number | null;
   percentage:    number;
   headRemark:    string | null;
   marks: Array<{
@@ -99,9 +102,9 @@ export function ReportCardDocument({ data }: Props) {
             { label: 'Student Name', value: studentName },
             { label: 'Grade / Class', value: grade },
             { label: 'Term',          value: term },
-            { label: 'Class Position', value: classPosition != null ? `${classPosition}` : '—' },
+            { label: 'Class Position', value: classPosition != null ? `${classPosition}${data.rankedOutOf ? ` of ${data.rankedOutOf}` : ''}` : data.subjectsSat != null ? 'Not ranked' : '—' },
             { label: 'Overall %',     value: `${percentage.toFixed(1)}%` },
-            { label: 'Total Subjects', value: `${marks.length}` },
+            { label: 'Subjects sat', value: data.subjectsSat != null && data.subjectsOffered != null ? `${data.subjectsSat} of ${data.subjectsOffered}` : `${marks.length}` },
           ].map(({ label, value }) => (
             <View key={label} style={S.infoCell}>
               <Text style={S.infoLabel}>{label}</Text>

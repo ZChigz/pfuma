@@ -7,14 +7,14 @@
 //  • never edits enrollments of past (CLOSED) terms.
 // Admission lives in lib/students/server.ts (admitStudent).
 import type { Prisma, StudentStatus } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canGraduate, nextLevelOrder } from '@/lib/academic/rules';
 import { requireOpenTerm, requireTerm } from '@/lib/academic/terms';
 import { findOrCreateClass } from '@/lib/students/server';
 
-type Tx = Prisma.TransactionClient;
+type Tx = Db;
 
 const ENROLLABLE: StudentStatus[] = ['ACTIVE', 'SUSPENDED'];
 
@@ -38,7 +38,7 @@ async function requireClass(tx: Tx, schoolId: string, classId: string) {
 // ─── Transfer class (within the open term) ───────────────────────────────────
 
 export async function transferClass(schoolId: string, actorId: string, studentIds: string[], classId: string) {
-  return prisma.$transaction(async (tx) => {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
     const term = await requireOpenTerm(schoolId, tx);
     const target = await requireClass(tx, schoolId, classId);
     const students = await loadStudents(tx, schoolId, studentIds);
@@ -92,7 +92,7 @@ interface YearEndInput {
 }
 
 async function yearEnd(schoolId: string, actorId: string, input: YearEndInput, mode: 'PROMOTE' | 'REPEAT') {
-  return prisma.$transaction(async (tx) => {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
     const source = input.sourceTermId
       ? await requireTerm(schoolId, input.sourceTermId, tx)
       : await requireOpenTerm(schoolId, tx);
@@ -198,7 +198,7 @@ const LEAVE: Record<LeaveMode, {
 
 async function leave(schoolId: string, actorId: string, studentIds: string[], mode: LeaveMode, reason?: string) {
   const rule = LEAVE[mode];
-  return prisma.$transaction(async (tx) => {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
     const students = await loadStudents(tx, schoolId, studentIds);
     const wrong = students.filter((s) => !rule.allowedFrom.includes(s.status));
     if (wrong.length) throw new ServiceError(`These students cannot be ${rule.verb}: ${wrong.map((s) => `${s.fullName} (${s.status.toLowerCase()})`).join(', ')}`, 409);

@@ -1,11 +1,11 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { canPublishResults } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { PublishResultsSchema } from '@/lib/validations/results';
-import { assignPositions, getLetterGrade } from '@/lib/results';
+import { assignPositions, getLetterGrade, summariseStudent, type OfferedSubject } from '@/lib/results';
 import { requireTerm } from '@/lib/academic/terms';
 import { classRoster } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
@@ -14,6 +14,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canPublishResults(user.role); }
   catch (e) { if (e instanceof Response) return e; throw e; }
@@ -22,20 +23,24 @@ async function _POST(req: NextRequest) {
   if ('error' in parsed) return parsed.error;
   const { classId, termId } = parsed.data;
 
-  const schoolClass = await prisma.schoolClass.findFirst({
+  const schoolClass = await db.schoolClass.findFirst({
     where: { id: classId, schoolId: user.schoolId },
   });
   if (!schoolClass) return apiNotFound('Class');
-  const termRow = await requireTerm(user.schoolId, termId);
+  const termRow = await requireTerm(user.schoolId, termId, db);
   const term = termRow.name;
 
-  const assignments = await prisma.subjectAssignment.findMany({
+  const assignments = await db.subjectAssignment.findMany({
     where: { schoolId: user.schoolId, classId, termId },
-    include: { subject: { select: { id: true, name: true, maxMark: true } } },
+    include: { subject: { select: { id: true, name: true, maxMark: true, type: true } } },
   });
 
   if (assignments.length === 0) {
     return apiError('No subjects are assigned to this class for this term', 400);
+  }
+
+  if (assignments.every((a) => a.marksStatus === 'PUBLISHED')) {
+    return apiError('These results are already published. To correct them, reopen the results first.', 409);
   }
 
   const notVerified = assignments.filter((a) => a.marksStatus !== 'VERIFIED');
@@ -48,8 +53,8 @@ async function _POST(req: NextRequest) {
 
   // Positions are among the students enrolled in this class for this term.
   const [students, boundaryRows] = await Promise.all([
-    classRoster(classId, termId),
-    prisma.gradeBoundary.findMany({ where: { schoolId: user.schoolId } }),
+    classRoster(classId, termId, db),
+    db.gradeBoundary.findMany({ where: { schoolId: user.schoolId } }),
   ]);
   const studentIds = students.map((s) => s.id);
 
@@ -59,10 +64,14 @@ async function _POST(req: NextRequest) {
     letterGrade: b.letterGrade,
   }));
 
-  const totalPossible = assignments.reduce((n, a) => n + a.subject.maxMark, 0);
+  const offered: OfferedSubject[] = assignments.map((a) => ({
+    id: a.subjectId,
+    maxMark: a.subject.maxMark,
+    core: a.subject.type === 'CORE',
+  }));
 
   const subjectIds = assignments.map((a) => a.subjectId);
-  const allMarks = await prisma.mark.findMany({
+  const allMarks = await db.mark.findMany({
     where: {
       schoolId:  user.schoolId,
       subjectId: { in: subjectIds },
@@ -72,20 +81,24 @@ async function _POST(req: NextRequest) {
     },
   });
 
+  // Fair ranking: average % over the subjects each student actually sat; a student
+  // who sat too few subjects is not ranked (see lib/results.ts).
   const summaries = students.map((s) => {
-    const subjectMarks = allMarks.filter((m) => m.studentId === s.id);
-    const totalMarks = subjectMarks.reduce((n, m) => n + m.rawMark.toNumber(), 0);
-    const percentage = totalPossible > 0 ? (totalMarks / totalPossible) * 100 : 0;
-    const letterGrade = getLetterGrade(percentage, boundaries);
-    return { studentId: s.id, fullName: s.fullName, totalMarks, percentage, letterGrade };
+    const sat = allMarks
+      .filter((m) => m.studentId === s.id)
+      .map((m) => ({ subjectId: m.subjectId, rawMark: m.rawMark.toNumber() }));
+    const summary = summariseStudent(sat, offered);
+    const letterGrade = getLetterGrade(summary.percentage, boundaries);
+    return { studentId: s.id, fullName: s.fullName, letterGrade, ...summary };
   });
 
-  summaries.sort((a, b) => b.totalMarks - a.totalMarks);
-  const positions = assignPositions(summaries.map((s) => ({ id: s.studentId, totalMarks: s.totalMarks })));
+  const positions = assignPositions(summaries.map((s) => ({ id: s.studentId, percentage: s.percentage, ranked: s.ranked })));
+  const rankedOutOf = positions.size;
+  summaries.sort((a, b) => (positions.get(a.studentId) ?? Infinity) - (positions.get(b.studentId) ?? Infinity) || b.percentage - a.percentage);
 
   const now = new Date();
 
-  await prisma.$transaction(async (tx) => {
+  await db.$tx(async (tx) => {
     for (const s of summaries) {
       await tx.termResult.upsert({
         where:  { studentId_termId: { studentId: s.studentId, termId } },
@@ -93,6 +106,9 @@ async function _POST(req: NextRequest) {
           totalMarks:    s.totalMarks,
           percentage:    s.percentage,
           classPosition: positions.get(s.studentId) ?? null,
+          subjectsSat:     s.subjectsSat,
+          subjectsOffered: s.subjectsOffered,
+          rankedOutOf,
           published:     true,
           publishedAt:   now,
         },
@@ -103,6 +119,9 @@ async function _POST(req: NextRequest) {
           totalMarks:    s.totalMarks,
           percentage:    s.percentage,
           classPosition: positions.get(s.studentId) ?? null,
+          subjectsSat:     s.subjectsSat,
+          subjectsOffered: s.subjectsOffered,
+          rankedOutOf,
           published:     true,
           publishedAt:   now,
         },
@@ -132,7 +151,7 @@ async function _POST(req: NextRequest) {
         action:     'PUBLISH_RESULTS',
         entityType: 'TermResult',
         entityId:   `${classId}:${termId}`,
-        detail:     `Published ${summaries.length} results for ${schoolClass.name} — ${term}`,
+        detail:     `Published ${summaries.length} results for ${schoolClass.name} — ${term} (${rankedOutOf} ranked, ${summaries.length - rankedOutOf} not ranked)`,
       },
       tx,
     );
@@ -144,7 +163,9 @@ async function _POST(req: NextRequest) {
 
   return apiSuccess({
     published:    summaries.length,
-    topStudent:   summaries[0]?.fullName ?? null,
+    ranked:       rankedOutOf,
+    notRanked:    summaries.length - rankedOutOf,
+    topStudent:   rankedOutOf > 0 ? summaries[0]?.fullName ?? null : null,
     classAverage,
   });
 }

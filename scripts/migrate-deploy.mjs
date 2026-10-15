@@ -16,6 +16,8 @@ const RETRYABLE = [
   '20261015090100_part1_backfill',
   '20261015090200_part1_constraints',
   '20261016010000_demo_data',
+  '20261017000100_security_backfill',
+  '20261017000200_security_rls_audit',
 ];
 
 async function failedRetryableMigrations() {
@@ -40,3 +42,30 @@ for (const name of await failedRetryableMigrations()) {
   run(`npx prisma migrate resolve --rolled-back ${name}`);
 }
 run('npx prisma migrate deploy');
+
+// Row-level security (migration 20261017000200) only protects anything if the
+// application's database role is subject to it. Superusers and roles with
+// BYPASSRLS skip every policy, so say so in the build log instead of failing
+// silently. (Application-level scoping in lib/scoped-db.ts still applies.)
+async function warnIfRoleBypassesRls() {
+  const prisma = new PrismaClient();
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT current_user AS "role", (rolsuper OR rolbypassrls) AS "bypasses"
+      FROM pg_roles WHERE rolname = current_user`;
+    if (rows[0]?.bypasses) {
+      console.warn(
+        `\n!! WARNING: database role "${rows[0].role}" is a superuser or has BYPASSRLS, so the row-level ` +
+          'security policies do not apply to the app. Connect with a normal role (NOSUPERUSER NOBYPASSRLS) ' +
+          'to get the second layer of school isolation.\n',
+      );
+    } else {
+      console.log(`Row-level security applies to database role "${rows[0]?.role}".`);
+    }
+  } catch (err) {
+    console.warn('Could not check whether the database role bypasses row-level security:', err.message);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+await warnIfRoleBypassesRls();

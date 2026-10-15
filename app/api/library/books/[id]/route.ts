@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { canManageLibrary } from '@/lib/permissions';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { z } from 'zod';
@@ -24,8 +24,9 @@ async function _GET(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const book = await prisma.book.findFirst({
+  const book = await db.book.findFirst({
     where: { id: params.id, schoolId: user.schoolId },
     include: {
       copies: {
@@ -51,10 +52,11 @@ async function _PATCH(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
 
-  const existing = await prisma.book.findFirst({
+  const existing = await db.book.findFirst({
     where: { id: params.id, schoolId: user.schoolId },
   });
   if (!existing) return apiNotFound('Book');
@@ -62,7 +64,7 @@ async function _PATCH(
   const parsed = await parseBody(req, UpdateBookSchema);
   if ('error' in parsed) return parsed.error;
 
-  const book = await prisma.book.update({
+  const book = await db.book.update({
     where: { id: params.id },
     data: {
       ...(parsed.data.isbn          !== undefined ? { isbn:          parsed.data.isbn          || null } : {}),

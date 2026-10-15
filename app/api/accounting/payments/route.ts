@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
+import { getScopedDb } from '@/lib/scoped-db';
+import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
+import { proofKeyBelongsTo } from '@/lib/proof-of-payment';
 import { logAudit } from '@/lib/audit';
 import { canRecordPayment } from '@/lib/permissions';
 import { CreatePaymentSchema } from '@/lib/validations/accounting';
@@ -12,6 +13,7 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const { searchParams } = req.nextUrl;
   const status    = searchParams.get('status')    || undefined;
@@ -19,7 +21,7 @@ async function _GET(req: NextRequest) {
   const currency  = searchParams.get('currency')  || undefined;
   const studentId = searchParams.get('studentId') || undefined;
 
-  const payments = await prisma.payment.findMany({
+  const payments = await db.payment.findMany({
     where: {
       schoolId: user.schoolId,
       ...(status    ? { status:    status    as never } : {}),
@@ -43,6 +45,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canRecordPayment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
@@ -50,7 +53,7 @@ async function _POST(req: NextRequest) {
   if ('error' in parsed) return parsed.error;
 
   const [student, school] = await Promise.all([
-    prisma.student.findUnique({
+    db.student.findUnique({
       where: { id: parsed.data.studentId },
       select: {
         id: true, schoolId: true, fullName: true,
@@ -58,17 +61,20 @@ async function _POST(req: NextRequest) {
         guardians: PRIMARY_GUARDIAN_INCLUDE,
       },
     }),
-    prisma.school.findUnique({
+    db.school.findUnique({
       where: { id: user.schoolId },
       select: { name: true },
     }),
   ]);
   if (!student || student.schoolId !== user.schoolId) return apiNotFound('Student');
+  if (parsed.data.popKey && !proofKeyBelongsTo(parsed.data.popKey, user.schoolId)) {
+    return apiError('That proof of payment was not uploaded for this school', 422);
+  }
 
   const isCash = parsed.data.method === 'CASH';
   const now    = new Date();
 
-  const payment = await prisma.$transaction(async (tx) => {
+  const payment = await db.$tx(async (tx) => {
     const p = await tx.payment.create({
       data: {
         schoolId:        user.schoolId,
@@ -78,7 +84,7 @@ async function _POST(req: NextRequest) {
         method:          parsed.data.method,
         reference:       parsed.data.reference  || null,
         feeLabel:        parsed.data.feeLabel,
-        popUrl:          parsed.data.popUrl     || null,
+        popKey:          parsed.data.popKey     || null,
         status:          isCash ? 'VERIFIED' : 'PENDING',
         recordedBy:      user.id,
         verifiedBy:      isCash ? user.id : null,

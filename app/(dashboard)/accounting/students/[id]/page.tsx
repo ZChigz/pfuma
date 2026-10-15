@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Permission } from '@/lib/permissions';
@@ -19,9 +19,10 @@ export default async function StudentDetailPage({
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const [student, terms] = await Promise.all([
-    prisma.student.findUnique({
+    db.student.findUnique({
       where: { id: params.id, schoolId: user.schoolId },
       include: {
         charges: { orderBy: { issuedAt: 'desc' }, include: { term: { select: { name: true } } } },
@@ -35,9 +36,10 @@ export default async function StudentDetailPage({
           include: { class: { select: { name: true } }, term: { select: { name: true, startDate: true } } },
           orderBy: { term: { startDate: 'desc' } },
         },
+        portalViews: { orderBy: { createdAt: 'desc' }, take: 10, select: { id: true, ip: true, createdAt: true } },
       },
     }),
-    listTerms(user.schoolId),
+    listTerms(user.schoolId, db),
   ]);
   if (!student) notFound();
   const primary = student.guardians.find((g) => g.isPrimary) ?? student.guardians[0];
@@ -74,7 +76,13 @@ export default async function StudentDetailPage({
     })),
   ].sort((a, b) => b.date.localeCompare(a.date));
 
-  const portalUrl    = `${process.env.NEXTAUTH_URL}/portal/${student.portalToken}`;
+  const portal = {
+    hasLink:   !!student.portalTokenHash,
+    createdAt: student.portalTokenCreatedAt?.toISOString() ?? null,
+    expiresAt: student.portalTokenExpiresAt?.toISOString() ?? null,
+    hasPin:    !!student.portalPinHash,
+    views:     student.portalViews.map((v) => ({ id: v.id, ip: v.ip, createdAt: v.createdAt.toISOString() })),
+  };
   const canApplyCharge = Permission.applyCharge.includes(user.role);
 
   return (
@@ -133,7 +141,7 @@ export default async function StudentDetailPage({
       <StudentDetailClient
         studentId={student.id}
         terms={terms.map((t) => ({ id: t.id, name: t.name, status: t.status }))}
-        portalUrl={portalUrl}
+        portal={portal}
         balanceUSD={cUSD - pUSD}
         balanceZiG={cZiG - pZiG}
         statement={statement}

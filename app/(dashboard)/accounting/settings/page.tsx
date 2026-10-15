@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { Permission } from '@/lib/permissions';
 import { formatDateTime } from '@/lib/utils';
@@ -10,16 +10,17 @@ export default async function SettingsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   if (!Permission.manageStudents.includes(user.role)) redirect('/accounting');
 
   const [current, history] = await Promise.all([
-    prisma.exchangeRate.findFirst({
+    db.exchangeRate.findFirst({
       where:   { schoolId: user.schoolId },
       orderBy: { createdAt: 'desc' },
       include: { user: { select: { fullName: true } } },
     }),
-    prisma.exchangeRate.findMany({
+    db.exchangeRate.findMany({
       where:   { schoolId: user.schoolId },
       orderBy: { createdAt: 'desc' },
       take:    10,

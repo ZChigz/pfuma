@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { formatUSD, formatZiG, formatDate } from '@/lib/utils';
 import { ExpenseForm } from '@/components/accounting/ExpenseForm';
@@ -9,6 +9,7 @@ export default async function BursarExpensesPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'BURSAR') redirect('/');
 
   const startOfToday = new Date();
@@ -16,7 +17,7 @@ export default async function BursarExpensesPage() {
   const startOfTomorrow = new Date(startOfToday);
   startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
 
-  const expenses = await prisma.expense.findMany({
+  const expenses = await db.expense.findMany({
     where: {
       schoolId: user.schoolId,
       recordedBy: user.id,

@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { AddStudentModal } from '@/components/admin/AddStudentModal';
@@ -19,15 +19,16 @@ export default async function AdminStudentsPage({ searchParams }: Props) {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageStudents(user.role); } catch { redirect('/accounting'); }
 
   const classId = searchParams.classId ?? '';
-  const openTerm = await getOpenTerm(user.schoolId);
+  const openTerm = await getOpenTerm(user.schoolId, db);
   const openTermId = openTerm?.id ?? '';
 
   const [students, classes] = await Promise.all([
-    prisma.student.findMany({
+    db.student.findMany({
       where: {
         schoolId: user.schoolId,
         // Filtering by class means "in that class this term" (Enrollment).
@@ -39,7 +40,7 @@ export default async function AdminStudentsPage({ searchParams }: Props) {
       },
       orderBy: [{ status: 'asc' }, { fullName: 'asc' }],
     }),
-    prisma.schoolClass.findMany({
+    db.schoolClass.findMany({
       where: { schoolId: user.schoolId, active: true },
       select: {
         id: true,

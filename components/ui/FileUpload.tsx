@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils';
 import { useUploadThing } from '@/lib/uploadthing';
 import { useCallback, useRef, useState } from 'react';
-import type { OurFileRouter } from '@/app/api/upload/route';
+import type { OurFileRouter } from '@/lib/upload-router';
 
 type Endpoint = keyof OurFileRouter;
 
@@ -38,11 +38,15 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
   const { startUpload } = useUploadThing(endpoint, {
     onUploadProgress: (p) => { setStatus('uploading'); setProgress(p); },
     onClientUploadComplete: (res) => {
-      const url  = res?.[0]?.url;
       const name = res?.[0]?.name;
+      // Private uploads (proof of payment) have no public URL: the server hands
+      // back a key, and the file is only ever opened through a signed link.
+      const isPrivate = endpoint === 'proofOfPayment';
+      const privateKey = (res?.[0]?.serverData as { key?: string } | undefined)?.key;
+      const url = isPrivate ? privateKey : res?.[0]?.url;
       if (url) {
-        setUploadedUrl(url);
-        setUploadedName(name ?? url.split('/').pop() ?? 'Uploaded file');
+        setUploadedUrl(isPrivate ? null : url);
+        setUploadedName(name ?? (isPrivate ? 'Uploaded file' : url.split('/').pop()) ?? 'Uploaded file');
         setStatus('done');
         onUpload(url);
       }
@@ -86,10 +90,10 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
       )}
 
       {/* Done state */}
-      {status === 'done' && uploadedUrl && (
+      {status === 'done' && (uploadedUrl || uploadedName) && (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-primary bg-success-bg px-3 py-2">
           <div className="flex min-w-0 items-center gap-2">
-            {uploadedUrl.match(/\.(jpe?g|png|webp|gif)$/i) ? (
+            {uploadedUrl?.match(/\.(jpe?g|png|webp|gif)$/i) ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={uploadedUrl}
@@ -101,14 +105,18 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
                 <path fillRule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z" clipRule="evenodd" />
               </svg>
             )}
-            <a
-              href={uploadedUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="truncate text-sm text-primary underline underline-offset-2"
-            >
-              {uploadedName ?? 'View file'}
-            </a>
+            {uploadedUrl ? (
+              <a
+                href={uploadedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="truncate text-sm text-primary underline underline-offset-2"
+              >
+                {uploadedName ?? 'View file'}
+              </a>
+            ) : (
+              <span className="truncate text-sm text-ink">{uploadedName ?? 'Uploaded file'}</span>
+            )}
           </div>
           <button
             type="button"

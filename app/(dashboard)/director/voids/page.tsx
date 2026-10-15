@@ -1,10 +1,11 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { cn, formatUSD, formatZiG, formatDate, formatDateTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { PaymentActionButton } from '@/components/accounting/PaymentActionButton';
+import { ProofLink } from '@/components/accounting/ProofLink';
 import { ExpenseVoidButton } from '@/components/accounting/ExpenseVoidButton';
 import type { SessionUser } from '@/types';
 
@@ -66,14 +67,15 @@ export default async function VoidsPage({
         </button>
       </form>
 
-      {tab === 'payments' ? <PaymentsTabContent schoolId={user.schoolId} q={q} /> : <ExpensesTabContent schoolId={user.schoolId} q={q} />}
+      {tab === 'payments' ? <PaymentsTabContent schoolId={user.schoolId} actorId={user.id} q={q} /> : <ExpensesTabContent schoolId={user.schoolId} actorId={user.id} q={q} />}
     </div>
   );
 }
 
 // ── Payments tab ─────────────────────────────────────────────────────────────
 
-async function PaymentsTabContent({ schoolId, q }: { schoolId: string; q: string }) {
+async function PaymentsTabContent({ schoolId, actorId, q }: { schoolId: string; actorId: string; q: string }) {
+  const db = getScopedDb(schoolId, actorId);
   const include = {
     student: { select: { fullName: true, currentClass: { select: { name: true } } } },
     voider:  { select: { fullName: true } },
@@ -89,12 +91,12 @@ async function PaymentsTabContent({ schoolId, q }: { schoolId: string; q: string
     : {};
 
   const [verified, voided] = await Promise.all([
-    prisma.payment.findMany({
+    db.payment.findMany({
       where: { schoolId, status: 'VERIFIED', ...searchFilter },
       include,
       orderBy: { recordedAt: 'desc' },
     }),
-    prisma.payment.findMany({
+    db.payment.findMany({
       where: { schoolId, status: 'VOIDED', ...searchFilter },
       include,
       orderBy: { recordedAt: 'desc' },
@@ -136,7 +138,10 @@ async function PaymentsTabContent({ schoolId, q }: { schoolId: string; q: string
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-muted">{formatDateTime(p.recordedAt)}</td>
                     <td className="px-4 py-3">
-                      <PaymentActionButton paymentId={p.id} action="void" />
+                      <div className="flex items-center gap-3">
+                        <PaymentActionButton paymentId={p.id} action="void" />
+                        {(p.popKey || p.popUrl) && <ProofLink paymentId={p.id} />}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -195,7 +200,8 @@ async function PaymentsTabContent({ schoolId, q }: { schoolId: string; q: string
 
 // ── Expenses tab ─────────────────────────────────────────────────────────────
 
-async function ExpensesTabContent({ schoolId, q }: { schoolId: string; q: string }) {
+async function ExpensesTabContent({ schoolId, actorId, q }: { schoolId: string; actorId: string; q: string }) {
+  const db = getScopedDb(schoolId, actorId);
   const include = {
     recorder: { select: { fullName: true } },
     voider:   { select: { fullName: true } },
@@ -211,12 +217,12 @@ async function ExpensesTabContent({ schoolId, q }: { schoolId: string; q: string
     : {};
 
   const [active, voided] = await Promise.all([
-    prisma.expense.findMany({
+    db.expense.findMany({
       where: { schoolId, status: 'ACTIVE', ...searchFilter },
       include,
       orderBy: { spentOn: 'desc' },
     }),
-    prisma.expense.findMany({
+    db.expense.findMany({
       where: { schoolId, status: 'VOIDED', ...searchFilter },
       include,
       orderBy: { spentOn: 'desc' },

@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { canManageLibrary } from '@/lib/permissions';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { z } from 'zod';
@@ -18,10 +18,11 @@ async function _PATCH(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
 
-  const existing = await prisma.bookCopy.findFirst({
+  const existing = await db.bookCopy.findFirst({
     where:   { id: params.id, schoolId: user.schoolId },
     include: { borrowings: { where: { returnDate: null }, select: { id: true } } },
   });
@@ -30,7 +31,7 @@ async function _PATCH(
   const parsed = await parseBody(req, UpdateCopySchema);
   if ('error' in parsed) return parsed.error;
 
-  const copy = await prisma.$transaction(async (tx) => {
+  const copy = await db.$tx(async (tx) => {
     const c = await tx.bookCopy.update({
       where: { id: params.id },
       data: {

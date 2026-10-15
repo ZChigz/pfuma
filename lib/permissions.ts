@@ -30,6 +30,10 @@ export const Permission = {
   manageAcademicCalendar: ['ADMIN', 'HEAD', 'DIRECTOR']                as UserRole[],
   manageEnrollment:   ['ADMIN', 'HEAD', 'DIRECTOR']                    as UserRole[],
   manageGuardians:    ['ADMIN', 'HEAD', 'DIRECTOR']                    as UserRole[],
+  // Parent-portal links and PINs.
+  managePortalLinks:  ['ADMIN', 'HEAD', 'BURSAR']                      as UserRole[],
+  // Reopen published results for a correction.
+  unpublishResults:   ['HEAD', 'DIRECTOR']                             as UserRole[],
 } satisfies Record<string, UserRole[]>;
 
 const forbidden = () =>
@@ -73,10 +77,94 @@ export async function canManageAcademicCalendar(role: UserRole): Promise<void> {
 export async function canManageEnrollment(role: UserRole): Promise<void> { await guard(role, Permission.manageEnrollment); }
 export async function canManageGuardians(role: UserRole): Promise<void> { await guard(role, Permission.manageGuardians); }
 
+export async function canManagePortalLinks(role: UserRole): Promise<void> { await guard(role, Permission.managePortalLinks); }
+export async function canUnpublishResults(role: UserRole): Promise<void> { await guard(role, Permission.unpublishResults); }
+
 export function canEnterMarksSync(role: UserRole): void {
   guardSync(role, Permission.enterMarks);
 }
 
 export function canManageGradeBoundaries(role: UserRole): void {
   guardSync(role, Permission.manageGradeBoundaries);
+}
+
+// ─── Separation of duties ────────────────────────────────────────────────────
+// Role checks above say WHO may do something; these say that the same person
+// may not do both halves of a money-handling step. Call them in the API route,
+// after loading the record and before changing it. Each throws a 403 Response
+// with a message that tells the user what to do, which withApi returns as-is.
+
+const conflict = (message: string) =>
+  new Response(JSON.stringify({ success: false, message }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+interface Actor { id: string }
+
+/** A payment cannot be verified by the person who recorded it. */
+export function assertCanVerifyPayment(actor: Actor, payment: { recordedBy: string }): void {
+  if (actor.id === payment.recordedBy) {
+    throw conflict('You recorded this payment, so someone else must verify it.');
+  }
+}
+
+/** An expense request cannot be approved or rejected by the person who raised it. */
+export function assertCanReviewExpenseRequest(
+  actor: Actor,
+  request: { requestedById: string },
+  verb: 'approve' | 'reject',
+): void {
+  if (actor.id === request.requestedById) {
+    throw conflict(`You raised this request, so someone else must ${verb} it.`);
+  }
+}
+
+/** The person who raised or approved an expense request cannot hand out the money. */
+export function assertCanDisburseExpenseRequest(
+  actor: Actor,
+  request: { requestedById: string; approvedById: string | null },
+): void {
+  if (actor.id === request.requestedById) {
+    throw conflict('You raised this request, so someone else must disburse it.');
+  }
+  if (request.approvedById && actor.id === request.approvedById) {
+    throw conflict('You approved this request, so someone else must disburse it.');
+  }
+}
+
+/**
+ * A charge adjustment or refund cannot be approved by the person who created it.
+ * (The system has no adjustment/refund workflow yet; call this from its approve route.)
+ */
+export function assertCanApproveAdjustment(actor: Actor, adjustment: { createdById: string }): void {
+  if (actor.id === adjustment.createdById) {
+    throw conflict('You created this adjustment, so someone else must approve it.');
+  }
+}
+
+export const VOID_REASON_MIN_LENGTH = 10;
+
+/**
+ * A payment or expense cannot be voided by the person who recorded it. The one
+ * exception is a school with a single active director: nobody else could ever
+ * void it, so the director may, but must give a reason (which the caller must
+ * write to the audit log). Returns true when that exception was used.
+ */
+export function assertCanVoid(
+  actor: Actor,
+  record: { recordedBy: string },
+  kind: 'payment' | 'expense',
+  opts: { activeDirectors: number; reason?: string | null },
+): boolean {
+  if (actor.id !== record.recordedBy) return false;
+  if (opts.activeDirectors > 1) {
+    throw conflict(`You recorded this ${kind}, so another director must void it.`);
+  }
+  if (!opts.reason || opts.reason.trim().length < VOID_REASON_MIN_LENGTH) {
+    throw conflict(
+      `You recorded this ${kind} and you are the school's only director. Give a reason of at least ${VOID_REASON_MIN_LENGTH} characters to void it.`,
+    );
+  }
+  return true;
 }

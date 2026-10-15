@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiNotFound, apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
 import { canManageGuardians } from '@/lib/permissions';
 import { AddGuardianSchema } from '@/lib/validations/academic';
@@ -12,8 +12,9 @@ async function _GET(_req: Request, { params }: Ctx) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const student = await prisma.student.findFirst({
+  const student = await db.student.findFirst({
     where: { id: params.id, schoolId: user.schoolId },
     select: {
       id: true,
@@ -32,16 +33,17 @@ async function _POST(req: Request, { params }: Ctx) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   try { await canManageGuardians(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
-  const student = await prisma.student.findFirst({ where: { id: params.id, schoolId: user.schoolId }, select: { id: true } });
+  const student = await db.student.findFirst({ where: { id: params.id, schoolId: user.schoolId }, select: { id: true } });
   if (!student) return apiNotFound('Student');
 
   const parsed = await parseBody(req, AddGuardianSchema);
   if ('error' in parsed) return parsed.error;
   const { relationship, relationshipNote, isPrimary, isFeePayer, canReceiveSms, ...details } = parsed.data;
 
-  const link = await prisma.$transaction(async (tx) => {
+  const link = await db.$tx(async (tx) => {
     const guardian = await findOrCreateGuardian(tx, user.schoolId, user.id, details);
     return linkGuardian(tx, user.schoolId, user.id, student.id, guardian.id, {
       relationship, relationshipNote, isPrimary, isFeePayer, canReceiveSms,

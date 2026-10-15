@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { parseBody, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { z } from 'zod';
@@ -17,8 +17,9 @@ async function _GET(_req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const rate = await prisma.exchangeRate.findFirst({
+  const rate = await db.exchangeRate.findFirst({
     where: { schoolId: user.schoolId },
     orderBy: { createdAt: 'desc' },
     include: { user: { select: { fullName: true } } },
@@ -35,6 +36,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   if (!ALLOWED_ROLES.includes(user.role as typeof ALLOWED_ROLES[number])) {
     return new Response(
@@ -46,7 +48,7 @@ async function _POST(req: NextRequest) {
   const parsed = await parseBody(req, SetExchangeRateSchema);
   if ('error' in parsed) return parsed.error;
 
-  const rate = await prisma.$transaction(async (tx) => {
+  const rate = await db.$tx(async (tx) => {
     const r = await tx.exchangeRate.create({
       data: {
         schoolId: user.schoolId,

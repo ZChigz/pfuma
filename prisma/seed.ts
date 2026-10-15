@@ -61,7 +61,7 @@ async function main() {
   }
 
   // ── 2. Users ─────────────────────────────────────────────────────────────────
-  const pw = await bcrypt.hash('School@2026', 10);
+  const pw = await bcrypt.hash('School@2026', 12);
 
   const [director, head, bursar, teacher, librarian, admin, teacher2] = await Promise.all([
     prisma.user.upsert({

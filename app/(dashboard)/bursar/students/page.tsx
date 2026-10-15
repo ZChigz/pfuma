@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { BursarStudentsTable } from '@/components/accounting/BursarStudentsTable';
 import { PRIMARY_GUARDIAN_INCLUDE } from '@/lib/students/guardians';
@@ -13,11 +13,12 @@ export default async function BursarStudentsPage({
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'BURSAR') redirect('/');
 
   const q = searchParams.q?.trim() ?? '';
 
-  const rows = await prisma.student.findMany({
+  const rows = await db.student.findMany({
     where: {
       schoolId: user.schoolId,
       status: 'ACTIVE',

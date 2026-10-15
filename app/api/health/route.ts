@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { pingDb } from '@/lib/health';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -7,7 +7,7 @@ export async function GET() {
   const timestamp = new Date().toISOString();
 
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await pingDb();
 
     return Response.json(
       { success: true,  data: { status: 'ok',       timestamp, dbConnected: true  } },

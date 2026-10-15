@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
@@ -74,24 +74,25 @@ export default async function AdminDashboard() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   if (!(['ADMIN', 'DIRECTOR'] as string[]).includes(user.role)) redirect('/');
   const { schoolId } = user;
 
   const [school, openTerm] = await Promise.all([
-    prisma.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } }),
-    getOpenTerm(schoolId),
+    db.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } }),
+    getOpenTerm(schoolId, db),
   ]);
   const term = openTerm?.name;
   const openTermId = openTerm?.id ?? '';
 
   const [totalUsers, totalStudents, totalSubjects, unplacedStudents, classes, recentUsers] = await Promise.all([
-    prisma.user.count({ where: { schoolId } }),
-    prisma.student.count({ where: { schoolId, status: 'ACTIVE' } }),
-    prisma.subject.count({ where: { schoolId } }),
+    db.user.count({ where: { schoolId } }),
+    db.student.count({ where: { schoolId, status: 'ACTIVE' } }),
+    db.subject.count({ where: { schoolId } }),
     // Active students with no class in the open term.
-    prisma.student.count({ where: { schoolId, status: 'ACTIVE', enrollments: { none: { termId: openTermId, status: 'ACTIVE' } } } }),
-    prisma.schoolClass.findMany({
+    db.student.count({ where: { schoolId, status: 'ACTIVE', enrollments: { none: { termId: openTermId, status: 'ACTIVE' } } } }),
+    db.schoolClass.findMany({
       where: { schoolId, active: true },
       orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }],
       select: {
@@ -102,7 +103,7 @@ export default async function AdminDashboard() {
         assignments: { where: { termId: openTermId }, select: { id: true }, take: 1 },
       },
     }),
-    prisma.user.findMany({
+    db.user.findMany({
       where: { schoolId },
       orderBy: { createdAt: 'desc' },
       take: 5,

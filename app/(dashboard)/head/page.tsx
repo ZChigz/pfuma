@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { StatCard } from '@/components/ui/StatCard';
 import Link from 'next/link';
@@ -11,24 +11,25 @@ export default async function HeadDashboard() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'HEAD') redirect('/');
 
   const { schoolId } = user;
 
-  const openTerm = await getOpenTerm(schoolId);
+  const openTerm = await getOpenTerm(schoolId, db);
   const currentTerm = openTerm?.name ?? '';
 
   const [pendingPaymentsCount, unpublishedAssignments, students] = await Promise.all([
-    prisma.payment.count({ where: { schoolId, status: 'PENDING' } }),
+    db.payment.count({ where: { schoolId, status: 'PENDING' } }),
     // Classes where marking has started but results are not yet published.
     openTerm
-      ? prisma.subjectAssignment.findMany({
+      ? db.subjectAssignment.findMany({
           where: { schoolId, termId: openTerm.id, marksStatus: { in: ['IN_PROGRESS', 'VERIFIED'] } },
           select: { classId: true },
           distinct: ['classId'],
         })
       : [],
-    prisma.student.findMany({
+    db.student.findMany({
       where: { schoolId, status: 'ACTIVE' },
       select: {
         id: true,

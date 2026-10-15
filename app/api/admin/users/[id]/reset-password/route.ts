@@ -1,27 +1,32 @@
-import bcrypt from 'bcryptjs';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canManageUsers } from '@/lib/permissions';
-import { generateTempPassword } from '@/lib/utils';
+import { generateTempPassword, hashPassword } from '@/lib/password';
 import type { SessionUser } from '@/types';
 
 async function _POST(_req: Request, ctx: { params: { id: string } }) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageUsers(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
-  const target = await prisma.user.findUnique({ where: { id: ctx.params.id } });
-  if (!target || target.schoolId !== user.schoolId) return apiNotFound('User');
+  const target = await db.user.findUnique({ where: { id: ctx.params.id } });
+  if (!target) return apiNotFound('User');
 
   const tempPassword = generateTempPassword();
-  const passwordHash = await bcrypt.hash(tempPassword, 10);
+  const passwordHash = await hashPassword(tempPassword);
 
-  await prisma.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: target.id }, data: { passwordHash } });
+  await db.$tx(async (tx) => {
+    // tokenVersion ends every session opened with the old password; the user
+    // must choose their own password at the next sign-in.
+    await tx.user.update({
+      where: { id: target.id },
+      data: { passwordHash, mustChangePassword: true, tokenVersion: { increment: 1 } },
+    });
     await logAudit(
       {
         schoolId:   user.schoolId,

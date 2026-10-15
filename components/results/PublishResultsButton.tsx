@@ -30,7 +30,7 @@ export function PublishResultsButton({ classId, className, termId, termName, dis
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.message ?? 'Publish failed'); return; }
-      toast.success(`Published ${data.data.published} results — top student: ${data.data.topStudent ?? '—'}, class average ${data.data.classAverage.toFixed(1)}%`);
+      toast.success(`Published ${data.data.published} results (${data.data.ranked} ranked) — top student: ${data.data.topStudent ?? '—'}, class average ${data.data.classAverage.toFixed(1)}%`);
       setConfirming(false);
       router.refresh();
     } finally {
@@ -67,8 +67,8 @@ export function PublishResultsButton({ classId, className, termId, termName, dis
           Are you sure you want to publish results for <strong>{className}</strong> — <strong>{termName}</strong>?
         </p>
         <p className="mt-2 text-sm text-muted">
-          This will calculate totals and class positions, lock all marks, and make results visible on student portals.
-          This action cannot be undone.
+          This will calculate percentages and class positions, lock all marks, and make results visible on student portals.
+          Positions use each student's average over the subjects they sat. If a mistake is found later, the Head or Director can reopen the results (with a reason) until the term is closed.
         </p>
       </Modal>
     </>

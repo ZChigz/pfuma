@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { classRosterIds } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
@@ -8,9 +8,10 @@ export default async function TeacherClassesPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'TEACHER') redirect('/');
 
-  const assignments = await prisma.subjectAssignment.findMany({
+  const assignments = await db.subjectAssignment.findMany({
     where: { schoolId: user.schoolId, teacherId: user.id },
     include: {
       subject: { select: { id: true, name: true, code: true } },
@@ -23,8 +24,8 @@ export default async function TeacherClassesPage() {
   const rows = await Promise.all(
     assignments
       .map(async (a) => {
-        const studentIds = await classRosterIds(a.classId, a.termId);
-        const marksEntered = await prisma.mark.count({
+        const studentIds = await classRosterIds(a.classId, a.termId, db);
+        const marksEntered = await db.mark.count({
           where: { schoolId: user.schoolId, subjectId: a.subjectId, termId: a.termId, studentId: { in: studentIds } },
         });
         const totalStudents = studentIds.length;

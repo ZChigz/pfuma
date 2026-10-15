@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiUnauthorized, apiError, apiNotFound, withApi } from '@/lib/api';
 import { renderToStream } from '@react-pdf/renderer';
 import { ReportCardDocument, type ReportCardData } from '@/components/results/ReportCardDocument';
@@ -18,13 +18,14 @@ async function _GET(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const termId = new URL(req.url).searchParams.get('termId');
   if (!termId) return apiError('termId query parameter is required', 400);
-  const termRow = await requireTerm(user.schoolId, termId);
+  const termRow = await requireTerm(user.schoolId, termId, db);
   const term = termRow.name;
 
-  const student = await prisma.student.findUnique({
+  const student = await db.student.findUnique({
     where: { id: params.studentId },
     include: {
       school:  { select: { name: true } },
@@ -43,7 +44,7 @@ async function _GET(
 
   const termResult = student.termResults[0] ?? null;
   // The class the student was in for that term, not their class today.
-  const enrollment = await enrollmentFor(student.id, termId);
+  const enrollment = await enrollmentFor(student.id, termId, db);
 
   const reportData: ReportCardData = {
     schoolName:    student.school.name,
@@ -51,6 +52,9 @@ async function _GET(
     grade:         enrollment?.class.name ?? '—',
     term,
     classPosition: termResult?.classPosition ?? null,
+    rankedOutOf:   termResult?.rankedOutOf ?? null,
+    subjectsSat:   termResult?.subjectsSat ?? null,
+    subjectsOffered: termResult?.subjectsOffered ?? null,
     percentage:    termResult?.percentage?.toNumber() ?? 0,
     headRemark:    termResult?.headRemark ?? null,
     marks: student.marks.map((m) => ({

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
 import { canManageEnrollment } from '@/lib/permissions';
 import { getOpenTerm, requireTerm } from '@/lib/academic/terms';
@@ -14,15 +14,16 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const { searchParams } = req.nextUrl;
   const classId = searchParams.get('classId') || undefined;
   const levelId = searchParams.get('levelId') || undefined;
   const termIdParam = searchParams.get('termId') || undefined;
-  const term = termIdParam ? await requireTerm(user.schoolId, termIdParam) : await getOpenTerm(user.schoolId);
+  const term = termIdParam ? await requireTerm(user.schoolId, termIdParam, db) : await getOpenTerm(user.schoolId, db);
   if (!term) return apiSuccess({ students: [], termName: null });
 
-  const enrollments = await prisma.enrollment.findMany({
+  const enrollments = await db.enrollment.findMany({
     where: {
       schoolId: user.schoolId,
       termId: term.id,
@@ -48,6 +49,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageEnrollment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
@@ -64,7 +66,7 @@ async function _POST(req: NextRequest) {
   const data = parsed.data;
 
   // Soft rules: the admin must have seen and accepted every warning.
-  const check = await checkRegistration(user.schoolId, data);
+  const check = await checkRegistration(user.schoolId, data, db);
   const acknowledged = new Set(body.data.acknowledgedWarnings);
   if (check.warnings.some((w) => !acknowledged.has(w.code))) {
     return NextResponse.json(

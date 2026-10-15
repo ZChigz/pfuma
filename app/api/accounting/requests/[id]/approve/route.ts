@@ -1,8 +1,8 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canApproveRequest } from '@/lib/permissions';
+import { assertCanReviewExpenseRequest, canApproveRequest } from '@/lib/permissions';
 import { REQUEST_INCLUDE, serializeExpenseRequest } from '@/lib/expense-requests';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
@@ -14,17 +14,20 @@ async function _POST(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canApproveRequest(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
-  const existing = await prisma.expenseRequest.findUnique({
+  const existing = await db.expenseRequest.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, requestedById: true },
   });
   if (!existing) return apiNotFound('Request');
   if (existing.status !== 'PENDING') return apiError('Only pending requests can be approved', 409);
+  // Separation of duties: the requester cannot approve their own request.
+  assertCanReviewExpenseRequest(user, existing, 'approve');
 
-  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await db.$tx(async (tx) => {
     const r = await tx.expenseRequest.update({
       where: { id: params.id },
       data: { status: 'APPROVED', approvedById: user.id, approvedAt: new Date() },

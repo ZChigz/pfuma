@@ -205,6 +205,17 @@ enum AuditAction {
   LINK_GUARDIAN
   UNLINK_GUARDIAN
   SET_PRIMARY_GUARDIAN
+  DATA_CREATE
+  DATA_UPDATE
+  DATA_DELETE
+  LOGIN_FAILED
+  LOGIN_LOCKED
+  LOGOUT_ALL_SESSIONS
+  CHANGE_PASSWORD
+  REGENERATE_PORTAL_LINK
+  SET_PORTAL_PIN
+  VOID_WITHOUT_SECOND_APPROVER
+  UNPUBLISH_RESULTS
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
@@ -259,6 +270,13 @@ model User {
   role         Role     @default(TEACHER)
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
+  // Bumped when the user is deactivated, changes role or school, resets their
+  // password, or an ADMIN logs everyone out. A JWT carrying an older value is
+  // rejected (lib/auth.ts).
+  tokenVersion       Int       @default(0)
+  // True for accounts created or reset by an admin until the user picks their own password.
+  mustChangePassword Boolean   @default(false)
+  passwordChangedAt  DateTime?
 
   school School @relation(fields: [schoolId], references: [id])
 
@@ -426,7 +444,16 @@ model Student {
   suburb                 String?
   city                   String?
   address                String?
-  portalToken            String        @unique @default(cuid())
+  // Legacy plaintext link token. Emptied by migration 20261017000100 and no
+  // longer read or written; dropped by the contract migration.
+  portalToken            String?       @unique
+  // SHA-256 (hex) of the parent-portal link token. The token itself is shown
+  // once when generated and never stored.
+  portalTokenHash        String?       @unique
+  portalTokenCreatedAt   DateTime?
+  portalTokenExpiresAt   DateTime?
+  // bcrypt hash of the optional 4-digit portal PIN.
+  portalPinHash          String?
   createdAt              DateTime      @default(now())
   // Legacy columns "grade", "classId", "parentName", "parentPhone", "active",
   // "studentNumber", "enrollmentYear", "guardianRelationship" and
@@ -440,6 +467,7 @@ model Student {
   payments     Payment[]
   marks        Mark[]
   termResults  TermResult[]
+  portalViews  PortalAccessLog[]
 
   @@unique([schoolId, admissionNumber])
   @@unique([schoolId, birthCertificateNumber])
@@ -536,7 +564,10 @@ model Payment {
   reference        String?
   feeLabel         String
   status           PaymentStatus @default(PENDING)
-  popUrl           String?
+  popUrl           String? // legacy public URL of an old proof of payment
+  // Private proof-of-payment upload (UploadThing custom id "pop:<schoolId>:…");
+  // served only through short-lived signed URLs.
+  popKey           String?
   recordedBy       String
   verifiedBy       String?
   voidedBy         String?
@@ -646,12 +677,32 @@ model AuditLog {
   entityType String
   entityId   String
   detail     String?
+  // Row values before and after a DATA_CREATE / DATA_UPDATE / DATA_DELETE,
+  // written by the database trigger "audit_row_change" (secrets removed).
+  before     Json?
+  after      Json?
   createdAt  DateTime    @default(now())
 
   school School @relation(fields: [schoolId], references: [id])
   actor  User   @relation(fields: [actorId], references: [id])
 
   @@index([schoolId])
+  @@index([schoolId, entityType, entityId])
+}
+
+// One row per view of a student's parent-portal page.
+model PortalAccessLog {
+  id        String   @id @default(cuid())
+  schoolId  String
+  studentId String
+  ip        String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([schoolId])
+  @@index([studentId, createdAt])
 }
 
 // ─── Results ─────────────────────────────────────────────────────────────────
@@ -732,6 +783,12 @@ model TermResult {
   totalMarks    Decimal   @db.Decimal(14, 2)
   percentage    Decimal   @db.Decimal(14, 2)
   classPosition Int?
+  // Fair ranking (Part 4): how many of the class's subjects the student sat,
+  // how many were offered, and how many students were ranked in the class.
+  // classPosition is null when the student sat too few subjects to be ranked.
+  subjectsSat     Int?
+  subjectsOffered Int?
+  rankedOutOf     Int?
   headRemark    String?
   published     Boolean   @default(false)
   publishedAt   DateTime?

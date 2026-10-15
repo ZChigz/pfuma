@@ -1,6 +1,6 @@
 // Server-only helpers for admission (form + CSV import) and classes.
 import { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { classDisplayName } from '@/lib/academic/rules';
@@ -14,14 +14,13 @@ import {
   type RegistrationWarning,
 } from '@/lib/students/registration';
 
-type Db = Prisma.TransactionClient | typeof prisma;
-type Tx = Prisma.TransactionClient;
+type Tx = Db;
 
 export const dobToDate = dateOnly;
 
 // ─── Classes ─────────────────────────────────────────────────────────────────
 
-export async function levelByName(schoolId: string, levelName: string, db: Db = prisma) {
+export async function levelByName(schoolId: string, levelName: string, db: Db) {
   const level = await db.level.findUnique({ where: { schoolId_name: { schoolId, name: levelName } } });
   if (level) return level;
   const levels = await ensureLevels(schoolId, db);
@@ -30,7 +29,7 @@ export async function levelByName(schoolId: string, levelName: string, db: Db = 
   return found;
 }
 
-export async function findClass(schoolId: string, levelName: string, stream: string, db: Db = prisma) {
+export async function findClass(schoolId: string, levelName: string, stream: string, db: Db) {
   return db.schoolClass.findFirst({
     where: { schoolId, level: { name: levelName }, stream: { equals: stream, mode: 'insensitive' } },
     include: { level: true },
@@ -58,14 +57,14 @@ export async function findOrCreateClass(tx: Tx, schoolId: string, actorId: strin
 }
 
 // Students currently in a class = ACTIVE enrollments in the open term.
-export async function classOccupancy(classId: string | null | undefined, termId: string | null | undefined, db: Db = prisma) {
+export async function classOccupancy(classId: string | null | undefined, termId: string | null | undefined, db: Db) {
   if (!classId || !termId) return 0;
   return db.enrollment.count({ where: { classId, termId, status: 'ACTIVE' } });
 }
 
 // ─── Duplicates & warnings ───────────────────────────────────────────────────
 
-export async function findDuplicate(schoolId: string, firstName: string, surname: string, dateOfBirth: string, db: Db = prisma) {
+export async function findDuplicate(schoolId: string, firstName: string, surname: string, dateOfBirth: string, db: Db) {
   return db.student.findFirst({
     where: {
       schoolId,
@@ -95,14 +94,14 @@ export interface RegistrationCheck {
   warnings: RegistrationWarning[];
 }
 
-export async function checkRegistration(schoolId: string, data: AdmissionData): Promise<RegistrationCheck> {
+export async function checkRegistration(schoolId: string, data: AdmissionData, db: Db): Promise<RegistrationCheck> {
   const [schoolClass, school, duplicate, term] = await Promise.all([
-    findClass(schoolId, data.level, data.stream),
-    prisma.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } }),
-    findDuplicate(schoolId, data.firstName, data.surname, data.dateOfBirth),
-    getOpenTerm(schoolId),
+    findClass(schoolId, data.level, data.stream, db),
+    db.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } }),
+    findDuplicate(schoolId, data.firstName, data.surname, data.dateOfBirth, db),
+    getOpenTerm(schoolId, db),
   ]);
-  const classCount = await classOccupancy(schoolClass?.id, term?.id);
+  const classCount = await classOccupancy(schoolClass?.id, term?.id, db);
   const capacity = schoolClass?.capacity ?? school?.maxClassSize ?? DEFAULT_MAX_CLASS_SIZE;
   const name = schoolClass?.name ?? data.className;
 
@@ -192,7 +191,6 @@ export async function admitStudent(
       address:                data.address,
       status:                 'ACTIVE',
       currentClassId:         opts.classId,
-      portalToken:            crypto.randomUUID(),
     },
   });
 
@@ -235,7 +233,7 @@ export async function admitStudent(
 // Admits one student from the form: class found or created, number generated.
 export async function admitFromForm(schoolId: string, actorId: string, data: AdmissionData, auditNote?: string) {
   return withAdmissionNumberRetry(() =>
-    prisma.$transaction(async (tx) => {
+    getScopedDb(schoolId, actorId).$tx(async (tx) => {
       const term = await requireOpenTerm(schoolId, tx);
       const schoolClass = await findOrCreateClass(tx, schoolId, actorId, data.level, data.stream);
       const year = Number(data.admissionDate.slice(0, 4));

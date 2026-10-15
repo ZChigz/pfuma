@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/Badge';
@@ -12,16 +12,17 @@ export default async function AdminClassesPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageClasses(user.role); } catch { redirect('/accounting'); }
 
   const [openTerm, levels, school] = await Promise.all([
-    getOpenTerm(user.schoolId),
-    prisma.level.findMany({ where: { schoolId: user.schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
-    prisma.school.findUnique({ where: { id: user.schoolId }, select: { maxClassSize: true } }),
+    getOpenTerm(user.schoolId, db),
+    db.level.findMany({ where: { schoolId: user.schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
+    db.school.findUnique({ where: { id: user.schoolId }, select: { maxClassSize: true } }),
   ]);
   const [classes, teachers] = await Promise.all([
-    prisma.schoolClass.findMany({
+    db.schoolClass.findMany({
       where: { schoolId: user.schoolId },
       include: {
         level: { select: { name: true } },
@@ -31,7 +32,7 @@ export default async function AdminClassesPage() {
       },
       orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }],
     }),
-    prisma.user.findMany({
+    db.user.findMany({
       where: { schoolId: user.schoolId, role: 'TEACHER', active: true },
       select: { id: true, fullName: true },
       orderBy: { fullName: 'asc' },

@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { canUnverifyMarks } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
@@ -12,6 +12,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canUnverifyMarks(user.role); }
   catch (e) { if (e instanceof Response) return e; throw e; }
@@ -20,15 +21,15 @@ async function _POST(req: NextRequest) {
   if ('error' in parsed) return parsed.error;
   const { assignmentId } = parsed.data;
 
-  const assignment = await prisma.subjectAssignment.findFirst({
+  const assignment = await db.subjectAssignment.findFirst({
     where: { id: assignmentId, schoolId: user.schoolId },
     include: { subject: { select: { name: true } }, class: { select: { name: true } }, term: { select: { name: true } } },
   });
   if (!assignment) return apiNotFound('Assignment');
 
-  const studentIds = await classRosterIds(assignment.classId, assignment.termId);
+  const studentIds = await classRosterIds(assignment.classId, assignment.termId, db);
 
-  await prisma.$transaction(async (tx) => {
+  await db.$tx(async (tx) => {
     await tx.mark.updateMany({
       where: {
         schoolId:  user.schoolId,

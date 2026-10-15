@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { formatUSD, formatZiG } from '@/lib/utils';
 import { listTerms } from '@/lib/academic/terms';
@@ -11,21 +11,22 @@ export default async function HeadFeesPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'HEAD') redirect('/');
 
   const [feeStructures, classes, levels, termRows] = await Promise.all([
-    prisma.feeStructure.findMany({
+    db.feeStructure.findMany({
       where: { schoolId: user.schoolId },
       include: { level: { select: { name: true, order: true } }, term: { select: { name: true } } },
       orderBy: [{ term: { startDate: 'desc' } }, { level: { order: 'asc' } }, { label: 'asc' }],
     }),
-    prisma.schoolClass.findMany({
+    db.schoolClass.findMany({
       where: { schoolId: user.schoolId, active: true },
       select: { id: true, name: true, levelId: true },
       orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }],
     }),
-    prisma.level.findMany({ where: { schoolId: user.schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
-    listTerms(user.schoolId),
+    db.level.findMany({ where: { schoolId: user.schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
+    listTerms(user.schoolId, db),
   ]);
   const terms = termRows.map((t) => ({ id: t.id, name: t.name, status: t.status }));
 

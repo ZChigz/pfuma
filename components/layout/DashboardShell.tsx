@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { getOpenTerm } from '@/lib/academic/terms';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
@@ -8,10 +8,11 @@ import type { ReactNode } from 'react';
 export async function DashboardShell({ children }: { children: ReactNode }) {
   const session = await auth();
   const schoolId = session?.user?.schoolId;
-  const [school, openTerm] = schoolId
+  const db = schoolId ? getScopedDb(schoolId, session?.user?.id) : null;
+  const [school, openTerm] = schoolId && db
     ? await Promise.all([
-        prisma.school.findUnique({ where: { id: schoolId }, select: { name: true } }),
-        getOpenTerm(schoolId),
+        db.school.findUnique({ where: { id: schoolId }, select: { name: true } }),
+        getOpenTerm(schoolId, db),
       ])
     : [null, null];
   const currentTerm = openTerm?.name;
