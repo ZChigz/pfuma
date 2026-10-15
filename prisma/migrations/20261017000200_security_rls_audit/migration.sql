@@ -196,7 +196,7 @@ CREATE TRIGGER "audit_User" AFTER INSERT OR UPDATE OR DELETE ON "User"
 CREATE OR REPLACE FUNCTION audit_log_immutable() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-  RAISE EXCEPTION 'AuditLog rows cannot be changed or deleted';
+  RAISE EXCEPTION 'This history cannot be changed or deleted';
 END;
 $$;
 CREATE TRIGGER "audit_log_no_change" BEFORE UPDATE OR DELETE ON "AuditLog"

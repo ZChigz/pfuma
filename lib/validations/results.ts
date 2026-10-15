@@ -28,6 +28,8 @@ export const EnterMarkSchema = z.object({
   classId:   z.string().min(1),
   termId:    z.string().min(1),
   rawMark:   z.number({ error: 'Mark must be a number' }).min(0),
+  // Required when changing a mark that has been verified before.
+  reason:    z.string().trim().max(300).optional(),
 });
 
 export const PublishResultsSchema = z.object({
@@ -60,6 +62,4 @@ export const UnpublishResultsSchema = z.object({
   classId: z.string().min(1, 'Class is required'),
   termId:  z.string().min(1, 'Term is required'),
   reason:  z.string().trim().min(10, 'Give a reason of at least 10 characters'),
-  // true: also unlock the marks for teachers to edit; false: marks stay locked (verified).
-  unlockMarks: z.boolean().optional().default(false),
 });

@@ -216,6 +216,7 @@ const ATTACKS: Attack[] = [
   { name: "publish B's class", file: 'results/publish', method: 'POST', as: 'HEAD', body: () => ({ classId: b().classId, termId: a().termId }), expect: 404 },
   { name: "unpublish B's class", file: 'results/unpublish', method: 'POST', as: 'HEAD', body: () => ({ classId: b().classId, termId: a().termId, reason: 'Wrong marks entered' }), expect: 404 },
   { name: "report card of a B student", file: 'results/reports/[studentId]', method: 'GET', as: 'HEAD', params: () => ({ studentId: b().studentId }), url: () => `?termId=${a().termId}`, expect: 404 },
+  { name: 'reopen a B term', file: 'director/terms/[id]/reopen', method: 'POST', as: 'DIRECTOR', params: () => ({ id: b().termId }), body: () => ({ reason: 'Trying to reach another school' }), expect: 404 },
   // Also bump every A user: must not touch B's.
   { name: 'log out all sessions (own school only)', file: 'admin/users/logout-all', method: 'POST', as: 'ADMIN', expect: 'ok' },
 ];

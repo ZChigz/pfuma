@@ -131,7 +131,7 @@ export default async function HeadResultsPage({
                 ✓ Published
               </span>
             )}
-            {isPublished && term?.status !== 'CLOSED' && (
+            {isPublished && term?.status !== 'CLOSED' && user.role === 'HEAD' && (
               <ReopenResultsButton classId={selectedClass.id} className={selectedClass.name} termId={selectedTermId} termName={selectedTerm} />
             )}
             {isPublished && <ExportResultsButton classId={selectedClass.id} className={selectedClass.name} termId={selectedTermId} termName={selectedTerm} />}

@@ -216,6 +216,8 @@ enum AuditAction {
   SET_PORTAL_PIN
   VOID_WITHOUT_SECOND_APPROVER
   UNPUBLISH_RESULTS
+  REOPEN_TERM
+  CHANGE_MARK
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
@@ -247,6 +249,7 @@ model School {
   subjects           Subject[]
   subjectAssignments SubjectAssignment[]
   marks              Mark[]
+  markChanges        MarkChange[]
   termResults        TermResult[]
   gradeBoundaries    GradeBoundary[]
   assetCategories    AssetCategory[]
@@ -293,6 +296,7 @@ model User {
   subjectAssignments  SubjectAssignment[]
   verifiedAssignments SubjectAssignment[] @relation("VerifiedAssignments")
   marks               Mark[]
+  markChanges         MarkChange[]
   assetMaintenances   AssetMaintenance[]
   assetDisposals      AssetDisposal[]
   libraryMember       LibraryMember?
@@ -760,6 +764,9 @@ model Mark {
   letterGrade String?
   status      MarkStatus @default(DRAFT)
   verifiedAt  DateTime?
+  // Set the first time the mark is verified and never cleared: any change after
+  // this moment needs a reason and is recorded in MarkChange.
+  firstVerifiedAt DateTime?
   enteredBy   String
   enteredAt   DateTime   @default(now())
 
@@ -768,11 +775,31 @@ model Mark {
   subject Subject      @relation(fields: [subjectId], references: [id])
   enterer User         @relation(fields: [enteredBy], references: [id])
   term    AcademicTerm @relation(fields: [termId], references: [id])
+  changes MarkChange[]
 
   @@unique([studentId, subjectId, termId])
   @@index([termId])
   @@index([schoolId])
   @@index([schoolId, studentId])
+}
+
+// History of every change to a mark after it was first verified.
+model MarkChange {
+  id          String   @id @default(cuid())
+  schoolId    String
+  markId      String
+  oldRawMark  Decimal  @db.Decimal(14, 2)
+  newRawMark  Decimal  @db.Decimal(14, 2)
+  changedById String
+  reason      String
+  changedAt   DateTime @default(now())
+
+  school    School @relation(fields: [schoolId], references: [id])
+  mark      Mark   @relation(fields: [markId], references: [id])
+  changedBy User   @relation(fields: [changedById], references: [id])
+
+  @@index([schoolId])
+  @@index([markId])
 }
 
 model TermResult {

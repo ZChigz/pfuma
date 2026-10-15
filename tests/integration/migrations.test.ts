@@ -48,6 +48,7 @@ beforeAll(async () => {
     '20261017000000_security_expand',
     '20261017000100_security_backfill',
     '20261017000200_security_rls_audit',
+    '20261018000000_results_corrections',
   ]) await applyMigration(pg, m);
 }, 300_000);
 

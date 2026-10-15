@@ -28,9 +28,9 @@ export interface TestDb {
 }
 
 /** Applies migrations up to (and excluding) `stopBefore`, if given. */
-export async function createPg(stopBefore?: string): Promise<PGlite> {
+export async function createPg(stopBefore?: string, opts: { includeData?: boolean } = {}): Promise<PGlite> {
   const pg = await PGlite.create();
-  const dirs = fs.readdirSync(MIGRATIONS).filter((d) => /^\d/.test(d)).sort().filter((d) => !SKIP.test(d));
+  const dirs = fs.readdirSync(MIGRATIONS).filter((d) => /^\d/.test(d)).sort().filter((d) => opts.includeData || !SKIP.test(d));
   for (const dir of dirs) {
     if (stopBefore && dir >= stopBefore) break;
     await pg.exec(fs.readFileSync(path.join(MIGRATIONS, dir, 'migration.sql'), 'utf8'));

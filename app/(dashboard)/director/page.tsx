@@ -9,6 +9,7 @@ import { CollectionTrendChart } from '@/components/accounting/CollectionTrendCha
 import { RequestReviewModal } from '@/components/accounting/RequestReviewModal';
 import { REQUEST_INCLUDE, REQUEST_TYPE_LABELS, serializeExpenseRequest } from '@/lib/expense-requests';
 import { Badge } from '@/components/ui/Badge';
+import { ReopenTermButton } from '@/components/results/ReopenTermButton';
 import type { SessionUser } from '@/types';
 import type { Currency } from '@prisma/client';
 
@@ -164,6 +165,9 @@ export default async function DirectorDashboard({
     .filter((r) => r.requestedAt <= twoDaysAgo)
     .map(serializeExpenseRequest);
 
+  const lastClosedTerm = await db.academicTerm.findFirst({ where: { schoolId, status: 'CLOSED' }, orderBy: { startDate: 'desc' } });
+  const hasOpenTerm = !!(await db.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } }));
+
   const fmt = (n: number) => (currency === 'USD' ? formatUSD(n) : formatZiG(n));
 
   return (
@@ -181,6 +185,13 @@ export default async function DirectorDashboard({
           Void an entry
         </Link>
       </div>
+
+      {lastClosedTerm && !hasOpenTerm && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
+          <p className="text-sm text-ink">{lastClosedTerm.name} is closed and its results are locked.</p>
+          <ReopenTermButton termId={lastClosedTerm.id} termName={lastClosedTerm.name} />
+        </div>
+      )}
 
       {/* ── Net position cards ───────────────────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2">

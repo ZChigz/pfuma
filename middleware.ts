@@ -39,7 +39,7 @@ const ROLE_ALLOWED: Record<UserRole, (pathname: string) => boolean> = {
   ADMIN: (p) => startsWithAny(p, ['/admin', '/api/admin', '/api/results/grade-boundaries', ...PORTAL_ADMIN_API]),
 
   DIRECTOR: (p) =>
-    startsWithAny(p, ['/director', '/accounting/dashboard', '/api/accounting/dashboard', '/api/accounting/requests']) ||
+    startsWithAny(p, ['/director', '/api/director', '/accounting/dashboard', '/api/accounting/dashboard', '/api/accounting/requests']) ||
     VOID_API_PATTERN.test(p) ||
     PROOF_API_PATTERN.test(p),
 

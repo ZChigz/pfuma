@@ -78,7 +78,7 @@ async function _POST(req: NextRequest) {
 
   const parsed = await parseBody(req, EnterMarkSchema);
   if ('error' in parsed) return parsed.error;
-  const { studentId, subjectId, classId, termId, rawMark } = parsed.data;
+  const { studentId, subjectId, classId, termId, rawMark, reason } = parsed.data;
 
   const subject = await db.subject.findFirst({ where: { id: subjectId, schoolId: user.schoolId } });
   if (!subject) return apiNotFound('Subject');
@@ -111,6 +111,14 @@ async function _POST(req: NextRequest) {
     return apiError('Marks are locked. Ask the Head to unlock them.', 403);
   }
 
+  // A mark that has been verified once may only change with a reason, which is
+  // kept in MarkChange together with the old and new value.
+  const previous = await db.mark.findUnique({ where: { studentId_subjectId_termId: { studentId, subjectId, termId: term.id } } });
+  const isChange = !!previous?.firstVerifiedAt && previous.rawMark.toNumber() !== rawMark;
+  if (isChange && (!reason || reason.length < 5)) {
+    return apiError('A reason is required to change a mark after it was verified', 422);
+  }
+
   const percentage = subject.maxMark > 0 ? (rawMark / subject.maxMark) * 100 : 0;
   const boundaries = await db.gradeBoundary.findMany({ where: { schoolId: user.schoolId } });
   const letterGrade = getLetterGrade(
@@ -124,6 +132,23 @@ async function _POST(req: NextRequest) {
       update: { rawMark, percentage, letterGrade, status: 'DRAFT', enteredBy: user.id, enteredAt: new Date() },
       create: { schoolId: user.schoolId, studentId, subjectId, termId: term.id, rawMark, percentage, letterGrade, status: 'DRAFT', enteredBy: user.id },
     });
+
+    if (isChange && previous) {
+      await tx.markChange.create({
+        data: { markId: m.id, oldRawMark: previous.rawMark, newRawMark: rawMark, changedById: user.id, reason: reason! } as never,
+      });
+      await logAudit(
+        {
+          schoolId:   user.schoolId,
+          actorId:    user.id,
+          action:     'CHANGE_MARK',
+          entityType: 'Mark',
+          entityId:   m.id,
+          detail:     `${previous.rawMark.toNumber()} → ${rawMark} for ${student.fullName} in ${subject.name} (${term.name}). Reason: ${reason}`,
+        },
+        tx,
+      );
+    }
 
     if (assignment.marksStatus === 'NOT_STARTED') {
       await tx.subjectAssignment.update({

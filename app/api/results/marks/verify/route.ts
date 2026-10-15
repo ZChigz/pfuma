@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
-import { apiSuccess, apiUnauthorized, apiForbidden, apiNotFound, parseBody, withApi } from '@/lib/api';
+import { apiError, apiSuccess, apiUnauthorized, apiForbidden, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { canVerifyMarks } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { VerifyMarksSchema } from '@/lib/validations/results';
@@ -23,9 +23,11 @@ async function _POST(req: NextRequest) {
 
   const assignment = await db.subjectAssignment.findFirst({
     where: { id: assignmentId, schoolId: user.schoolId },
-    include: { subject: { select: { name: true } }, class: { select: { name: true } }, term: { select: { name: true } } },
+    include: { subject: { select: { name: true } }, class: { select: { name: true } }, term: { select: { name: true, status: true } } },
   });
   if (!assignment) return apiNotFound('Assignment');
+  if (assignment.term.status === 'CLOSED') return apiError(`${assignment.term.name} is closed, so its results are locked. The Director can reopen the term.`, 409);
+
 
   if (user.role === 'TEACHER' && assignment.teacherId !== user.id) {
     return apiForbidden();
@@ -61,6 +63,11 @@ async function _POST(req: NextRequest) {
     await tx.mark.updateMany({
       where: { schoolId: user.schoolId, subjectId: assignment.subjectId, termId: assignment.termId, status: 'DRAFT', studentId: { in: studentIds } },
       data: { status: 'VERIFIED', verifiedAt: now },
+    });
+    // Remember that these marks have been verified once; later changes need a reason.
+    await tx.mark.updateMany({
+      where: { schoolId: user.schoolId, subjectId: assignment.subjectId, termId: assignment.termId, status: 'VERIFIED', firstVerifiedAt: null, studentId: { in: studentIds } },
+      data: { firstVerifiedAt: now },
     });
 
     await tx.subjectAssignment.update({

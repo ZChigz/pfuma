@@ -101,12 +101,22 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
     setMarks((prev) => ({ ...prev, [studentId]: { ...prev[studentId], status: 'saving' } }));
 
     try {
-      const res = await fetch('/api/results/marks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, subjectId, classId, termId, rawMark: rawNum }),
-      });
-      const body = await res.json();
+      const send = (reason?: string) =>
+        fetch('/api/results/marks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studentId, subjectId, classId, termId, rawMark: rawNum, ...(reason ? { reason } : {}) }),
+        });
+      let res = await send();
+      let body = await res.json();
+      // A mark that was verified before needs a reason to change.
+      if (res.status === 422 && /reason is required/i.test(body.message ?? '')) {
+        const reason = window.prompt('This mark was verified before. Why is it being changed?');
+        if (reason && reason.trim().length >= 5) {
+          res = await send(reason.trim());
+          body = await res.json();
+        }
+      }
       if (!res.ok || !body.success) {
         setMarks((prev) => ({
           ...prev,

@@ -55,7 +55,7 @@ beforeAll(async () => {
     await prisma.enrollment.create({ data: { schoolId: A.schoolId, studentId: st.id, classId, termId: A.termId, startDate: new Date('2026-01-10') } });
     for (const [subj, raw] of Object.entries(marks)) {
       await prisma.mark.create({
-        data: { schoolId: A.schoolId, studentId: st.id, subjectId: subjects[subj], termId: A.termId, rawMark: raw, percentage: raw, status: 'VERIFIED', enteredBy: A.users.TEACHER.id },
+        data: { schoolId: A.schoolId, studentId: st.id, subjectId: subjects[subj], termId: A.termId, rawMark: raw, percentage: raw, status: 'VERIFIED', firstVerifiedAt: new Date(), enteredBy: A.users.TEACHER.id },
       });
     }
   }
@@ -127,70 +127,126 @@ describe('publishing ranks fairly', () => {
   });
 });
 
-describe('correcting published results', () => {
-  it('only the Head or Director may reopen, and a reason is required', async () => {
+describe('correcting published results (4.1)', () => {
+  it('only the HEAD may unpublish, and a reason is required', async () => {
     expect((await reopen(A.users.TEACHER)).status).toBe(403);
+    expect((await reopen(A.users.DIRECTOR)).status).toBe(403);
     expect((await reopen(A.users.BURSAR)).status).toBe(403);
     expect((await reopen(A.users.HEAD, { reason: 'oops' })).status).toBe(422);
     expect((await reopen(A.users.HEAD, { reason: '' })).status).toBe(422);
   });
 
-  it('hides the results from parents, unlocks the marks and is audited with the reason', async () => {
-    const r = await reopen(A.users.DIRECTOR, { unlockMarks: true });
+  it('unpublishes the class: off the portal, every subject back to VERIFIED, audited with the reason', async () => {
+    const r = await reopen(A.users.HEAD);
     expect(r.status).toBe(200);
     expect((await result('missedExams')).published).toBe(false);
     expect((await result('missedExams')).publishedAt).toBeNull();
     const assignments = await prisma.subjectAssignment.findMany({ where: { classId, termId: A.termId } });
-    expect(assignments.every((x) => x.marksStatus === 'IN_PROGRESS')).toBe(true);
+    expect(assignments.every((x) => x.marksStatus === 'VERIFIED')).toBe(true);
     const marks = await prisma.mark.findMany({ where: { termId: A.termId, subjectId: { in: Object.values(subjects) } } });
-    expect(marks.every((m) => m.status === 'DRAFT')).toBe(true);
+    expect(marks.every((m) => m.status === 'VERIFIED')).toBe(true);
     const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: 'UNPUBLISH_RESULTS' }, orderBy: { createdAt: 'desc' } });
-    expect(audit.actorId).toBe(A.users.DIRECTOR.id);
+    expect(audit.actorId).toBe(A.users.HEAD.id);
     expect(audit.detail).toContain('Maths marks were entered under wrong names');
   });
 
-  it('cannot reopen what is not published', async () => {
+  it('cannot unpublish what is not published', async () => {
     expect((await reopen()).status).toBe(409);
   });
 
+  it('marks stay locked until the Head unlocks the one subject to fix', async () => {
+    const math = await prisma.subjectAssignment.findFirstOrThrow({ where: { classId, subjectId: subjects.math, termId: A.termId } });
+    const edit = await call('results/marks', 'POST', {
+      as: A.users.TEACHER, body: { studentId: students.onePaper, subjectId: subjects.math, classId, termId: A.termId, rawMark: 90, reason: 'Recount' },
+    });
+    expect(edit.status).toBe(403);
+    expect((await call('results/marks/unverify', 'POST', { as: A.users.TEACHER, body: { assignmentId: math.id } })).status).toBe(403);
+  });
+
+  it('a change to a verified mark needs a reason, and is recorded in MarkChange', async () => {
+    const math = await prisma.subjectAssignment.findFirstOrThrow({ where: { classId, subjectId: subjects.math, termId: A.termId } });
+    const sci = await prisma.subjectAssignment.findFirstOrThrow({ where: { classId, subjectId: subjects.sci, termId: A.termId } });
+    expect((await call('results/marks/unverify', 'POST', { as: A.users.HEAD, body: { assignmentId: math.id } })).status).toBe(200);
+    expect((await prisma.subjectAssignment.findUniqueOrThrow({ where: { id: sci.id } })).marksStatus).toBe('VERIFIED'); // others untouched
+
+    const body = { studentId: students.missedExams, subjectId: subjects.math, classId, termId: A.termId, rawMark: 90 };
+    const noReason = await call('results/marks', 'POST', { as: A.users.TEACHER, body });
+    expect(noReason.status).toBe(422);
+    expect(noReason.json.message).toMatch(/reason is required/);
+    expect((await call('results/marks', 'POST', { as: A.users.TEACHER, body: { ...body, reason: 'x' } })).status).toBe(422);
+    expect(await prisma.markChange.count()).toBe(0);
+
+    // A mark that was never verified needs no reason.
+    const fresh = await call('results/marks', 'POST', { as: A.users.TEACHER, body: { ...body, studentId: students.absent, rawMark: 40 } });
+    expect(fresh.status).toBe(200);
+    expect(await prisma.markChange.count()).toBe(0);
+
+    const ok = await call('results/marks', 'POST', { as: A.users.TEACHER, body: { ...body, reason: 'Paper was marked out of the wrong total' } });
+    expect(ok.status).toBe(200);
+    const [change] = await prisma.markChange.findMany();
+    expect(change).toMatchObject({ changedById: A.users.TEACHER.id, reason: 'Paper was marked out of the wrong total', schoolId: A.schoolId });
+    expect(change.oldRawMark.toNumber()).toBe(75);
+    expect(change.newRawMark.toNumber()).toBe(90);
+    expect(await prisma.auditLog.count({ where: { action: 'CHANGE_MARK', entityId: change.markId } })).toBe(1);
+
+    // Sending the same value again is not a change.
+    expect((await call('results/marks', 'POST', { as: A.users.TEACHER, body })).status).toBe(200);
+    expect(await prisma.markChange.count()).toBe(1);
+  });
+
+  it('the history cannot be edited or deleted', async () => {
+    await expect(t.pg.exec('DELETE FROM "MarkChange"')).rejects.toThrow(/cannot be changed or deleted/); // straight to Postgres: the test socket drops after a DB error
+  });
+
   it('after the correction, republishing recalculates every position', async () => {
-    // The teacher fixes the one-paper student: they did sit three core papers after all.
-    for (const subject of ['math', 'sci']) {
-      const edit = await call('results/marks', 'POST', {
-        as: A.users.TEACHER, body: { studentId: students.onePaper, subjectId: subjects[subject], classId, termId: A.termId, rawMark: 90 },
-      });
-      expect(edit.status).toBe(200);
-    }
-    for (const a of await prisma.subjectAssignment.findMany({ where: { classId, termId: A.termId } })) {
-      const v = await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: a.id, force: true } });
-      expect(v.status).toBe(200);
-    }
+    const math = await prisma.subjectAssignment.findFirstOrThrow({ where: { classId, subjectId: subjects.math, termId: A.termId } });
+    expect((await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: math.id, force: true } })).status).toBe(200);
     const r = await publish();
     expect(r.status).toBe(200);
-    expect(r.json.data).toMatchObject({ published: 6, ranked: 5, notRanked: 1 });
-    const fixed = await result('onePaper');
-    expect(fixed.classPosition).toBe(1); // (100 + 90 + 90) / 300 = 93 %
-    expect(fixed.subjectsSat).toBe(3);
-    expect((await result('missedExams')).classPosition).toBe(2);
-    expect((await result('allSubjects')).classPosition).toBe(3);
-    expect((await result('tieOne')).classPosition).toBe(4);
-    expect((await result('absent')).classPosition).toBeNull();
-    expect((await result('missedExams')).published).toBe(true);
+    expect(r.json.data).toMatchObject({ published: 6 });
+    const fixed = await result('missedExams');
+    expect(fixed.published).toBe(true);
+    expect(fixed.totalMarks.toNumber()).toBe(240); // 75 + 90 + 75
+    expect(fixed.classPosition).toBe(1);
+    expect((await result('allSubjects')).classPosition).toBe(2);
   });
+});
 
-  it('can reopen without unlocking the marks (they stay verified)', async () => {
-    const r = await reopen(A.users.HEAD, { unlockMarks: false });
-    expect(r.status).toBe(200);
-    const assignments = await prisma.subjectAssignment.findMany({ where: { classId, termId: A.termId } });
-    expect(assignments.every((x) => x.marksStatus === 'VERIFIED')).toBe(true);
-    expect((await publish()).status).toBe(200);
-  });
-
-  it('once the term is closed the results are final', async () => {
+describe('a CLOSED term is locked (4.1)', () => {
+  it('blocks marks, verify, unverify, publish and unpublish', async () => {
     await prisma.academicTerm.update({ where: { id: A.termId }, data: { status: 'CLOSED', closedAt: new Date() } });
-    const r = await reopen();
-    expect(r.status).toBe(409);
-    expect(r.json.message).toMatch(/final/);
+    const a = await prisma.subjectAssignment.findFirstOrThrow({ where: { classId, termId: A.termId } });
+    expect((await reopen()).status).toBe(409);
+    expect((await call('results/marks/unverify', 'POST', { as: A.users.HEAD, body: { assignmentId: a.id } })).status).toBe(409);
+    expect((await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: a.id, force: true } })).status).toBe(409);
+    expect((await publish()).status).toBe(409);
+    const edit = await call('results/marks', 'POST', {
+      as: A.users.TEACHER, body: { studentId: students.onePaper, subjectId: subjects.math, classId, termId: A.termId, rawMark: 1, reason: 'Trying to change a closed term' },
+    });
+    expect(edit.status).toBe(409);
     expect((await result('missedExams')).published).toBe(true);
+  });
+
+  it('only the Director can reopen it, with a reason', async () => {
+    const path = 'director/terms/[id]/reopen';
+    const params = { id: A.termId };
+    for (const role of ['HEAD', 'ADMIN', 'BURSAR', 'TEACHER'] as const) {
+      expect((await call(path, 'POST', { as: A.users[role], params, body: { reason: 'Needed to fix a marking error' } })).status).toBe(403);
+    }
+    expect((await call(path, 'POST', { as: A.users.DIRECTOR, params, body: { reason: 'short' } })).status).toBe(422);
+    const ok = await call(path, 'POST', { as: A.users.DIRECTOR, params, body: { reason: 'Needed to fix a marking error' } });
+    expect(ok.status).toBe(200);
+    const term = await prisma.academicTerm.findUniqueOrThrow({ where: { id: A.termId } });
+    expect(term.status).toBe('OPEN');
+    expect(term.closedAt).toBeNull();
+    const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: 'REOPEN_TERM' } });
+    expect(audit.actorId).toBe(A.users.DIRECTOR.id);
+    expect(audit.detail).toContain('Needed to fix a marking error');
+    expect((await reopen()).status).toBe(200); // the Head can correct again
+  });
+
+  it('cannot reopen a term that is not closed', async () => {
+    const r = await call('director/terms/[id]/reopen', 'POST', { as: A.users.DIRECTOR, params: { id: A.termId }, body: { reason: 'Already open, nothing to do' } });
+    expect(r.status).toBe(409);
   });
 });

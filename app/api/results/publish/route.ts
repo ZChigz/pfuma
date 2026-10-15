@@ -29,6 +29,7 @@ async function _POST(req: NextRequest) {
   if (!schoolClass) return apiNotFound('Class');
   const termRow = await requireTerm(user.schoolId, termId, db);
   const term = termRow.name;
+  if (termRow.status === 'CLOSED') return apiError(`${termRow.name} is closed, so its results are locked. The Director can reopen the term.`, 409);
 
   const assignments = await db.subjectAssignment.findMany({
     where: { schoolId: user.schoolId, classId, termId },
