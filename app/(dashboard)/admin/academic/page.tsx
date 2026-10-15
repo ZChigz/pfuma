@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { canManageAcademicCalendar } from '@/lib/permissions';
 import { isoDate } from '@/lib/academic/terms';
@@ -10,9 +10,10 @@ export default async function AcademicCalendarPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   try { await canManageAcademicCalendar(user.role); } catch { redirect('/'); }
 
-  const years = await prisma.academicYear.findMany({
+  const years = await db.academicYear.findMany({
     where: { schoolId: user.schoolId },
     include: {
       terms: {

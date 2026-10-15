@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { CatalogClient } from '@/components/library/CatalogClient';
 import type { SessionUser } from '@/types';
@@ -8,8 +8,9 @@ export default async function CatalogPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const books = await prisma.book.findMany({
+  const books = await db.book.findMany({
     where: { schoolId: user.schoolId },
     include: {
       copies: {

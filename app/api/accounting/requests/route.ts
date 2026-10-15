@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canCreateExpenseRequest } from '@/lib/permissions';
@@ -15,6 +15,7 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const { searchParams } = req.nextUrl;
   const status = searchParams.get('status') || undefined;
@@ -47,7 +48,7 @@ async function _GET(req: NextRequest) {
     where.status = status as never;
   }
 
-  const requests = await prisma.expenseRequest.findMany({
+  const requests = await db.expenseRequest.findMany({
     where: where as never,
     include: REQUEST_INCLUDE,
     orderBy: { requestedAt: 'desc' },
@@ -60,6 +61,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canCreateExpenseRequest(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
@@ -73,7 +75,7 @@ async function _POST(req: NextRequest) {
   }));
   const estimatedTotal = itemsWithTotals.reduce((sum, item) => sum + item.total, 0);
 
-  const request = await prisma.$transaction(async (tx) => {
+  const request = await db.$tx(async (tx) => {
     const requestNumber = await generateRequestNumber(user.schoolId, tx);
     const r = await tx.expenseRequest.create({
       data: {

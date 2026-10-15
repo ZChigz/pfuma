@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { canManageLibrary } from '@/lib/permissions';
 import { parseBody, apiSuccess, apiError, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
@@ -15,10 +15,11 @@ async function _POST(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
 
-  const existing = await prisma.borrowing.findFirst({
+  const existing = await db.borrowing.findFirst({
     where:   { id: params.id, schoolId: user.schoolId },
     include: {
       copy:   { include: { book: { select: { title: true } } } },
@@ -37,7 +38,7 @@ async function _POST(
 
   const newCopyStatus = parsed.data.conditionOnReturn === 'DAMAGED' ? 'AVAILABLE' : 'AVAILABLE';
 
-  const borrowing = await prisma.$transaction(async (tx) => {
+  const borrowing = await db.$tx(async (tx) => {
     const b = await tx.borrowing.update({
       where: { id: params.id },
       data: {

@@ -58,6 +58,12 @@ export function withApi(label: string, handler: NextHandler): NextHandler {
     } catch (err) {
       if (err instanceof ServiceError) return apiError(err.message, err.status);
       if (err instanceof Response) return err;
+      // The database refused a reference into another school (trigger
+      // check_same_school). Treat it like any record the caller cannot see.
+      if (err instanceof Error && err.message.includes('Cross-school reference')) {
+        logger.warn(`Cross-school reference refused: ${label}`, { url: req.url });
+        return NextResponse.json({ success: false, message: 'Referenced record not found' }, { status: 404 });
+      }
       logger.error(`Unhandled route error: ${label}`, err, { url: req.url });
       return NextResponse.json(
         { success: false, message: 'Internal server error' },

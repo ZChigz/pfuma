@@ -1,8 +1,8 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canVerifyPayment } from '@/lib/permissions';
+import { assertCanVerifyPayment, canVerifyPayment } from '@/lib/permissions';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -13,6 +13,7 @@ async function _POST(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try {
     await canVerifyPayment(user.role);
@@ -21,14 +22,16 @@ async function _POST(
     throw e;
   }
 
-  const payment = await prisma.payment.findUnique({
+  const payment = await db.payment.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, recordedBy: true },
   });
   if (!payment) return apiNotFound('Payment');
   if (payment.status !== 'PENDING') return apiError('Payment is not pending', 409);
+  // Separation of duties: the person who recorded it cannot verify it.
+  assertCanVerifyPayment(user, payment);
 
-  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await db.$tx(async (tx) => {
     const p = await tx.payment.update({
       where: { id: params.id },
       data: {

@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, withApi } from '@/lib/api';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
@@ -8,13 +8,14 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const { searchParams } = new URL(req.url);
   const teacherId = searchParams.get('teacherId');
   const termId    = searchParams.get('termId');
   if (!teacherId || !termId) return apiError('teacherId and termId are required', 400);
 
-  const assignments = await prisma.subjectAssignment.findMany({
+  const assignments = await db.subjectAssignment.findMany({
     where: { schoolId: user.schoolId, teacherId, termId },
     include: {
       subject: { select: { id: true, name: true, code: true } },

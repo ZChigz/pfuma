@@ -52,6 +52,22 @@ export function UserRowActions({ userId, active }: Props) {
     }
   }
 
+  async function logOut() {
+    if (!confirm('Sign this user out of every device? They will need to sign in again.')) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/logout`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message ?? 'Failed to sign the user out');
+        return;
+      }
+      toast.success('User signed out everywhere');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function handleCloseTempPassword() {
     setTempPassword(null);
     router.refresh();
@@ -74,6 +90,14 @@ export function UserRowActions({ userId, active }: Props) {
         className="rounded px-2 py-1 text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
       >
         Reset Password
+      </button>
+      <button
+        type="button"
+        onClick={logOut}
+        disabled={busy}
+        className="rounded px-2 py-1 text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
+      >
+        Log out
       </button>
 
       <Modal

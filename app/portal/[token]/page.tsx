@@ -1,7 +1,36 @@
 // Public portal — NO auth(), NO redirect('/login'). Accessible without a session.
-import { prisma } from '@/lib/prisma';
+import { cookies, headers } from 'next/headers';
+import type { Metadata } from 'next';
+import { getScopedDb } from '@/lib/scoped-db';
+import { clientIp } from '@/lib/rate-limit';
+import { lookupPortalToken, pinCookieName, pinCookieValid, recordPortalView } from '@/lib/portal';
+import { PortalPinForm } from '@/components/portal/PortalPinForm';
 
 export const dynamic = 'force-dynamic';
+
+// The link is a secret: keep it out of search engines and out of Referer headers.
+export const metadata: Metadata = {
+  title: 'Student Portal',
+  robots: { index: false, follow: false, nocache: true },
+  referrer: 'no-referrer',
+};
+
+function PortalMessage({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
+      <div className="w-full max-w-md rounded-2xl bg-white p-10 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-danger-bg">
+          <svg className="h-7 w-7 text-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M15 9l-6 6M9 9l6 6" />
+          </svg>
+        </div>
+        <h1 className="text-base font-semibold text-ink">{title}</h1>
+        <p className="mt-1 text-sm text-muted">{body}</p>
+      </div>
+    </div>
+  );
+}
 
 function fmt(n: number, currency: string) {
   return currency === 'USD'
@@ -16,8 +45,23 @@ function fmtDate(d: Date | string) {
 }
 
 export default async function PortalPage({ params }: { params: { token: string } }) {
-  const student = await prisma.student.findUnique({
-    where: { portalToken: params.token },
+  // The token is looked up by its SHA-256 hash; expired links are refused.
+  const found = await lookupPortalToken(params.token);
+  if (found.status === 'expired') {
+    return <PortalMessage title="This link has expired" body="Please ask the school office for a new portal link." />;
+  }
+  if (found.status !== 'ok') {
+    return <PortalMessage title="Link not found or expired" body="This portal link is invalid. Please contact the school office for a new link." />;
+  }
+
+  // Links protected by a PIN ask for it once per device.
+  if (!pinCookieValid(found.student, cookies().get(pinCookieName(found.student.portalTokenHash))?.value)) {
+    return <PortalPinForm token={params.token} />;
+  }
+
+  const db = getScopedDb(found.student.schoolId);
+  const student = await db.student.findUnique({
+    where: { id: found.student.id },
     include: {
       school: {
         select: {
@@ -48,25 +92,13 @@ export default async function PortalPage({ params }: { params: { token: string }
     },
   });
 
-  // ── Not found ──────────────────────────────────────────────────────────────
   if (!student) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
-        <div className="w-full max-w-md rounded-2xl bg-white p-10 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-danger-bg">
-            <svg className="h-7 w-7 text-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M15 9l-6 6M9 9l6 6" />
-            </svg>
-          </div>
-          <h1 className="text-base font-semibold text-ink">Link not found or expired</h1>
-          <p className="mt-1 text-sm text-muted">
-            This portal link is invalid. Please contact the school office for a new link.
-          </p>
-        </div>
-      </div>
-    );
+    return <PortalMessage title="Link not found or expired" body="This portal link is invalid. Please contact the school office for a new link." />;
   }
+
+  // Every view is logged for the school (student, time, IP).
+  const h = headers();
+  await recordPortalView(student.id, student.schoolId, clientIp(h), h.get('user-agent'));
 
   // ── Compute fee balances ───────────────────────────────────────────────────
   const chargesUSD = student.charges.filter(c => c.currency === 'USD').reduce((n, c) => n + c.amount.toNumber(), 0);
@@ -101,7 +133,7 @@ export default async function PortalPage({ params }: { params: { token: string }
   for (const tr of publishedTerms) {
     const classId = classByTerm.get(tr.termId);
     if (!classId) continue;
-    classSizeByTerm.set(tr.termId, await prisma.termResult.count({
+    classSizeByTerm.set(tr.termId, await db.termResult.count({
       where: {
         schoolId:  student.schoolId,
         published: true,
@@ -214,9 +246,14 @@ export default async function PortalPage({ params }: { params: { token: string }
                     {/* Term header */}
                     <div className="border-b border-line bg-primary px-4 py-3 text-white">
                       <p className="text-sm font-bold">{tr.term.name}</p>
-                      {tr.classPosition != null && classSize != null && (
+                      {tr.classPosition != null && (tr.rankedOutOf ?? classSize) != null && (
                         <p className="mt-0.5 text-xs text-emerald-100">
-                          Position {tr.classPosition} out of {classSize} students
+                          Position {tr.classPosition} out of {tr.rankedOutOf ?? classSize} students
+                        </p>
+                      )}
+                      {tr.classPosition == null && tr.subjectsSat != null && (
+                        <p className="mt-0.5 text-xs text-emerald-100">
+                          Not ranked — sat {tr.subjectsSat} of {tr.subjectsOffered} subjects
                         </p>
                       )}
                     </div>

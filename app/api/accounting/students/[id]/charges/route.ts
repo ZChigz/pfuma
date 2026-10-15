@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canApplyCharge } from '@/lib/permissions';
@@ -15,6 +15,7 @@ async function _POST(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const parsed = await parseBody(req, CreateChargeSchema);
   if ('error' in parsed) return parsed.error;
@@ -27,14 +28,14 @@ async function _POST(
   }
 
   // Verify the student belongs to this school (never trust body schoolId)
-  const student = await prisma.student.findUnique({
+  const student = await db.student.findUnique({
     where: { id: params.id },
     select: { id: true, schoolId: true },
   });
   if (!student || student.schoolId !== user.schoolId) return apiNotFound('Student');
-  const term = await requireTerm(user.schoolId, parsed.data.termId);
+  const term = await requireTerm(user.schoolId, parsed.data.termId, db);
 
-  const charge = await prisma.$transaction(async (tx) => {
+  const charge = await db.$tx(async (tx) => {
     const newCharge = await tx.charge.create({
       data: {
         schoolId: user.schoolId,

@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { isoWeekKey } from '@/lib/utils';
 import { PRIMARY_GUARDIAN_INCLUDE } from '@/lib/students/guardians';
@@ -11,6 +11,7 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   const { schoolId } = user;
 
   const rawCurr = new URL(req.url).searchParams.get('currency');
@@ -26,23 +27,23 @@ async function _GET(req: NextRequest) {
     students,
     recentPayments,
   ] = await Promise.all([
-    prisma.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'USD' }, _sum: { amount: true } }),
-    prisma.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'ZIG' }, _sum: { amount: true } }),
-    prisma.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'USD' }, _sum: { amount: true } }),
-    prisma.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'ZIG' }, _sum: { amount: true } }),
-    prisma.expense.groupBy({
+    db.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'USD' }, _sum: { amount: true } }),
+    db.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'ZIG' }, _sum: { amount: true } }),
+    db.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'USD' }, _sum: { amount: true } }),
+    db.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'ZIG' }, _sum: { amount: true } }),
+    db.expense.groupBy({
       by: ['category'],
       where: { schoolId, status: 'ACTIVE', currency },
       _sum: { amount: true },
       orderBy: { _sum: { amount: 'desc' } },
     }),
-    prisma.payment.groupBy({
+    db.payment.groupBy({
       by: ['method'],
       where: { schoolId, status: 'VERIFIED', currency },
       _sum: { amount: true },
       _count: { id: true },
     }),
-    prisma.student.findMany({
+    db.student.findMany({
       where: { schoolId, status: 'ACTIVE' },
       select: {
         id: true,
@@ -55,7 +56,7 @@ async function _GET(req: NextRequest) {
         },
       },
     }),
-    prisma.payment.findMany({
+    db.payment.findMany({
       where: {
         schoolId,
         status: 'VERIFIED',

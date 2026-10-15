@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { AssetsClient } from '@/components/assets/AssetsClient';
 import type { SessionUser } from '@/types';
@@ -14,6 +14,7 @@ export default async function AssetsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   const { schoolId, role } = user;
 
   const today = new Date();
@@ -27,16 +28,16 @@ export default async function AssetsPage() {
     categories,
     assetsRaw,
   ] = await Promise.all([
-    prisma.asset.count({ where: { schoolId, status: 'ACTIVE' } }),
-    prisma.asset.count({ where: { schoolId, status: 'UNDER_MAINTENANCE' } }),
-    prisma.asset.count({
+    db.asset.count({ where: { schoolId, status: 'ACTIVE' } }),
+    db.asset.count({ where: { schoolId, status: 'UNDER_MAINTENANCE' } }),
+    db.asset.count({
       where: {
         schoolId,
         status: 'DISPOSED',
         disposal: { disposalDate: { gte: getTermStart(today) } },
       },
     }),
-    prisma.assetMaintenance.findMany({
+    db.assetMaintenance.findMany({
       where: {
         schoolId,
         nextServiceDate: { lt: today },
@@ -49,12 +50,12 @@ export default async function AssetsPage() {
       orderBy: { nextServiceDate: 'asc' },
       distinct:  ['assetId'],
     }),
-    prisma.assetCategory.findMany({
+    db.assetCategory.findMany({
       where: { schoolId },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
-    prisma.asset.findMany({
+    db.asset.findMany({
       where: { schoolId },
       include: {
         category: { select: { name: true } },

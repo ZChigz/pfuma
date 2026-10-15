@@ -2,7 +2,7 @@
 // AcademicTerm (also enforced by the partial unique index
 // "AcademicTerm_one_open_per_school").
 import type { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import {
@@ -15,16 +15,15 @@ import {
   validateTermDates,
 } from '@/lib/academic/rules';
 
-type Db = Prisma.TransactionClient | typeof prisma;
 
 export const dateOnly = (iso: string) => new Date(`${iso}T00:00:00Z`);
 export const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 
-export async function getOpenTerm(schoolId: string, db: Db = prisma) {
+export async function getOpenTerm(schoolId: string, db: Db) {
   return db.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' } });
 }
 
-export async function requireOpenTerm(schoolId: string, db: Db = prisma) {
+export async function requireOpenTerm(schoolId: string, db: Db) {
   const term = await getOpenTerm(schoolId, db);
   if (!term) {
     throw new ServiceError('No term is open. Open a term under Admin → Academic calendar first.', 409);
@@ -33,14 +32,14 @@ export async function requireOpenTerm(schoolId: string, db: Db = prisma) {
 }
 
 // A term id supplied by a client must belong to the caller's school.
-export async function requireTerm(schoolId: string, termId: string, db: Db = prisma) {
+export async function requireTerm(schoolId: string, termId: string, db: Db) {
   const term = await db.academicTerm.findFirst({ where: { id: termId, schoolId } });
   if (!term) throw new ServiceError('Term not found', 404);
   return term;
 }
 
 // Terms newest first, for dropdowns.
-export async function listTerms(schoolId: string, db: Db = prisma) {
+export async function listTerms(schoolId: string, db: Db) {
   return db.academicTerm.findMany({
     where: { schoolId },
     orderBy: [{ startDate: 'desc' }],
@@ -49,7 +48,7 @@ export async function listTerms(schoolId: string, db: Db = prisma) {
 }
 
 // Every school has Form 1–6. Idempotent.
-export async function ensureLevels(schoolId: string, db: Db = prisma) {
+export async function ensureLevels(schoolId: string, db: Db) {
   for (const l of LEVEL_DEFINITIONS) {
     await db.level.upsert({
       where: { schoolId_order: { schoolId, order: l.order } },
@@ -72,7 +71,7 @@ export async function createAcademicYear(
   const endDate = input.endDate ?? `${year}-12-31`;
   if (startDate > endDate) throw new ServiceError('The academic year must start before it ends', 422);
 
-  const exists = await prisma.academicYear.findUnique({ where: { schoolId_year: { schoolId, year } } });
+  const exists = await getScopedDb(schoolId, actorId).academicYear.findUnique({ where: { schoolId_year: { schoolId, year } } });
   if (exists) throw new ServiceError(`The ${year} academic year already exists`, 409);
 
   const terms = Array.from({ length: TERMS_PER_YEAR }, (_, i) => ({ termNumber: i + 1, ...defaultTermDates(year, i + 1) }))
@@ -85,7 +84,7 @@ export async function createAcademicYear(
   const problem = validateTermDates(year, startDate, endDate, terms);
   if (problem) throw new ServiceError(`${problem}. Adjust the year dates.`, 422);
 
-  return prisma.$transaction(async (tx) => {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
     const y = await tx.academicYear.create({
       data: { schoolId, year, startDate: dateOnly(startDate), endDate: dateOnly(endDate) },
     });
@@ -115,8 +114,9 @@ export async function updateTermDates(
   termId: string,
   input: { startDate: string; endDate: string },
 ) {
-  const term = await requireTerm(schoolId, termId);
-  const year = await prisma.academicYear.findUniqueOrThrow({
+  const db = getScopedDb(schoolId, actorId);
+  const term = await requireTerm(schoolId, termId, db);
+  const year = await db.academicYear.findUniqueOrThrow({
     where: { id: term.academicYearId },
     include: { terms: true },
   });
@@ -128,7 +128,7 @@ export async function updateTermDates(
   const problem = validateTermDates(year.year, isoDate(year.startDate), isoDate(year.endDate), proposed);
   if (problem) throw new ServiceError(problem, 422);
 
-  return prisma.$transaction(async (tx) => {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
     const t = await tx.academicTerm.update({
       where: { id: termId },
       data: { startDate: dateOnly(input.startDate), endDate: dateOnly(input.endDate) },
@@ -148,7 +148,7 @@ export async function updateTermDates(
 //  • every other active student carries over into the same class;
 //  • Student.currentClassId is refreshed for the new term.
 export async function openTerm(schoolId: string, actorId: string, termId: string) {
-  return prisma.$transaction(async (tx) => {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
     const term = await requireTerm(schoolId, termId, tx);
     const open = await getOpenTerm(schoolId, tx);
     const problem = canOpenTerm(term, open, termId);
@@ -202,7 +202,7 @@ export async function openTerm(schoolId: string, actorId: string, termId: string
 }
 
 export async function closeTerm(schoolId: string, actorId: string, termId: string) {
-  return prisma.$transaction(async (tx) => {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
     const term = await requireTerm(schoolId, termId, tx);
     const problem = canCloseTerm(term);
     if (problem) throw new ServiceError(problem, 409);
@@ -220,7 +220,7 @@ export async function closeTerm(schoolId: string, actorId: string, termId: strin
 }
 
 // Sets every student's cached currentClassId from their ACTIVE enrollment in termId.
-export async function refreshCurrentClasses(tx: Prisma.TransactionClient, schoolId: string, termId: string) {
+export async function refreshCurrentClasses(tx: Db, schoolId: string, termId: string) {
   await tx.student.updateMany({ where: { schoolId }, data: { currentClassId: null } });
   const enrollments = await tx.enrollment.findMany({
     where: { schoolId, termId, status: 'ACTIVE', student: { status: { in: ['ACTIVE', 'SUSPENDED'] } } },

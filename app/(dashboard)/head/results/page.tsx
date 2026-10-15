@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -7,6 +7,7 @@ import { TermSelect } from '@/components/results/TermSelect';
 import { PublishResultsButton } from '@/components/results/PublishResultsButton';
 import { ExportResultsButton } from '@/components/results/ExportResultsButton';
 import { UnlockSubjectLink } from '@/components/results/UnlockSubjectLink';
+import { ReopenResultsButton } from '@/components/results/ReopenResultsButton';
 import { listTerms } from '@/lib/academic/terms';
 import { classRosterIds } from '@/lib/academic/roster';
 import type { SessionUser, AssignmentMarkStatus } from '@/types';
@@ -26,13 +27,14 @@ export default async function HeadResultsPage({
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'HEAD') redirect('/');
 
   const { schoolId } = user;
 
   const [terms, classes] = await Promise.all([
-    listTerms(schoolId),
-    prisma.schoolClass.findMany({
+    listTerms(schoolId, db),
+    db.schoolClass.findMany({
       where: { schoolId, active: true },
       orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }],
     }),
@@ -60,10 +62,13 @@ export default async function HeadResultsPage({
     total: number;
     percentage: number;
     position: number | null;
+    subjectsSat: number | null;
+    subjectsOffered: number | null;
   }> = [];
+  let rankedOutOf: number | null = null;
 
   if (selectedClass && term) {
-    assignments = await prisma.subjectAssignment.findMany({
+    assignments = await db.subjectAssignment.findMany({
       where: { schoolId, classId: selectedClass.id, termId: selectedTermId, subject: { active: true } },
       include: {
         subject: { select: { id: true, name: true, maxMark: true } },
@@ -80,14 +85,14 @@ export default async function HeadResultsPage({
   if (selectedClass && term && isPublished) {
     const subjectIds = assignments.map((a) => a.subjectId);
     // The class list for that term comes from Enrollment.
-    const studentIds = await classRosterIds(selectedClass.id, selectedTermId);
+    const studentIds = await classRosterIds(selectedClass.id, selectedTermId, db);
     const [termResults, marks] = await Promise.all([
-      prisma.termResult.findMany({
+      db.termResult.findMany({
         where: { schoolId, termId: selectedTermId, studentId: { in: studentIds } },
         include: { student: { select: { id: true, fullName: true } } },
         orderBy: { classPosition: 'asc' },
       }),
-      prisma.mark.findMany({
+      db.mark.findMany({
         where: { schoolId, subjectId: { in: subjectIds }, termId: selectedTermId, status: 'PUBLISHED', studentId: { in: studentIds } },
       }),
     ]);
@@ -104,8 +109,11 @@ export default async function HeadResultsPage({
         total:      tr.totalMarks.toNumber(),
         percentage: tr.percentage.toNumber(),
         position:   tr.classPosition,
+        subjectsSat: tr.subjectsSat,
+        subjectsOffered: tr.subjectsOffered,
       };
     });
+    rankedOutOf = termResults.find((tr) => tr.rankedOutOf != null)?.rankedOutOf ?? null;
   }
 
   return (
@@ -122,6 +130,9 @@ export default async function HeadResultsPage({
               <span className="inline-flex items-center rounded-full bg-success-bg px-3 py-1 text-sm font-medium text-primary">
                 ✓ Published
               </span>
+            )}
+            {isPublished && term?.status !== 'CLOSED' && (
+              <ReopenResultsButton classId={selectedClass.id} className={selectedClass.name} termId={selectedTermId} termName={selectedTerm} />
             )}
             {isPublished && <ExportResultsButton classId={selectedClass.id} className={selectedClass.name} termId={selectedTermId} termName={selectedTerm} />}
           </div>
@@ -217,6 +228,13 @@ export default async function HeadResultsPage({
 
           {/* Results table */}
           {isPublished && resultRows.length > 0 && (
+            <p className="text-sm text-muted">
+              Positions use each student&apos;s average percentage over the subjects they sat, so a missed exam or a different
+              elective is not counted as zero. {rankedOutOf != null ? `${rankedOutOf} of ${resultRows.length} students are ranked; ` : ''}
+              a student who sat fewer than half of the core subjects is shown as &ldquo;Not ranked&rdquo;.
+            </p>
+          )}
+          {isPublished && resultRows.length > 0 && (
             <div className="overflow-x-auto rounded-2xl bg-white">
               <table className="w-full text-left text-sm text-ink">
                 <thead className="border-b border-line bg-white">
@@ -230,12 +248,13 @@ export default async function HeadResultsPage({
                     ))}
                     <th className="px-4 py-3.5 text-xs font-medium text-subtle">Total</th>
                     <th className="px-4 py-3.5 text-xs font-medium text-subtle">%</th>
+                    <th className="px-4 py-3.5 text-xs font-medium text-subtle">Subjects sat</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line bg-white">
                   {resultRows.map((r) => (
                     <tr key={r.studentId}>
-                      <td className="px-4 py-3 font-bold tabular-nums">{r.position ?? '—'}</td>
+                      <td className="px-4 py-3 font-bold tabular-nums">{r.position ?? 'Not ranked'}</td>
                       <td className="px-4 py-3 font-medium">{r.fullName}</td>
                       {assignments.map((a) => (
                         <td key={a.subjectId} className="px-4 py-3 tabular-nums">
@@ -244,6 +263,9 @@ export default async function HeadResultsPage({
                       ))}
                       <td className="px-4 py-3 tabular-nums font-medium">{r.total}</td>
                       <td className="px-4 py-3 tabular-nums font-medium">{r.percentage.toFixed(1)}%</td>
+                      <td className="px-4 py-3 tabular-nums text-muted">
+                        {r.subjectsSat != null ? `${r.subjectsSat} of ${r.subjectsOffered}` : '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -3,7 +3,7 @@ import {
   generateUploadButton,
   generateUploadDropzone,
 } from '@uploadthing/react';
-import type { OurFileRouter } from '@/app/api/upload/route';
+import type { OurFileRouter } from '@/lib/upload-router';
 
 export const { useUploadThing, uploadFiles } = generateReactHelpers<OurFileRouter>();
 export const UploadButton   = generateUploadButton<OurFileRouter>();

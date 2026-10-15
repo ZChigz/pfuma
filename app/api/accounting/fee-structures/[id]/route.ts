@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiError, apiSuccess, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canBulkApplyFees } from '@/lib/permissions';
@@ -12,22 +12,23 @@ async function _PATCH(req: NextRequest, ctx: { params: { id: string } }) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canBulkApplyFees(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
-  const existing = await prisma.feeStructure.findUnique({ where: { id: ctx.params.id } });
+  const existing = await db.feeStructure.findUnique({ where: { id: ctx.params.id } });
   if (!existing || existing.schoolId !== user.schoolId) return apiNotFound('Fee structure');
 
   const parsed = await parseBody(req, UpdateFeeStructureSchema);
   if ('error' in parsed) return parsed.error;
   const { levelId, termId, label, currency, amount } = parsed.data;
 
-  if (termId) await requireTerm(user.schoolId, termId);
-  if (levelId && !await prisma.level.findFirst({ where: { id: levelId, schoolId: user.schoolId } })) {
+  if (termId) await requireTerm(user.schoolId, termId, db);
+  if (levelId && !await db.level.findFirst({ where: { id: levelId, schoolId: user.schoolId } })) {
     return apiError('Level not found', 404);
   }
 
-  const feeStructure = await prisma.$transaction(async (tx) => {
+  const feeStructure = await db.$tx(async (tx) => {
     const fs = await tx.feeStructure.update({
       where: { id: existing.id },
       data: {

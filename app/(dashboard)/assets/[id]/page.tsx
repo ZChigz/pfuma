@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect, notFound } from 'next/navigation';
 import { AssetDetailClient } from '@/components/assets/AssetDetailClient';
 import type { SessionUser } from '@/types';
@@ -12,8 +12,9 @@ export default async function AssetDetailPage({
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const asset = await prisma.asset.findFirst({
+  const asset = await db.asset.findFirst({
     where: { id: params.id, schoolId: user.schoolId },
     include: {
       category:    { select: { id: true, name: true } },
@@ -29,7 +30,7 @@ export default async function AssetDetailPage({
 
   if (!asset) notFound();
 
-  const categories = await prisma.assetCategory.findMany({
+  const categories = await db.assetCategory.findMany({
     where:   { schoolId: user.schoolId },
     select:  { id: true, name: true },
     orderBy: { name: 'asc' },

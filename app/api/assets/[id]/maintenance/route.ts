@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { canManageAssets } from '@/lib/permissions';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
@@ -14,10 +14,11 @@ async function _POST(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageAssets(user.role); } catch (res) { return res as Response; }
 
-  const asset = await prisma.asset.findFirst({
+  const asset = await db.asset.findFirst({
     where: { id: params.id, schoolId: user.schoolId },
   });
   if (!asset) return apiNotFound('Asset');
@@ -25,7 +26,7 @@ async function _POST(
   const parsed = await parseBody(req, CreateMaintenanceSchema);
   if ('error' in parsed) return parsed.error;
 
-  const maintenance = await prisma.$transaction(async (tx) => {
+  const maintenance = await db.$tx(async (tx) => {
     const m = await tx.assetMaintenance.create({
       data: {
         schoolId:        user.schoolId,

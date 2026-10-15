@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canManageClasses } from '@/lib/permissions';
@@ -13,9 +13,10 @@ async function _GET() {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const term = await getOpenTerm(user.schoolId);
-  const classes = await prisma.schoolClass.findMany({
+  const term = await getOpenTerm(user.schoolId, db);
+  const classes = await db.schoolClass.findMany({
     where: { schoolId: user.schoolId },
     include: {
       level: { select: { id: true, name: true, order: true } },
@@ -44,6 +45,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageClasses(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
@@ -53,23 +55,23 @@ async function _POST(req: NextRequest) {
   const stream = normalizeStream(parsed.data.stream ?? '');
 
   const [level, school] = await Promise.all([
-    prisma.level.findFirst({ where: { id: levelId, schoolId: user.schoolId } }),
-    prisma.school.findUnique({ where: { id: user.schoolId }, select: { maxClassSize: true } }),
+    db.level.findFirst({ where: { id: levelId, schoolId: user.schoolId } }),
+    db.school.findUnique({ where: { id: user.schoolId }, select: { maxClassSize: true } }),
   ]);
   if (!level) return apiError('Level not found', 404);
 
   const name = classDisplayName(level.name, stream);
-  const existing = await prisma.schoolClass.findFirst({
+  const existing = await db.schoolClass.findFirst({
     where: { schoolId: user.schoolId, OR: [{ name }, { levelId, stream: { equals: stream, mode: 'insensitive' } }] },
   });
   if (existing) return apiError(`A class for ${name} already exists`, 409);
 
   if (classTeacherId) {
-    const teacher = await prisma.user.findUnique({ where: { id: classTeacherId } });
+    const teacher = await db.user.findUnique({ where: { id: classTeacherId } });
     if (!teacher || teacher.schoolId !== user.schoolId) return apiError('Class teacher not found in this school', 404);
   }
 
-  const created = await prisma.$transaction(async (tx) => {
+  const created = await db.$tx(async (tx) => {
     const schoolClass = await tx.schoolClass.create({
       data: {
         schoolId: user.schoolId,

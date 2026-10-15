@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { canManageLibrary } from '@/lib/permissions';
 import { parseBody, apiSuccess, apiError, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
@@ -12,6 +12,7 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const { searchParams } = req.nextUrl;
   const overdue   = searchParams.get('overdue')   === 'true';
@@ -21,7 +22,7 @@ async function _GET(req: NextRequest) {
 
   const now = new Date();
 
-  const borrowings = await prisma.borrowing.findMany({
+  const borrowings = await db.borrowing.findMany({
     where: {
       schoolId: user.schoolId,
       ...(history ? {} : { returnDate: null }),
@@ -53,6 +54,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
 
@@ -60,10 +62,10 @@ async function _POST(req: NextRequest) {
   if ('error' in parsed) return parsed.error;
 
   const [copy, member] = await Promise.all([
-    prisma.bookCopy.findFirst({
+    db.bookCopy.findFirst({
       where: { id: parsed.data.copyId, schoolId: user.schoolId },
     }),
-    prisma.libraryMember.findFirst({
+    db.libraryMember.findFirst({
       where:   { id: parsed.data.memberId, schoolId: user.schoolId },
       include: { borrowings: { where: { returnDate: null } } },
     }),
@@ -87,7 +89,7 @@ async function _POST(req: NextRequest) {
     ? new Date(parsed.data.dueDate)
     : new Date(Date.now() + loanDays * 86_400_000);
 
-  const borrowing = await prisma.$transaction(async (tx) => {
+  const borrowing = await db.$tx(async (tx) => {
     const borrow = await tx.borrowing.create({
       data: {
         schoolId:     user.schoolId,

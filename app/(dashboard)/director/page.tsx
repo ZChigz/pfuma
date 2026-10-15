@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { formatUSD, formatZiG, formatDate, isoWeekKey } from '@/lib/utils';
@@ -20,6 +20,7 @@ export default async function DirectorDashboard({
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'DIRECTOR') redirect('/');
 
   const { schoolId } = user;
@@ -36,23 +37,23 @@ export default async function DirectorDashboard({
     recentPayments,
     pendingApprovalsRaw,
   ] = await Promise.all([
-    prisma.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'USD' }, _sum: { amount: true } }),
-    prisma.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'ZIG' }, _sum: { amount: true } }),
-    prisma.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'USD' }, _sum: { amount: true } }),
-    prisma.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'ZIG' }, _sum: { amount: true } }),
-    prisma.expense.groupBy({
+    db.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'USD' }, _sum: { amount: true } }),
+    db.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'ZIG' }, _sum: { amount: true } }),
+    db.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'USD' }, _sum: { amount: true } }),
+    db.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'ZIG' }, _sum: { amount: true } }),
+    db.expense.groupBy({
       by: ['category'],
       where: { schoolId, status: 'ACTIVE', currency },
       _sum: { amount: true },
       orderBy: { _sum: { amount: 'desc' } },
     }),
-    prisma.payment.groupBy({
+    db.payment.groupBy({
       by: ['method'],
       where: { schoolId, status: 'VERIFIED', currency },
       _sum: { amount: true },
       _count: { id: true },
     }),
-    prisma.student.findMany({
+    db.student.findMany({
       where: { schoolId, status: 'ACTIVE' },
       select: {
         id: true,
@@ -63,7 +64,7 @@ export default async function DirectorDashboard({
         },
       },
     }),
-    prisma.payment.findMany({
+    db.payment.findMany({
       where: {
         schoolId,
         status: 'VERIFIED',
@@ -72,7 +73,7 @@ export default async function DirectorDashboard({
       },
       select: { amount: true, recordedAt: true },
     }),
-    prisma.expenseRequest.findMany({
+    db.expenseRequest.findMany({
       where: { schoolId, status: 'PENDING' },
       include: REQUEST_INCLUDE,
       orderBy: { requestedAt: 'asc' },

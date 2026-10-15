@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { LibraryOverviewClient } from '@/components/library/LibraryOverviewClient';
 import { getDaysOverdue } from '@/lib/utils';
@@ -9,20 +9,21 @@ export default async function LibraryPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   const { schoolId, role } = user;
 
   const now = new Date();
 
   const [totalTitles, borrowedCount, overdueCount, availableAgg, overdueRaw] =
     await Promise.all([
-      prisma.book.count({ where: { schoolId } }),
-      prisma.borrowing.count({ where: { schoolId, returnDate: null } }),
-      prisma.borrowing.count({ where: { schoolId, returnDate: null, dueDate: { lt: now } } }),
-      prisma.bookCopy.aggregate({
+      db.book.count({ where: { schoolId } }),
+      db.borrowing.count({ where: { schoolId, returnDate: null } }),
+      db.borrowing.count({ where: { schoolId, returnDate: null, dueDate: { lt: now } } }),
+      db.bookCopy.aggregate({
         where: { schoolId, status: 'AVAILABLE' },
         _count: { id: true },
       }),
-      prisma.borrowing.findMany({
+      db.borrowing.findMany({
         where:   { schoolId, returnDate: null, dueDate: { lt: now } },
         include: {
           member: { include: { user: { select: { fullName: true } } } },

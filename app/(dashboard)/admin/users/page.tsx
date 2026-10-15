@@ -1,9 +1,10 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/Badge';
 import { AddUserModal } from '@/components/admin/AddUserModal';
 import { UserRowActions } from '@/components/admin/UserRowActions';
+import { LogoutAllButton } from '@/components/admin/LogoutAllButton';
 import { canManageUsers } from '@/lib/permissions';
 import type { SessionUser } from '@/types';
 
@@ -20,10 +21,11 @@ export default async function AdminUsersPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageUsers(user.role); } catch { redirect('/accounting'); }
 
-  const users = await prisma.user.findMany({
+  const users = await db.user.findMany({
     where: { schoolId: user.schoolId },
     select: { id: true, fullName: true, email: true, role: true, active: true },
     orderBy: { fullName: 'asc' },
@@ -36,7 +38,10 @@ export default async function AdminUsersPage() {
           <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Users</h1>
           <p className="mt-1 text-sm text-muted">Manage staff accounts and access</p>
         </div>
-        <AddUserModal />
+        <div className="flex items-center gap-2">
+          <LogoutAllButton />
+          <AddUserModal />
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-2xl bg-white">

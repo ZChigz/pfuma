@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
 import { canManageAcademicCalendar } from '@/lib/permissions';
 import { CreateAcademicYearSchema } from '@/lib/validations/academic';
@@ -10,8 +10,9 @@ async function _GET() {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const years = await prisma.academicYear.findMany({
+  const years = await db.academicYear.findMany({
     where: { schoolId: user.schoolId },
     include: { terms: { orderBy: { termNumber: 'asc' } } },
     orderBy: { year: 'desc' },

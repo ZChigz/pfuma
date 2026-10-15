@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { getDaysOverdue } from '@/lib/utils';
 import { PRIMARY_GUARDIAN_INCLUDE } from '@/lib/students/guardians';
@@ -12,6 +12,7 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const { searchParams } = req.nextUrl;
   const includeInactive = searchParams.get('includeInactive') === 'true';
@@ -19,7 +20,7 @@ async function _GET(req: NextRequest) {
   const statusFilter = searchParams.get('status') || undefined;
   const q = searchParams.get('q') || undefined;
 
-  const rows = await prisma.student.findMany({
+  const rows = await db.student.findMany({
     where: {
       schoolId: user.schoolId,
       ...(includeInactive ? {} : { status: 'ACTIVE' }),

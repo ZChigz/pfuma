@@ -5,11 +5,11 @@
 //  • a linked student always has exactly one primary guardian;
 //  • the last guardian of a student cannot be removed.
 import type { GuardianRelationship, Prisma } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 
-type Tx = Prisma.TransactionClient;
+type Tx = Db;
 
 export interface GuardianInput {
   fullName: string;
@@ -80,7 +80,7 @@ export async function linkGuardian(tx: Tx, schoolId: string, actorId: string, st
 }
 
 export async function setPrimaryGuardian(schoolId: string, actorId: string, studentId: string, guardianId: string) {
-  return prisma.$transaction(async (tx) => {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
     await requireLink(tx, schoolId, studentId, guardianId);
     await tx.studentGuardian.updateMany({ where: { studentId, isPrimary: true }, data: { isPrimary: false } });
     const sg = await tx.studentGuardian.update({
@@ -102,7 +102,7 @@ export async function updateLink(
   guardianId: string,
   data: { relationship?: GuardianRelationship; relationshipNote?: string | null; isFeePayer?: boolean; canReceiveSms?: boolean },
 ) {
-  return prisma.$transaction(async (tx) => {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
     await requireLink(tx, schoolId, studentId, guardianId);
     const sg = await tx.studentGuardian.update({ where: { studentId_guardianId: { studentId, guardianId } }, data });
     await logAudit(
@@ -114,7 +114,7 @@ export async function updateLink(
 }
 
 export async function unlinkGuardian(schoolId: string, actorId: string, studentId: string, guardianId: string) {
-  return prisma.$transaction(async (tx) => {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
     const link = await requireLink(tx, schoolId, studentId, guardianId);
     const count = await tx.studentGuardian.count({ where: { studentId } });
     if (count <= 1) throw new ServiceError('A student must keep at least one guardian. Add another guardian first.', 409);
@@ -128,7 +128,7 @@ export async function unlinkGuardian(schoolId: string, actorId: string, studentI
 }
 
 export async function updateGuardian(schoolId: string, actorId: string, guardianId: string, data: Partial<GuardianInput>) {
-  return prisma.$transaction(async (tx) => {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
     const g = await tx.guardian.findFirst({ where: { id: guardianId, schoolId } });
     if (!g) throw new ServiceError('Guardian not found', 404);
     const updated = await tx.guardian.update({ where: { id: guardianId }, data });

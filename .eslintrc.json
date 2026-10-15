@@ -1,3 +1,33 @@
 {
-  "extends": ["next/core-web-vitals", "next/typescript"]
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@/lib/prisma",
+            "message": "The raw Prisma client sees every school's data. Use getScopedDb(user.schoolId, user.id) from '@/lib/scoped-db'. Only code under lib/ may import the raw client."
+          },
+          {
+            "name": "@prisma/client",
+            "importNames": ["PrismaClient"],
+            "message": "Do not create a raw Prisma client. Use getScopedDb(user.schoolId, user.id) from '@/lib/scoped-db'."
+          }
+        ],
+        "patterns": [
+          {
+            "group": ["**/lib/prisma"],
+            "message": "The raw Prisma client sees every school's data. Use getScopedDb from '@/lib/scoped-db'."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["lib/**", "prisma/**", "scripts/**", "tests/**", "vitest.setup.ts"],
+      "rules": { "no-restricted-imports": "off" }
+    }
+  ]
 }

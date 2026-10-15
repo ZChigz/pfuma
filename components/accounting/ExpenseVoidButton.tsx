@@ -17,9 +17,23 @@ export function ExpenseVoidButton({ expenseId }: Props) {
   async function handleVoid() {
     if (!confirm('Void this expense? This cannot be undone.')) return;
     setLoading(true);
-    const res  = await fetch(`/api/accounting/expenses/${expenseId}/void`, { method: 'POST' });
+    const post = (reason?: string) =>
+      fetch(`/api/accounting/expenses/${expenseId}/void`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reason ? { reason } : {}),
+      });
+    let res  = await post();
+    let data = await res.json();
+    // A sole director may void an expense they recorded, but must say why.
+    if (!res.ok && res.status === 403 && /Give a reason/.test(data.message ?? '')) {
+      const reason = window.prompt(data.message);
+      if (reason) {
+        res  = await post(reason);
+        data = await res.json();
+      }
+    }
     setLoading(false);
-    const data = await res.json();
     if (!res.ok) {
       toast.error(data.message ?? 'Failed to void expense');
       return;

@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiForbidden, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { canVerifyMarks } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
@@ -12,6 +12,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canVerifyMarks(user.role); }
   catch (e) { if (e instanceof Response) return e; throw e; }
@@ -20,7 +21,7 @@ async function _POST(req: NextRequest) {
   if ('error' in parsed) return parsed.error;
   const { assignmentId, force } = parsed.data;
 
-  const assignment = await prisma.subjectAssignment.findFirst({
+  const assignment = await db.subjectAssignment.findFirst({
     where: { id: assignmentId, schoolId: user.schoolId },
     include: { subject: { select: { name: true } }, class: { select: { name: true } }, term: { select: { name: true } } },
   });
@@ -34,9 +35,9 @@ async function _POST(req: NextRequest) {
     return apiSuccess({ verified: false, message: 'Marks have already been verified for this assignment' });
   }
 
-  const students = await classRoster(assignment.classId, assignment.termId);
+  const students = await classRoster(assignment.classId, assignment.termId, db);
   const studentIds = students.map((s) => s.id);
-  const marks = await prisma.mark.findMany({
+  const marks = await db.mark.findMany({
     where: { schoolId: user.schoolId, subjectId: assignment.subjectId, termId: assignment.termId, studentId: { in: studentIds } },
     select: { studentId: true },
   });
@@ -54,7 +55,7 @@ async function _POST(req: NextRequest) {
     });
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await db.$tx(async (tx) => {
     const now = new Date();
 
     await tx.mark.updateMany({

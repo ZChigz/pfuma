@@ -1,9 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { canManageAssets } from '@/lib/permissions';
-import { parseBody, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
+import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { CreateAssetSchema } from '@/lib/validations/assets';
 import type { SessionUser } from '@/types';
 
@@ -11,6 +11,7 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const { searchParams } = req.nextUrl;
   const category  = searchParams.get('category')  || undefined;
@@ -18,7 +19,7 @@ async function _GET(req: NextRequest) {
   const status    = searchParams.get('status')     || undefined;
   const q         = searchParams.get('q')          || undefined;
 
-  const assets = await prisma.asset.findMany({
+  const assets = await db.asset.findMany({
     where: {
       schoolId: user.schoolId,
       ...(category  ? { categoryId: category }         : {}),
@@ -46,13 +47,17 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageAssets(user.role); } catch (res) { return res as Response; }
 
   const parsed = await parseBody(req, CreateAssetSchema);
   if ('error' in parsed) return parsed.error;
 
-  const asset = await prisma.$transaction(async (tx) => {
+  const category = await db.assetCategory.findFirst({ where: { id: parsed.data.categoryId, schoolId: user.schoolId } });
+  if (!category) return apiNotFound('Category');
+
+  const asset = await db.$tx(async (tx) => {
     const a = await tx.asset.create({
       data: {
         schoolId:        user.schoolId,

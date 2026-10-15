@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canBulkApplyFees } from '@/lib/permissions';
@@ -14,6 +14,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canBulkApplyFees(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
@@ -21,20 +22,20 @@ async function _POST(req: NextRequest) {
   if ('error' in parsed) return parsed.error;
   const { scope, classId, levelId, feeStructureId, termId } = parsed.data;
 
-  const term = await requireTerm(user.schoolId, termId);
-  const feeStructure = await prisma.feeStructure.findFirst({ where: { id: feeStructureId, schoolId: user.schoolId } });
+  const term = await requireTerm(user.schoolId, termId, db);
+  const feeStructure = await db.feeStructure.findFirst({ where: { id: feeStructureId, schoolId: user.schoolId } });
   if (!feeStructure) return apiError('Fee structure not found', 404);
 
   let targetName: string;
   if (scope === 'class') {
-    const schoolClass = await prisma.schoolClass.findFirst({ where: { id: classId, schoolId: user.schoolId } });
+    const schoolClass = await db.schoolClass.findFirst({ where: { id: classId, schoolId: user.schoolId } });
     if (!schoolClass) return apiError('Class not found', 404);
     if (feeStructure.levelId && feeStructure.levelId !== schoolClass.levelId) {
       return apiError(`This fee structure is for a different level than ${schoolClass.name}`, 422);
     }
     targetName = schoolClass.name;
   } else {
-    const level = await prisma.level.findFirst({ where: { id: levelId, schoolId: user.schoolId } });
+    const level = await db.level.findFirst({ where: { id: levelId, schoolId: user.schoolId } });
     if (!level) return apiError('Level not found', 404);
     if (feeStructure.levelId && feeStructure.levelId !== level.id) {
       return apiError(`This fee structure is not for ${level.name}`, 422);
@@ -42,7 +43,7 @@ async function _POST(req: NextRequest) {
     targetName = level.name;
   }
 
-  const enrolled = await prisma.enrollment.findMany({
+  const enrolled = await db.enrollment.findMany({
     where: {
       schoolId: user.schoolId,
       termId: term.id,
@@ -53,14 +54,14 @@ async function _POST(req: NextRequest) {
   });
   const studentIds = enrolled.map((e) => e.studentId);
 
-  const existingCharges = await prisma.charge.findMany({
+  const existingCharges = await db.charge.findMany({
     where: { studentId: { in: studentIds }, termId: term.id, label: feeStructure.label },
     select: { studentId: true },
   });
   const alreadyCharged = new Set(existingCharges.map((c) => c.studentId));
   const toApply = studentIds.filter((id) => !alreadyCharged.has(id));
 
-  const applied = await prisma.$transaction(async (tx) => {
+  const applied = await db.$tx(async (tx) => {
     await tx.charge.createMany({
       data: toApply.map((studentId) => ({
         schoolId: user.schoolId,

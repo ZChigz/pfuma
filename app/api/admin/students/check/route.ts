@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
 import { canManageEnrollment } from '@/lib/permissions';
+import { getScopedDb } from '@/lib/scoped-db';
 import { requireOpenTerm } from '@/lib/academic/terms';
 import { fieldErrors, RegisterStudentRequestSchema, RegisterStudentSchema } from '@/lib/students/registration';
 import { checkRegistration } from '@/lib/students/server';
@@ -13,6 +14,7 @@ async function _POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageEnrollment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
@@ -27,8 +29,8 @@ async function _POST(req: Request) {
     );
   }
 
-  await requireOpenTerm(user.schoolId);
-  const check = await checkRegistration(user.schoolId, parsed.data);
+  await requireOpenTerm(user.schoolId, db);
+  const check = await checkRegistration(user.schoolId, parsed.data, db);
   return apiSuccess({ student: parsed.data, ...check });
 }
 

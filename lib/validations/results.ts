@@ -55,3 +55,11 @@ export const SaveBoundariesSchema = z.object({
     )
     .min(1, 'At least one boundary is required'),
 });
+
+export const UnpublishResultsSchema = z.object({
+  classId: z.string().min(1, 'Class is required'),
+  termId:  z.string().min(1, 'Term is required'),
+  reason:  z.string().trim().min(10, 'Give a reason of at least 10 characters'),
+  // true: also unlock the marks for teachers to edit; false: marks stay locked (verified).
+  unlockMarks: z.boolean().optional().default(false),
+});

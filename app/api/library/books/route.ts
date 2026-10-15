@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { canManageLibrary } from '@/lib/permissions';
 import { parseBody, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
@@ -11,12 +11,13 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const { searchParams } = req.nextUrl;
   const q         = searchParams.get('q')         || undefined;
   const available = searchParams.get('available') === 'true';
 
-  const books = await prisma.book.findMany({
+  const books = await db.book.findMany({
     where: {
       schoolId: user.schoolId,
       ...(q ? {
@@ -50,6 +51,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
 
@@ -58,7 +60,7 @@ async function _POST(req: NextRequest) {
 
   const currentYear = new Date().getFullYear();
 
-  const { book, copies } = await prisma.$transaction(async (tx) => {
+  const { book, copies } = await db.$tx(async (tx) => {
     const b = await tx.book.create({
       data: {
         schoolId:     user.schoolId,

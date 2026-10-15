@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Table, type Column } from '@/components/ui/Table';
 import { ApplyChargeModal, type TermOption } from './ApplyChargeModal';
+import { PortalLinkPanel } from './PortalLinkPanel';
 import { formatUSD, formatZiG, formatDate } from '@/lib/utils';
 import type { PaymentStatus } from '@/types';
 
@@ -26,7 +27,13 @@ export interface StatementItem {
 interface Props {
   studentId: string;
   terms: TermOption[];
-  portalUrl: string;
+  portal: {
+    hasLink: boolean;
+    createdAt: string | null;
+    expiresAt: string | null;
+    hasPin: boolean;
+    views: { id: string; ip: string; createdAt: string }[];
+  };
   balanceUSD: number;
   balanceZiG: number;
   statement: StatementItem[];
@@ -42,20 +49,12 @@ const STATUS_VARIANT: Record<PaymentStatus, 'success' | 'warning' | 'neutral'> =
 export function StudentDetailClient({
   studentId,
   terms,
-  portalUrl,
+  portal,
   balanceUSD,
   balanceZiG,
   statement,
   canApplyCharge,
 }: Props) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
-    await navigator.clipboard.writeText(portalUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   const columns: Column<StatementItem>[] = [
     {
       key: 'date',
@@ -107,14 +106,12 @@ export function StudentDetailClient({
   return (
     <div className="flex flex-col gap-6">
       {/* Portal link + charge action */}
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white px-4 py-3">
-        <p className="mr-2 text-xs font-medium   text-muted">Portal link</p>
-        <span className="flex-1 truncate text-sm text-ink">{portalUrl}</span>
-        <Button variant="ghost" size="sm" onClick={handleCopy}>
-          {copied ? '✓ Copied' : 'Copy link'}
-        </Button>
-        {canApplyCharge && <ApplyChargeModal studentId={studentId} terms={terms} />}
-      </div>
+      <PortalLinkPanel studentId={studentId} {...portal} />
+      {canApplyCharge && (
+        <div className="flex justify-end">
+          <ApplyChargeModal studentId={studentId} terms={terms} />
+        </div>
+      )}
 
       {/* Balance cards */}
       <div className="grid gap-4 sm:grid-cols-2">
