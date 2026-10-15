@@ -32,7 +32,8 @@ export const ALWAYS_ON_MODULES: readonly string[] = ['system'];
 
 export const PERMISSIONS = {
   'system.dashboard.view':      'View the dashboard',
-  'system.calendar.view':       'View the school calendar',
+  'system.setup.view':          'See the setup checklist',
+  'system.calendar.view':      'View the school calendar',
   'system.calendar.create':     'Add calendar events',
   'system.calendar.update':     'Edit calendar events',
   'system.calendar.delete':     'Delete calendar events',

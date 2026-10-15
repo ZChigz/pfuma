@@ -11,7 +11,7 @@ import { FileUpload } from '@/components/ui/FileUpload';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { toast } from '@/components/ui/Toast';
-import { SchoolSettingsSchema } from '@/lib/validations/system';
+import { PROVINCES, SchoolSettingsSchema } from '@/lib/validations/system';
 
 type FormInput = z.input<typeof SchoolSettingsSchema>;
 type FormOutput = z.output<typeof SchoolSettingsSchema>;
@@ -27,6 +27,11 @@ export interface SchoolProfile {
   logoUrl: string | null;
   defaultCurrency: 'USD' | 'ZIG';
   maxClassSize: number;
+  province: string | null;
+  zimsecCentreNumber: string | null;
+  receiptPrefix: string | null;
+  receiptNextNumber: number;
+  setupChecklistPinned: boolean;
 }
 
 export function SettingsForm({ school, canUpdate }: { school: SchoolProfile; canUpdate: boolean }) {
@@ -38,6 +43,8 @@ export function SettingsForm({ school, canUpdate }: { school: SchoolProfile; can
       name: school.name, schoolType: school.schoolType, location: school.location ?? '', address: school.address ?? '',
       phone: school.phone ?? '', email: school.email ?? '', motto: school.motto ?? '', logoUrl: school.logoUrl ?? '',
       defaultCurrency: school.defaultCurrency, maxClassSize: school.maxClassSize,
+      province: (school.province ?? '') as FormInput['province'], zimsecCentreNumber: school.zimsecCentreNumber ?? '', receiptPrefix: school.receiptPrefix ?? '',
+      receiptNextNumber: school.receiptNextNumber, setupChecklistPinned: school.setupChecklistPinned,
     },
   });
 
@@ -69,6 +76,8 @@ export function SettingsForm({ school, canUpdate }: { school: SchoolProfile; can
             {...register('schoolType')}
           />
           <Input id="s-location" label="Town or district" error={errors.location?.message} {...register('location')} />
+          <Select id="s-province" label="Province" placeholder="Select a province" options={PROVINCES.map((p) => ({ value: p, label: p }))} error={errors.province?.message} {...register('province')} />
+          <Input id="s-centre" label="ZIMSEC centre number" autoCapitalize="characters" error={errors.zimsecCentreNumber?.message} {...register('zimsecCentreNumber')} />
           <Input id="s-motto" label="Motto" error={errors.motto?.message} {...register('motto')} />
           <div className="sm:col-span-2"><Input id="s-address" label="Postal or street address" error={errors.address?.message} {...register('address')} /></div>
           <Input id="s-phone" label="Phone" type="tel" placeholder="+263 242 123456" error={errors.phone?.message} {...register('phone')} />
@@ -102,6 +111,12 @@ export function SettingsForm({ school, canUpdate }: { school: SchoolProfile; can
             hint="Used for new classes" error={errors.maxClassSize?.message}
             {...register('maxClassSize', { valueAsNumber: true })}
           />
+          <Input id="s-rprefix" label="Receipt prefix" placeholder="RCT" hint="Receipts read RCT-000001" error={errors.receiptPrefix?.message} {...register('receiptPrefix')} />
+          <Input id="s-rnext" label="Next receipt number" type="number" inputMode="numeric" min={1} error={errors.receiptNextNumber?.message} {...register('receiptNextNumber', { valueAsNumber: true })} />
+          <label className="flex min-h-[44px] items-center gap-3 text-sm text-ink sm:col-span-2">
+            <input type="checkbox" className="h-5 w-5 accent-primary" {...register('setupChecklistPinned')} />
+            Keep the setup checklist on the dashboard even when every step is done
+          </label>
         </fieldset>
       </Card>
 

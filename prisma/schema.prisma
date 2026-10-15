@@ -314,6 +314,14 @@ model School {
   motto            String?
   logoUrl          String?
   defaultCurrency  Currency    @default(USD)
+  province         String?
+  // ZIMSEC examination centre number.
+  zimsecCentreNumber String?
+  // Receipt numbers look like <prefix>-<number>; a null prefix means not chosen yet.
+  receiptPrefix      String?
+  receiptNextNumber  Int @default(1)
+  // Keeps the dashboard setup checklist visible after every step is done.
+  setupChecklistPinned Boolean @default(false)
   createdAt        DateTime    @default(now())
   // Legacy column "currentTerm" still exists in the database until the
   // contract migration; the current term is now the OPEN AcademicTerm.

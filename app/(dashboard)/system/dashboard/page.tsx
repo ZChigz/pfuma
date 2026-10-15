@@ -4,6 +4,8 @@ import { getScopedDb } from '@/lib/scoped-db';
 import { getViewTerm } from '@/lib/system/view-term';
 import { getDashboardData } from '@/lib/system/dashboard';
 import { subscriptionView } from '@/lib/system/subscription';
+import { checklistVisible, evaluateSetup, loadSetupFacts, summarize } from '@/lib/system/setup-checklist';
+import { SetupChecklist } from '@/components/system/SetupChecklist';
 import { termLabel } from '@/lib/term-label';
 import { formatDate, formatDateTime, formatUSD, formatZiG } from '@/lib/utils';
 import { AccessDenied } from '@/components/ui/AccessDenied';
@@ -25,10 +27,16 @@ export default async function DashboardPage() {
   const { term } = await getViewTerm(user.schoolId, db);
   const showFinance = can('finance.payments.view');
   const showAudit = can('system.audit.view');
-  const [data, sub] = await Promise.all([
+  const showSetup = can('system.setup.view');
+  const [data, sub, setup] = await Promise.all([
     getDashboardData(db, user.schoolId, term, { finance: showFinance, audit: showAudit }),
     can('system.subscription.view') ? db.subscription.findFirst() : Promise.resolve(null),
+    showSetup
+      ? Promise.all([loadSetupFacts(db, user.schoolId, term), db.school.findUniqueOrThrow({ where: { id: user.schoolId }, select: { setupChecklistPinned: true } })])
+      : Promise.resolve(null),
   ]);
+  const steps = setup ? evaluateSetup(setup[0]) : null;
+  const pinned = setup?.[1].setupChecklistPinned ?? false;
   const subscription = sub ? subscriptionView(sub) : null;
 
   return (
@@ -38,6 +46,8 @@ export default async function DashboardPage() {
         description={term ? `Showing ${termLabel(term.name)}${term.status === 'OPEN' ? ' (the open term)' : ''}` : 'No term has been set up yet'}
         breadcrumbs={[{ label: 'Dashboard & System' }, { label: 'Dashboard' }]}
       />
+
+      {steps && checklistVisible(summarize(steps).complete, pinned) && <SetupChecklist steps={steps} pinned={pinned} />}
 
       {subscription && (subscription.status === 'EXPIRED' || subscription.expiringSoon) && (
         <div role="status" className="rounded-2xl border border-warn-line bg-warn-bg px-4 py-3 text-sm text-warn">

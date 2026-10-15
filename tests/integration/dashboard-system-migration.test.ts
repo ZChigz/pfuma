@@ -23,6 +23,7 @@ beforeAll(async () => {
   before = { School: await count('School'), User: await count('User'), AuditLog: await count('AuditLog') };
   await applyMigration(pg, '20261023000000_dashboard_system');
   await applyMigration(pg, '20261023000100_dashboard_system_backfill');
+  await applyMigration(pg, '20261024000000_setup_checklist');
 }, 300_000);
 
 afterAll(async () => { await pg.close(); });
@@ -38,6 +39,13 @@ describe('Dashboard & System migrations', () => {
     const rows = await all<Record<string, unknown>>(`SELECT "id","name","location","schoolType","defaultCurrency","phone","logoUrl" FROM "School" ORDER BY "id"`);
     expect(rows[0]).toMatchObject({ name: 'Old School A', location: 'Harare', schoolType: 'GOVERNMENT', defaultCurrency: 'USD', phone: null, logoUrl: null });
     expect(rows[1]).toMatchObject({ name: 'Old School B', schoolType: 'GOVERNMENT', defaultCurrency: 'USD' });
+  });
+
+  it('setup checklist columns: existing schools get empty values, a hidden checklist flag, and receipts from 1', async () => {
+    const rows = await all<Record<string, unknown>>(`SELECT "province","zimsecCentreNumber","receiptPrefix","receiptNextNumber","setupChecklistPinned" FROM "School"`);
+    expect(rows).toHaveLength(2);
+    for (const r of rows) expect(r).toEqual({ province: null, zimsecCentreNumber: null, receiptPrefix: null, receiptNextNumber: 1, setupChecklistPinned: false });
+    await expect(pg.exec(`UPDATE "School" SET "receiptNextNumber" = 0 WHERE "id" = 's1'`)).rejects.toThrow();
   });
 
   it('give every existing school one active subscription with no end date and no student limit', async () => {

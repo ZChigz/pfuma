@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { MODULE_KEYS } from '@/lib/access-core';
 
+export const PROVINCES = [
+  'Bulawayo', 'Harare', 'Manicaland', 'Mashonaland Central', 'Mashonaland East', 'Mashonaland West',
+  'Masvingo', 'Matabeleland North', 'Matabeleland South', 'Midlands',
+] as const;
+
 export const ROLES = ['ADMIN', 'DIRECTOR', 'HEAD', 'BURSAR', 'TEACHER', 'LIBRARIAN'] as const;
 
 const fullName = z.string().trim().min(2, 'Enter the full name').max(100, 'The name is too long');
@@ -41,6 +46,27 @@ export const SchoolSettingsSchema = z.object({
     .optional(),
   email: z.string().trim().toLowerCase().email('Enter a valid email address').max(254).or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional(),
   motto: optionalText(150),
+  province: z.enum(PROVINCES).or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional(),
+  zimsecCentreNumber: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{3,10}$/, 'Use 3 to 10 letters or digits, as printed on your ZIMSEC papers')
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? null : v))
+    .nullable()
+    .optional(),
+  receiptPrefix: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{1,8}$/, 'Use 1 to 8 letters or digits, e.g. RCT')
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? null : v))
+    .nullable()
+    .optional(),
+  receiptNextNumber: z.number({ error: 'Receipt number must be a number' }).int('Whole number only').min(1, 'At least 1').max(99_999_999).optional(),
+  setupChecklistPinned: z.boolean().optional(),
   logoUrl: z
     .string()
     .trim()

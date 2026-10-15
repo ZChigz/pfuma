@@ -7,6 +7,7 @@ import type { SchoolSettingsSchema } from '@/lib/validations/system';
 export const SCHOOL_PROFILE_SELECT = {
   id: true, name: true, schoolType: true, location: true, address: true, phone: true, email: true,
   motto: true, logoUrl: true, defaultCurrency: true, maxClassSize: true,
+  province: true, zimsecCentreNumber: true, receiptPrefix: true, receiptNextNumber: true, setupChecklistPinned: true,
 } as const;
 
 export async function getSchoolProfile(db: ScopedDb, schoolId: string) {
@@ -32,6 +33,12 @@ export async function updateSchoolProfile(
     logoUrl: input.logoUrl ?? null,
     defaultCurrency: input.defaultCurrency,
     maxClassSize: input.maxClassSize,
+    province: input.province ?? null,
+    zimsecCentreNumber: input.zimsecCentreNumber ?? null,
+    receiptPrefix: input.receiptPrefix ?? null,
+    // Left out of the request = keep what is there.
+    receiptNextNumber: input.receiptNextNumber ?? before.receiptNextNumber,
+    setupChecklistPinned: input.setupChecklistPinned ?? before.setupChecklistPinned,
   };
   const changed = (Object.keys(data) as (keyof typeof data)[]).filter((k) => data[k] !== before[k]);
 
