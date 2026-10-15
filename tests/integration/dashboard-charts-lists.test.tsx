@@ -145,13 +145,16 @@ describe('upcoming events', () => {
     await mk('On now', -1, 2);
     for (let i = 1; i <= 6; i++) await mk(`Future ${i}`, i * 3, i * 3);
     await mk('B only', 1, 1, B);
-    const events = await loadUpcomingEvents(await dbOf(A), A.schoolId);
+    const events = (await loadUpcomingEvents(await dbOf(A), A.users.ADMIN)).filter((e) => !e.preloaded);
     expect(events.map((e) => e.title)).toEqual(['On now', 'Future 1', 'Future 2', 'Future 3', 'Future 4']);
-    expect((await loadUpcomingEvents(await dbOf(B), B.schoolId)).map((e) => e.title)).toEqual(['B only']);
+    expect((await loadUpcomingEvents(await dbOf(B), B.users.ADMIN)).filter((e) => !e.preloaded).map((e) => e.title)).toEqual(['B only']);
   });
 
   it('shows an empty state with a link to add one', async () => {
     const { UpcomingEvents } = await import('@/components/system/lists/Lists');
+    // Mark the holiday years as loaded (and nothing in them), as if the administrator had deleted every holiday.
+    const y = new Date().getUTCFullYear();
+    await prisma.calendarHolidayYear.createMany({ data: [y, y + 1, y + 2].map((year) => ({ schoolId: C.schoolId, year })) });
     const out = await html(UpcomingEvents({ user: userOf(C) }));
     expect(out).toContain('Nothing is coming up');
     expect(out).toContain('href="/system/calendar?new=1"');

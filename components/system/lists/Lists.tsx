@@ -8,7 +8,7 @@ import { ChartPanel, EmptyPanel } from '@/components/system/charts/chart-parts';
 
 export async function UpcomingEvents({ user }: { user: AccessUser }) {
   if (!can(user, 'system.calendar.view')) return null;
-  const events = await loadUpcomingEvents(getScopedDb(user.schoolId, user.id), user.schoolId);
+  const events = await loadUpcomingEvents(getScopedDb(user.schoolId, user.id), user);
   return (
     <ChartPanel title="Upcoming events" subtitle="The next five on the calendar">
       {events.length === 0 ? (
@@ -20,9 +20,9 @@ export async function UpcomingEvents({ user }: { user: AccessUser }) {
         <>
           <ul className="divide-y divide-line">
             {events.map((e) => (
-              <li key={e.id} className="py-2.5 first:pt-0 last:pb-0">
+              <li key={e.key} className="py-2.5 first:pt-0 last:pb-0">
                 <p className="text-sm font-medium text-ink">{e.title}</p>
-                <p className="text-xs text-muted">{formatDate(e.startDate)}{e.endDate.getTime() !== e.startDate.getTime() ? ` to ${formatDate(e.endDate)}` : ''}</p>
+                <p className="text-xs text-muted">{formatDate(e.startDate)}{e.endDate !== e.startDate ? ` to ${formatDate(e.endDate)}` : ''}{e.allDay ? '' : ` · ${e.startTime}`}</p>
               </li>
             ))}
           </ul>

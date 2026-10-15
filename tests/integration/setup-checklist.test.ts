@@ -70,7 +70,7 @@ describe('setup checklist facts', () => {
 
   it('counts an event outside the term as not enough', async () => {
     await prisma.calendarEvent.deleteMany({ where: { schoolId: A.schoolId } });
-    await call('system/calendar', 'POST', { as: A.users.ADMIN, body: { title: 'Next year', kind: 'OTHER', startDate: '2027-03-01', endDate: '2027-03-01' } });
+    await call('system/calendar', 'POST', { as: A.users.ADMIN, body: { title: 'Next year', kind: 'OTHER', startDate: '2027-03-01', endDate: '2027-03-01', acknowledged: true } });
     expect((await stepsFor(A)).calendar).toBe(false);
   });
 

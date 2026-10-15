@@ -37,6 +37,7 @@ export const PERMISSIONS = {
   'system.calendar.create':     'Add calendar events',
   'system.calendar.update':     'Edit calendar events',
   'system.calendar.delete':     'Delete calendar events',
+  'system.calendar.export':     'Export the calendar to PDF',
   'system.settings.view':       'View school settings',
   'system.settings.update':     'Change school settings',
   'system.users.view':          'View users',

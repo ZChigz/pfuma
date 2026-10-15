@@ -194,7 +194,7 @@ describe('input rules (Zod)', () => {
   });
 
   it('checks calendar events', () => {
-    const ok = { title: 'Heroes Day', kind: 'HOLIDAY', startDate: '2026-08-10', endDate: '2026-08-11' };
+    const ok = { title: 'Heroes Day', kind: 'PUBLIC_HOLIDAY', startDate: '2026-08-10', endDate: '2026-08-11' };
     expect(CalendarEventSchema.safeParse(ok).success).toBe(true);
     expect(CalendarEventSchema.safeParse({ ...ok, endDate: '2026-08-09' }).success).toBe(false);
     expect(CalendarEventSchema.safeParse({ ...ok, startDate: '2026-02-30', endDate: '2026-03-01' }).success).toBe(false);
