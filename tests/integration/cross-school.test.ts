@@ -28,6 +28,8 @@ let B: SeededSchool;
 let prisma: typeof import('@/lib/prisma').prisma;
 let before: string;
 let bIds: string[] = [];
+let bEventId = '';
+let bNotificationId = '';
 let bStrings: string[] = [];
 
 const TABLES = [
@@ -35,6 +37,7 @@ const TABLES = [
   'Charge', 'Payment', 'Expense', 'ExpenseRequest', 'AuditLog', 'Subject', 'SubjectAssignment', 'Mark', 'TermResult',
   'GradeBoundary', 'AssetCategory', 'Asset', 'AssetMaintenance', 'AssetDisposal', 'Book', 'BookCopy', 'LibraryMember',
   'Borrowing', 'ExchangeRate', 'PortalAccessLog', 'PasswordResetToken', 'AssetTransfer', 'Income', 'MarkChange',
+  'Subscription', 'SchoolModule', 'RolePermission', 'Notification', 'CalendarEvent',
 ];
 
 /** Every row of school B (and its child rows), as stable JSON. */
@@ -65,6 +68,11 @@ beforeAll(async () => {
   ({ prisma } = await import('@/lib/prisma'));
   A = await seedSchool(prisma, 'School A');
   B = await seedSchool(prisma, 'School B');
+  bEventId = (await prisma.calendarEvent.create({ data: { schoolId: B.schoolId, title: 'B event', startDate: new Date('2026-08-10'), endDate: new Date('2026-08-10'), createdById: B.users.ADMIN.id } })).id;
+  bNotificationId = (await prisma.notification.create({ data: { schoolId: B.schoolId, userId: B.users.HEAD.id, title: 'B note' } })).id;
+  await prisma.subscription.create({ data: { schoolId: B.schoolId } });
+  await prisma.schoolModule.create({ data: { schoolId: B.schoolId, module: 'hr', enabled: false } });
+  await prisma.rolePermission.create({ data: { schoolId: B.schoolId, role: 'HEAD', permission: 'system.users.view' } });
   const snap = await snapshotB();
   before = snap.json;
   bIds = snap.ids;
@@ -228,6 +236,29 @@ const ATTACKS: Attack[] = [
   { name: 'reopen a B term', file: 'director/terms/[id]/reopen', method: 'POST', as: 'DIRECTOR', params: () => ({ id: b().termId }), body: () => ({ reason: 'Trying to reach another school' }), expect: 404 },
   // Also bump every A user: must not touch B's.
   { name: 'log out all sessions (own school only)', file: 'admin/users/logout-all', method: 'POST', as: 'ADMIN', expect: 'ok' },
+  // ── Dashboard & System ──
+  { name: 'system users (list)', file: 'system/users', method: 'GET', as: 'ADMIN', url: () => '?pageSize=100', expect: 'ok' },
+  { name: 'system users CSV', file: 'system/users', method: 'GET', as: 'ADMIN', url: () => '?format=csv', expect: 'ok' },
+  { name: 'system user create (own school)', file: 'system/users', method: 'POST', as: 'ADMIN', body: () => ({ fullName: 'System New', email: 'system.new@schoola.test', role: 'TEACHER' }), expect: 'ok' },
+  { name: "system edit B's user", file: 'system/users/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), body: () => ({ role: 'ADMIN' }), expect: 404 },
+  { name: "system deactivate B's user", file: 'system/users/[id]/deactivate', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.HEAD.id }), expect: 404 },
+  { name: "system reactivate B's user", file: 'system/users/[id]/reactivate', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.HEAD.id }), expect: 404 },
+  { name: "system reset B's user password", file: 'system/users/[id]/reset-password', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },
+  { name: 'system settings read', file: 'system/settings', method: 'GET', as: 'ADMIN', expect: 'ok' },
+  { name: 'system settings change (own school)', file: 'system/settings', method: 'PATCH', as: 'ADMIN', body: () => ({ name: 'School A Renamed', schoolType: 'GOVERNMENT', defaultCurrency: 'USD', maxClassSize: 44 }), expect: 'ok' },
+  { name: 'system calendar (list)', file: 'system/calendar', method: 'GET', as: 'ADMIN', url: () => '?from=2026-01-01&to=2026-12-31', expect: 'ok' },
+  { name: 'system calendar add (own school)', file: 'system/calendar', method: 'POST', as: 'ADMIN', body: () => ({ title: 'A event', kind: 'EXAM', startDate: '2026-09-01', endDate: '2026-09-02' }), expect: 'ok' },
+  { name: "system edit B's event", file: 'system/calendar/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: bEventId }), body: () => ({ title: 'hacked', kind: 'EXAM', startDate: '2026-09-01', endDate: '2026-09-02' }), expect: 404 },
+  { name: "system delete B's event", file: 'system/calendar/[id]', method: 'DELETE', as: 'ADMIN', params: () => ({ id: bEventId }), expect: 404 },
+  { name: 'system audit log (list)', file: 'system/audit-log', method: 'GET', as: 'ADMIN', url: () => '?pageSize=100', expect: 'ok' },
+  { name: 'system audit log filtered by a B person', file: 'system/audit-log', method: 'GET', as: 'ADMIN', url: () => `?actor=${b().users.ADMIN.id}&entity=User`, expect: 'ok' },
+  { name: 'system audit log CSV', file: 'system/audit-log', method: 'GET', as: 'ADMIN', url: () => '?format=csv', expect: 'ok' },
+  { name: 'system modules read', file: 'system/subscription/modules', method: 'GET', as: 'ADMIN', expect: 'ok' },
+  { name: 'system modules change (own school)', file: 'system/subscription/modules', method: 'PATCH', as: 'ADMIN', body: () => ({ modules: { communication: false } }), expect: 'ok' },
+  { name: 'system notifications (list)', file: 'system/notifications', method: 'GET', as: 'HEAD', expect: 'ok' },
+  { name: "system mark B's notification read", file: 'system/notifications', method: 'POST', as: 'HEAD', body: () => ({ id: bNotificationId }), expect: 404 },
+  { name: 'system switch to a B term', file: 'system/view-term', method: 'POST', as: 'ADMIN', body: () => ({ termId: b().termId }), expect: 404 },
+  { name: 'system profile change (own)', file: 'system/profile', method: 'PATCH', as: 'TEACHER', body: () => ({ fullName: 'Own Name Only' }), expect: 'ok' },
 ];
 
 // Routes that take no school-owned data from the caller and are covered elsewhere.

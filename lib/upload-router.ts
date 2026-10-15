@@ -3,6 +3,7 @@
 import { createUploadthing, type FileRouter } from 'uploadthing/next';
 import { UploadThingError, UTFiles } from 'uploadthing/server';
 import { auth } from '@/lib/auth';
+import { requirePermission } from '@/lib/access';
 import { POP_ALLOWED_TYPES, POP_MAX_BYTES, newProofKey } from '@/lib/proof-of-payment';
 
 const f = createUploadthing();
@@ -59,6 +60,18 @@ export const fileRouter = {
       const session = await auth();
       if (!session?.user) throw new Error('Unauthorized');
       return { userId: session.user.id };
+    })
+    .onUploadComplete(() => {}),
+
+  // School logo (Dashboard & System → School Settings): only people who may change settings.
+  schoolLogo: f({ image: { maxFileSize: '2MB', maxFileCount: 1 } })
+    .middleware(async () => {
+      try {
+        const user = await requirePermission('system.settings.update');
+        return { userId: user.id };
+      } catch {
+        throw new UploadThingError('You cannot change the school logo');
+      }
     })
     .onUploadComplete(() => {}),
 } satisfies FileRouter;

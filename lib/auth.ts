@@ -53,6 +53,13 @@ export async function authorizeCredentials(
 
   await clearLoginFailures(email, ip);
 
+  // Feeds "logged in this week" on the dashboard. A failure here must not block sign-in.
+  try {
+    await prisma.user.update({ where: { id: matched.id }, data: { lastLoginAt: new Date() } });
+  } catch {
+    // ignore
+  }
+
   // Bring hashes made with the old, cheaper cost up to the current one.
   if (needsRehash(matched.passwordHash)) {
     try {

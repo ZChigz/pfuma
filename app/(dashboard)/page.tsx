@@ -8,7 +8,7 @@ export default async function DashboardPage() {
   const user = session.user as unknown as SessionUser;
 
   switch (user.role) {
-    case 'ADMIN':     redirect('/admin');
+    case 'ADMIN':     redirect('/system/dashboard');
     case 'DIRECTOR':  redirect('/director');
     case 'HEAD':      redirect('/head');
     case 'BURSAR':    redirect('/bursar/students');

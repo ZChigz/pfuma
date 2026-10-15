@@ -13,7 +13,7 @@ const { auth } = NextAuth(authConfig);
 // ─── Role-based route protection ──────────────────────────────────────────────
 
 const ROLE_HOME: Record<UserRole, string> = {
-  ADMIN:     '/admin',
+  ADMIN:     '/system/dashboard',
   DIRECTOR:  '/director',
   HEAD:      '/head',
   BURSAR:    '/bursar/students',
@@ -78,7 +78,8 @@ const ROLE_ALLOWED: Record<UserRole, (pathname: string) => boolean> = {
 };
 
 // Reachable by any signed-in user, whatever their role.
-const ANY_ROLE = ['/change-password', '/api/account'];
+// /system and /api/system: every signed-in user reaches them, and can() (lib/access.ts) decides what they may do.
+const ANY_ROLE = ['/change-password', '/api/account', '/system', '/api/system'];
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 
