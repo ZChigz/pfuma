@@ -72,7 +72,7 @@ const ROLE_ALLOWED: Record<UserRole, (pathname: string) => boolean> = {
     ]),
 
   TEACHER: (p) =>
-    startsWithAny(p, ['/teacher', '/api/results/marks', '/api/accounting/requests']),
+    startsWithAny(p, ['/teacher', '/api/results/marks', '/api/results/remarks', '/api/accounting/requests']),
 
   LIBRARIAN: (p) => startsWithAny(p, ['/library', '/api/library']),
 };

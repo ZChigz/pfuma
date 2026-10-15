@@ -5,7 +5,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiNotFound, parseBody, withApi 
 import { canPublishResults } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { PublishResultsSchema } from '@/lib/validations/results';
-import { assignPositions, getLetterGrade, passThreshold, summariseStudent, type OfferedSubject } from '@/lib/results';
+import { assignPositions, boundariesFor, getLetterGrade, gradeFor, passThreshold, summariseStudent, type OfferedSubject } from '@/lib/results';
 import { requireTerm } from '@/lib/academic/terms';
 import { classRoster } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
@@ -60,11 +60,23 @@ async function _POST(req: NextRequest) {
   ]);
   const studentIds = students.map((s) => s.id);
 
-  const boundaries = boundaryRows.map((b) => ({
-    minPercent:  b.minPercent.toNumber(),
-    maxPercent:  b.maxPercent.toNumber(),
-    letterGrade: b.letterGrade,
-  }));
+  // The boundaries for this class's level and this term (most specific set wins).
+  const boundaries = boundariesFor(
+    boundaryRows.map((b) => ({
+      minPercent:  b.minPercent.toNumber(),
+      maxPercent:  b.maxPercent.toNumber(),
+      letterGrade: b.letterGrade,
+      levelId:     b.levelId,
+      termId:      b.termId,
+    })),
+    schoolClass.levelId,
+    termId,
+  );
+  const nextTerm = await db.academicTerm.findFirst({
+    where: { schoolId: user.schoolId, startDate: { gt: termRow.startDate } },
+    orderBy: { startDate: 'asc' },
+    select: { startDate: true },
+  });
 
   const offered: OfferedSubject[] = assignments.map((a) => ({
     id: a.subjectId,
@@ -121,6 +133,9 @@ async function _POST(req: NextRequest) {
           subjectsPassed:  s.subjectsPassed,
           subjectsOffered: s.subjectsOffered,
           rankedOutOf,
+          classSize:     students.length,
+          letterGrade:   s.letterGrade,
+          nextTermStartDate: nextTerm?.startDate ?? null,
           published:     true,
           publishedAt:   now,
         },
@@ -137,10 +152,31 @@ async function _POST(req: NextRequest) {
           subjectsPassed:  s.subjectsPassed,
           subjectsOffered: s.subjectsOffered,
           rankedOutOf,
+          classSize:     students.length,
+          letterGrade:   s.letterGrade,
+          nextTermStartDate: nextTerm?.startDate ?? null,
           published:     true,
           publishedAt:   now,
         },
       });
+    }
+
+    // Freeze each score's grade with the boundaries in force now (only rows that differ are touched).
+    const maxBySubject = new Map(offered.map((o) => [o.id, o.maxMark]));
+    for (const m of allMarks) {
+      if (m.status !== 'VERIFIED') continue;
+      const max = maxBySubject.get(m.subjectId) ?? 0;
+      const pct = max > 0 ? (m.rawMark.toNumber() / max) * 100 : 0;
+      const band = gradeFor(pct, boundaries);
+      const min = band?.minPercent ?? null;
+      const top = band?.maxPercent ?? null;
+      if (
+        (band?.letterGrade ?? null) !== m.letterGrade ||
+        min !== (m.gradeMinPercent?.toNumber() ?? null) ||
+        top !== (m.gradeMaxPercent?.toNumber() ?? null)
+      ) {
+        await tx.mark.update({ where: { id: m.id }, data: { letterGrade: band?.letterGrade ?? null, gradeMinPercent: min, gradeMaxPercent: top } });
+      }
     }
 
     await tx.mark.updateMany({

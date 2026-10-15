@@ -248,7 +248,7 @@ export default async function PortalPage({ params }: { params: { token: string }
                       <p className="text-sm font-bold">{tr.term.name}</p>
                       {tr.classPosition != null && (tr.rankedOutOf ?? classSize) != null && (
                         <p className="mt-0.5 text-xs text-emerald-100">
-                          Position {tr.classPosition} out of {tr.rankedOutOf ?? classSize} students
+                          Position {tr.classPosition} of {tr.classSize ?? tr.rankedOutOf ?? classSize}
                         </p>
                       )}
                       {tr.classPosition == null && tr.subjectsSat != null && (
@@ -263,7 +263,7 @@ export default async function PortalPage({ params }: { params: { token: string }
                       {[
                         { label: 'Total', value: tr.totalMarks.toNumber().toFixed(1) },
                         { label: 'Percentage', value: `${pct.toFixed(1)}%` },
-                        { label: 'Grade', value: getGrade(pct) },
+                        { label: 'Grade', value: tr.letterGrade ?? getGrade(pct) }, // frozen when published
                       ].map(({ label, value }) => (
                         <div key={label} className="p-3 text-center">
                           <p className="text-xs text-muted">{label}</p>

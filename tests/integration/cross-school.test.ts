@@ -215,6 +215,8 @@ const ATTACKS: Attack[] = [
   { name: "verify B's marks", file: 'results/marks/verify', method: 'POST', as: 'HEAD', body: () => ({ assignmentId: b().assignmentId, force: true }), expect: 404 },
   { name: "publish B's class", file: 'results/publish', method: 'POST', as: 'HEAD', body: () => ({ classId: b().classId, termId: a().termId }), expect: 404 },
   { name: 'excuse an absence of B', file: 'results/marks/excuse', method: 'POST', as: 'HEAD', body: () => ({ markId: b().markId, excused: true, reason: 'Trying to reach another school' }), expect: 404 },
+  { name: 'remarks of a B student', file: 'results/remarks', method: 'PATCH', as: 'HEAD', body: () => ({ studentId: b().studentId, termId: a().termId, headRemark: 'Hello' }), expect: 404 },
+  { name: 'remove a B level boundary set', file: 'results/grade-boundaries', method: 'DELETE', as: 'HEAD', url: () => `?levelId=${b().levelId}`, expect: 'ok' },
   { name: 'results settings (read own)', file: 'results/settings', method: 'GET', as: 'HEAD', expect: 'ok' },
   { name: 'results settings (change own)', file: 'results/settings', method: 'PATCH', as: 'HEAD', body: () => ({ oLevelRanking: 'AVERAGE' }), expect: 'ok' },
   { name: "unpublish B's class", file: 'results/unpublish', method: 'POST', as: 'HEAD', body: () => ({ classId: b().classId, termId: a().termId, reason: 'Wrong marks entered' }), expect: 404 },

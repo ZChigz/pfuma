@@ -51,16 +51,33 @@ export const UnverifyMarksSchema = z.object({
 });
 
 export const SaveBoundariesSchema = z.object({
+  // Which set is being saved. Both null/absent = the school-wide set.
+  levelId: z.string().min(1).nullable().optional(),
+  termId:  z.string().min(1).nullable().optional(),
   boundaries: z
     .array(
       z.object({
         minPercent:  z.number().min(0).max(100),
         maxPercent:  z.number().min(0).max(100),
-        letterGrade: z.string().min(1).max(5),
+        letterGrade: z.string().trim().min(1).max(5),
       }),
     )
     .min(1, 'At least one boundary is required'),
 });
+
+export const ReportCardDetailsSchema = z
+  .object({
+    studentId: z.string().min(1),
+    termId:    z.string().min(1),
+    classTeacherRemark: z.string().trim().max(500).nullable().optional(),
+    headRemark:         z.string().trim().max(500).nullable().optional(),
+    daysPresent:        z.number().int().min(0).max(366).nullable().optional(),
+    daysAbsent:         z.number().int().min(0).max(366).nullable().optional(),
+  })
+  .refine(
+    (d) => ['classTeacherRemark', 'headRemark', 'daysPresent', 'daysAbsent'].some((k) => (d as Record<string, unknown>)[k] !== undefined),
+    { message: 'Nothing to update' },
+  );
 
 export const UnpublishResultsSchema = z.object({
   classId: z.string().min(1, 'Class is required'),

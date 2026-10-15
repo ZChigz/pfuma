@@ -27,6 +27,9 @@ async function _POST(req: NextRequest) {
   });
   if (!assignment) return apiNotFound('Assignment');
   if (assignment.term.status === 'CLOSED') return apiError(`${assignment.term.name} is closed, so its results are locked. The Director can reopen the term.`, 409);
+  if (assignment.marksStatus === 'PUBLISHED') {
+    return apiError('These results are published. Unpublish the class results first, then unlock the subject.', 409);
+  }
 
 
   const studentIds = await classRosterIds(assignment.classId, assignment.termId, db);

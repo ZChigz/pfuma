@@ -7,7 +7,7 @@ import {
 import { canEnterMarksSync } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { EnterMarkSchema } from '@/lib/validations/results';
-import { getLetterGrade } from '@/lib/results';
+import { boundariesFor, gradeFor } from '@/lib/results';
 import { requireTerm } from '@/lib/academic/terms';
 import { classRoster } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
@@ -125,11 +125,19 @@ async function _POST(req: NextRequest) {
   }
 
   const percentage = kind === 'SCORE' ? (subject.maxMark > 0 ? (rawMark / subject.maxMark) * 100 : 0) : null;
-  const boundaries = await db.gradeBoundary.findMany({ where: { schoolId: user.schoolId } });
-  const letterGrade = percentage === null ? null : getLetterGrade(
+  const klass = await db.schoolClass.findFirst({ where: { id: classId, schoolId: user.schoolId }, select: { levelId: true } });
+  const boundaryRows = await db.gradeBoundary.findMany({ where: { schoolId: user.schoolId } });
+  const band = percentage === null ? null : gradeFor(
     percentage,
-    boundaries.map((b) => ({ minPercent: b.minPercent.toNumber(), maxPercent: b.maxPercent.toNumber(), letterGrade: b.letterGrade })),
+    boundariesFor(
+      boundaryRows.map((b) => ({ minPercent: b.minPercent.toNumber(), maxPercent: b.maxPercent.toNumber(), letterGrade: b.letterGrade, levelId: b.levelId, termId: b.termId })),
+      klass?.levelId ?? null,
+      term.id,
+    ),
   );
+  const letterGrade = band?.letterGrade ?? null;
+  const gradeMinPercent = band?.minPercent ?? null;
+  const gradeMaxPercent = band?.maxPercent ?? null;
 
   const rowStatus = kind === 'SCORE' ? ('DRAFT' as const) : kind;
   const reasonText = kind === 'ABSENT' ? absenceReason || null : null;
@@ -139,8 +147,8 @@ async function _POST(req: NextRequest) {
   const mark = await db.$tx(async (tx) => {
     const m = await tx.mark.upsert({
       where: { studentId_subjectId_termId: { studentId, subjectId, termId: term.id } },
-      update: { rawMark, percentage, letterGrade, status: rowStatus, absenceReason: reasonText, excused: keepExcused, enteredBy: user.id, enteredAt: new Date() },
-      create: { schoolId: user.schoolId, studentId, subjectId, termId: term.id, rawMark, percentage, letterGrade, status: rowStatus, absenceReason: reasonText, enteredBy: user.id },
+      update: { rawMark, percentage, letterGrade, gradeMinPercent, gradeMaxPercent, status: rowStatus, absenceReason: reasonText, excused: keepExcused, enteredBy: user.id, enteredAt: new Date() },
+      create: { schoolId: user.schoolId, studentId, subjectId, termId: term.id, rawMark, percentage, letterGrade, gradeMinPercent, gradeMaxPercent, status: rowStatus, absenceReason: reasonText, enteredBy: user.id },
     });
 
     if (isChange && previous) {

@@ -22,6 +22,10 @@ export default async function AdminSubjectsPage() {
 
   const { schoolId } = user;
 
+  const [gradeLevels, gradeTerms] = await Promise.all([
+    db.level.findMany({ where: { schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
+    db.academicTerm.findMany({ where: { schoolId }, select: { id: true, name: true }, orderBy: { startDate: 'desc' } }),
+  ]);
   const resultsSchool = await db.school.findUnique({ where: { id: schoolId }, select: { passGrade: true, oLevelRanking: true } });
 
   const [subjects, classes, teachers, openTerm] = await Promise.all([
@@ -200,7 +204,7 @@ export default async function AdminSubjectsPage() {
 
       {/* Section 3 — Grade boundaries */}
       <section className="rounded-2xl bg-white p-5">
-        <GradeBoundariesManager />
+        <GradeBoundariesManager levels={gradeLevels} terms={gradeTerms} />
       </section>
 
       <ResultsSettings passGrade={resultsSchool?.passGrade ?? 'C'} oLevelRanking={resultsSchool?.oLevelRanking ?? 'AVERAGE'} />

@@ -63,7 +63,11 @@ export default async function ReportsPage({
     });
     const classByStudent = new Map(enrolled.map((e) => [e.studentId, e.class.name]));
     const rows = await db.termResult.findMany({
-      where: { schoolId: user.schoolId, termId, studentId: { in: Array.from(classByStudent.keys()) } },
+      where: {
+        schoolId: user.schoolId, termId, studentId: { in: Array.from(classByStudent.keys()) },
+        // not the empty rows that only hold remarks until the class is published
+        OR: [{ published: true }, { subjectsOffered: { not: null } }],
+      },
       include: { student: { select: { fullName: true } } },
       orderBy: [{ classPosition: 'asc' }, { student: { fullName: 'asc' } }],
     });
@@ -76,7 +80,7 @@ export default async function ReportsPage({
       classPosition: r.classPosition,
       published:     r.published,
       student:       { fullName: r.student.fullName, className: classByStudent.get(r.studentId) ?? '' },
-      letterGrade:   getLetterGrade(r.percentage.toNumber()),
+      letterGrade:   r.letterGrade ?? getLetterGrade(r.percentage.toNumber()),
     }));
 
     isPublished = results.some((r) => r.published);

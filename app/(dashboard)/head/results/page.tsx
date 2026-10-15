@@ -9,8 +9,9 @@ import { ExportResultsButton } from '@/components/results/ExportResultsButton';
 import { UnlockSubjectLink } from '@/components/results/UnlockSubjectLink';
 import { ReopenResultsButton } from '@/components/results/ReopenResultsButton';
 import { ExcuseAbsenceButton } from '@/components/results/ExcuseAbsenceButton';
+import { ReportCardDetails, type DetailRow } from '@/components/results/ReportCardDetails';
 import { listTerms } from '@/lib/academic/terms';
-import { classRosterIds } from '@/lib/academic/roster';
+import { classRoster, classRosterIds } from '@/lib/academic/roster';
 import type { SessionUser, AssignmentMarkStatus } from '@/types';
 
 const STATUS_DISPLAY: Record<AssignmentMarkStatus, { icon: string; label: string; className: string }> = {
@@ -94,6 +95,25 @@ export default async function HeadResultsPage({
           orderBy: [{ student: { fullName: 'asc' } }],
         })
       : [];
+
+  // Report-card extras (remarks, days present / absent) for everyone in the class.
+  let detailRows: DetailRow[] = [];
+  if (selectedClass && term && user.role === 'HEAD') {
+    const roster = await classRoster(selectedClass.id, selectedTermId, db);
+    const saved = await db.termResult.findMany({ where: { schoolId, termId: selectedTermId, studentId: { in: roster.map((s) => s.id) } } });
+    const byStudent = new Map(saved.map((r) => [r.studentId, r]));
+    detailRows = roster.map((s) => {
+      const r = byStudent.get(s.id);
+      return {
+        studentId: s.id,
+        fullName: s.fullName,
+        classTeacherRemark: r?.classTeacherRemark ?? '',
+        headRemark: r?.headRemark ?? '',
+        daysPresent: r?.daysPresent != null ? String(r.daysPresent) : '',
+        daysAbsent: r?.daysAbsent != null ? String(r.daysAbsent) : '',
+      };
+    });
+  }
 
   const verifiedCount = assignments.filter((a) => a.marksStatus === 'VERIFIED' || a.marksStatus === 'PUBLISHED').length;
   const allVerified = assignments.length > 0 && verifiedCount === assignments.length;
@@ -316,6 +336,8 @@ export default async function HeadResultsPage({
           )}
         </>
       )}
+
+      {detailRows.length > 0 && term?.status !== 'CLOSED' && <ReportCardDetails key={`${selectedClassId}-${selectedTermId}`} termId={selectedTermId} rows={detailRows} />}
     </div>
   );
 }

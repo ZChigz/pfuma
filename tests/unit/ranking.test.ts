@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  assignPositions, passThreshold, requiredSubjects, summariseStudent, type MarkEntry, type OfferedSubject,
+  assignPositions, boundariesFor, getLetterGrade, gradeFor, passThreshold, requiredSubjects, round2, summariseStudent, validateBoundaries,
+  type MarkEntry, type OfferedSubject,
 } from '@/lib/results';
 
 const core = (id: string, maxMark = 100): OfferedSubject => ({ id, maxMark, core: true });
@@ -144,5 +145,95 @@ describe('assignPositions', () => {
 
   it('copes with an empty class', () => {
     expect(assignPositions([]).size).toBe(0);
+  });
+});
+
+describe('4.4 — competition ranking and rounding', () => {
+  const st = (id: string, averagePercentage: number) => ({ id, averagePercentage, subjectsPassed: 0, ranked: true });
+
+  it('equal averages share a position and the next one is skipped (1, 2, 2, 4)', () => {
+    const pos = assignPositions([st('a', 90), st('b', 80), st('c', 80), st('d', 70)]);
+    expect(['a', 'b', 'c', 'd'].map((k) => pos.get(k))).toEqual([1, 2, 2, 4]);
+  });
+
+  it('more than two tied: 1, 1, 1, 4', () => {
+    const pos = assignPositions([st('a', 80), st('b', 80), st('c', 80), st('d', 70)]);
+    expect(['a', 'b', 'c', 'd'].map((k) => pos.get(k))).toEqual([1, 1, 1, 4]);
+  });
+
+  it('rounds to 2 decimal places without floating-point noise', () => {
+    expect(round2(1.005)).toBe(1.01);
+    expect(round2(66.665)).toBe(66.67);
+    expect(round2(0.1 + 0.2)).toBe(0.3);
+    expect(round2(70)).toBe(70);
+  });
+
+  it('averages that only differ by floating-point noise tie', () => {
+    const third = 80.00000000000001;  // the same 80 with floating-point dust either side
+    const noisy = 79.99999999999999;
+    expect(third).not.toBe(noisy);
+    const pos = assignPositions([st('a', third), st('b', noisy), st('c', 79.99)]);
+    expect(pos.get('a')).toBe(1);
+    expect(pos.get('b')).toBe(1);
+    expect(pos.get('c')).toBe(3);
+  });
+
+  it('averages 0.01 apart do not tie', () => {
+    const pos = assignPositions([st('a', 70.01), st('b', 70.0)]);
+    expect([pos.get('a'), pos.get('b')]).toEqual([1, 2]);
+  });
+});
+
+describe('4.5 — grade boundaries', () => {
+  const set = (...r: [string, number, number][]) => r.map(([letterGrade, minPercent, maxPercent]) => ({ letterGrade, minPercent, maxPercent }));
+  const GOOD = set(['A', 80, 100], ['B', 70, 79], ['C', 60, 69], ['D', 50, 59], ['E', 40, 49], ['F', 0, 39]);
+
+  it('accepts whole-number bands and two-decimal bands that cover 0–100', () => {
+    expect(validateBoundaries(GOOD)).toBeNull();
+    expect(validateBoundaries(set(['P', 50, 100], ['F', 0, 49.99]))).toBeNull();
+    expect(validateBoundaries(set(['X', 0, 100]))).toBeNull();
+  });
+
+  it('rejects ranges that overlap', () => {
+    expect(validateBoundaries(set(['A', 75, 100], ['B', 0, 80]))).toMatch(/overlap/);
+    expect(validateBoundaries(set(['A', 80, 100], ['B', 0, 80]))).toMatch(/overlap/); // sharing a point
+  });
+
+  it('rejects gaps, including a missing bottom or top', () => {
+    expect(validateBoundaries(set(['A', 80, 100], ['C', 0, 59]))).toMatch(/Gap between 59% and 80%/);
+    expect(validateBoundaries(set(['A', 80, 100], ['B', 10, 79]))).toMatch(/start at 0%/);
+    expect(validateBoundaries(set(['A', 80, 95], ['B', 0, 79]))).toMatch(/end at 100%/);
+    expect(validateBoundaries(set(['A', 80, 100], ['B', 0, 78]))).toMatch(/Gap/);
+  });
+
+  it('rejects empty sets, bad values and repeated letters', () => {
+    expect(validateBoundaries([])).toMatch(/At least one/);
+    expect(validateBoundaries(set(['A', 60, 50]))).toMatch(/min %/);
+    expect(validateBoundaries(set(['A', 0, 120]))).toMatch(/between 0 and 100/);
+    expect(validateBoundaries(set(['A', 50, 100], ['a', 0, 49]))).toMatch(/only be used once/);
+  });
+
+  it('picks the band by the lowest mark it starts at, so fractions never fall in a hole', () => {
+    expect(getLetterGrade(79.5, GOOD)).toBe('B');
+    expect(getLetterGrade(80, GOOD)).toBe('A');
+    expect(getLetterGrade(39.99, GOOD)).toBe('F');
+    expect(getLetterGrade(0, GOOD)).toBe('F');
+    expect(getLetterGrade(100, GOOD)).toBe('A');
+    expect(gradeFor(65, GOOD)).toMatchObject({ letterGrade: 'C', minPercent: 60, maxPercent: 69 });
+  });
+
+  it('the most specific set wins: level + term, level, term, then school-wide', () => {
+    const rows = [
+      { letterGrade: 'ALL', minPercent: 0, maxPercent: 100, levelId: null, termId: null },
+      { letterGrade: 'TERM', minPercent: 0, maxPercent: 100, levelId: null, termId: 't1' },
+      { letterGrade: 'LEVEL', minPercent: 0, maxPercent: 100, levelId: 'o', termId: null },
+      { letterGrade: 'BOTH', minPercent: 0, maxPercent: 100, levelId: 'o', termId: 't1' },
+    ];
+    const grade = (l: string | null, t: string | null) => boundariesFor(rows, l, t)[0].letterGrade;
+    expect(grade('o', 't1')).toBe('BOTH');
+    expect(grade('o', 't2')).toBe('LEVEL');
+    expect(grade('a', 't1')).toBe('TERM');
+    expect(grade('a', 't2')).toBe('ALL');
+    expect(boundariesFor([], 'o', 't1')).toEqual([]);
   });
 });

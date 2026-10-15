@@ -230,6 +230,8 @@ enum AuditAction {
   REOPEN_TERM
   CHANGE_MARK
   EXCUSE_ABSENCE
+  UPDATE_GRADE_BOUNDARIES
+  UPDATE_REPORT_CARD
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
@@ -366,6 +368,7 @@ model Level {
   school        School         @relation(fields: [schoolId], references: [id])
   classes       SchoolClass[]
   feeStructures FeeStructure[]
+  gradeBoundaries GradeBoundary[]
 
   @@unique([schoolId, name])
   @@unique([schoolId, order])
@@ -412,6 +415,7 @@ model AcademicTerm {
   marks              Mark[]
   termResults        TermResult[]
   enrollments        Enrollment[]
+  gradeBoundaries    GradeBoundary[]
 
   @@unique([academicYearId, termNumber])
   @@index([schoolId])
@@ -786,6 +790,11 @@ model Mark {
   // Why the student was absent (status ABSENT), and whether the Head excused it.
   absenceReason   String?
   excused         Boolean   @default(false)
+  // The boundary the letter grade came from, copied when the mark is entered and
+  // again when the class is published, so later boundary edits never change a
+  // published grade.
+  gradeMinPercent Decimal?  @db.Decimal(14, 2)
+  gradeMaxPercent Decimal?  @db.Decimal(14, 2)
   enteredBy   String
   enteredAt   DateTime   @default(now())
 
@@ -841,6 +850,14 @@ model TermResult {
   subjectsTaken     Int?
   averagePercentage Decimal? @db.Decimal(14, 2)
   subjectsPassed    Int?
+  // 4.4 / 4.6: students in the class ("Position 2 of 42"), the overall grade as
+  // published, and the report-card extras.
+  classSize         Int?
+  letterGrade       String?
+  classTeacherRemark String?
+  daysPresent       Int?
+  daysAbsent        Int?
+  nextTermStartDate DateTime? @db.Date
   headRemark    String?
   published     Boolean   @default(false)
   publishedAt   DateTime?
@@ -855,16 +872,24 @@ model TermResult {
   @@index([schoolId, studentId])
 }
 
+// A set of boundaries is all rows sharing the same (levelId, termId). The most
+// specific set wins: level + term, then level, then term, then the school-wide set
+// (both null). This lets O Level and A Level use different boundaries.
 model GradeBoundary {
   id          String  @id @default(cuid())
   schoolId    String
+  levelId     String?
+  termId      String?
   minPercent  Decimal @db.Decimal(14, 2)
   maxPercent  Decimal @db.Decimal(14, 2)
   letterGrade String
 
-  school School @relation(fields: [schoolId], references: [id])
+  school School        @relation(fields: [schoolId], references: [id])
+  level  Level?        @relation(fields: [levelId], references: [id])
+  term   AcademicTerm? @relation(fields: [termId], references: [id])
 
   @@index([schoolId])
+  @@index([schoolId, levelId, termId])
 }
 
 // ─── Assets ──────────────────────────────────────────────────────────────────

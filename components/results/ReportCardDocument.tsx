@@ -3,14 +3,25 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 export interface ReportCardData {
   schoolName:    string;
   studentName:   string;
+  admissionNumber?: string;
+  /** e.g. "Form 2" and "North" */
+  level?:        string;
+  stream?:       string;
   grade:         string;
   term:          string;
   classPosition: number | null;
+  /** Students in the class: "Position 2 of 42". */
+  classSize?:    number | null;
   rankedOutOf:   number | null;
   subjectsSat:   number | null;
   subjectsOffered: number | null;
   percentage:    number;
   headRemark:    string | null;
+  classTeacherRemark?: string | null;
+  daysPresent?:  number | null;
+  daysAbsent?:   number | null;
+  /** ISO date (YYYY-MM-DD) the next term starts. */
+  nextTermStartDate?: string | null;
   marks: Array<{
     subjectName: string;
     rawMark:     number;
@@ -102,11 +113,17 @@ export function ReportCardDocument({ data }: Props) {
         <View style={S.infoGrid}>
           {[
             { label: 'Student Name', value: studentName },
-            { label: 'Grade / Class', value: grade },
+            { label: 'Admission Number', value: data.admissionNumber ?? '—' },
+            { label: 'Level', value: data.level ?? '—' },
+            { label: 'Stream / Class', value: data.stream ? `${data.stream} (${grade})` : grade },
             { label: 'Term',          value: term },
-            { label: 'Class Position', value: classPosition != null ? `${classPosition}${data.rankedOutOf ? ` of ${data.rankedOutOf}` : ''}` : data.subjectsSat != null ? 'Not ranked' : '—' },
+            { label: 'Class Position', value: classPosition != null ? `Position ${classPosition} of ${data.classSize ?? data.rankedOutOf ?? '—'}` : data.subjectsSat != null ? 'Not ranked' : '—' },
             { label: 'Overall %',     value: `${percentage.toFixed(1)}%` },
             { label: 'Subjects taken', value: data.subjectsSat != null && data.subjectsOffered != null ? `${data.subjectsSat} of ${data.subjectsOffered}` : `${marks.length}` },
+            ...(data.daysPresent != null || data.daysAbsent != null
+              ? [{ label: 'Days present / absent', value: `${data.daysPresent ?? '—'} / ${data.daysAbsent ?? '—'}` }]
+              : []),
+            ...(data.nextTermStartDate ? [{ label: 'Next term starts', value: data.nextTermStartDate }] : []),
           ].map(({ label, value }) => (
             <View key={label} style={S.infoCell}>
               <Text style={S.infoLabel}>{label}</Text>
@@ -141,6 +158,14 @@ export function ReportCardDocument({ data }: Props) {
         {marks.length === 0 && (
           <View style={S.row}>
             <Text style={{ color: '#6b7a70', fontSize: 9 }}>No marks recorded for this term.</Text>
+          </View>
+        )}
+
+        {/* Class teacher's remark */}
+        {data.classTeacherRemark && (
+          <View style={S.remarkBox}>
+            <Text style={S.remarkLabel}>Class Teacher's Remark</Text>
+            <Text style={S.remarkText}>{data.classTeacherRemark}</Text>
           </View>
         )}
 

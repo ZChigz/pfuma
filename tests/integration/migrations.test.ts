@@ -50,6 +50,7 @@ beforeAll(async () => {
     '20261017000200_security_rls_audit',
     '20261018000000_results_corrections',
     '20261019000000_absences_and_averages',
+    '20261020000000_report_cards',
   ]) await applyMigration(pg, m);
 }, 300_000);
 
@@ -104,6 +105,13 @@ describe('migrations on top of the live demo data', () => {
     for (const s of schools) expect(s).toEqual({ passGrade: 'C', oLevelRanking: 'AVERAGE' });
     const bad = await one<{ n: string }>(`SELECT count(*) AS n FROM "TermResult" WHERE "subjectsTaken" IS DISTINCT FROM "subjectsSat" OR "averagePercentage" IS DISTINCT FROM "percentage"`);
     expect(Number(bad.n)).toBe(0);
+  });
+
+  it('add per-level grade boundaries with the same-school check', async () => {
+    const cols = await all<{ column_name: string }>(`SELECT column_name FROM information_schema.columns WHERE table_name = 'GradeBoundary' AND column_name IN ('levelId','termId')`);
+    expect(cols).toHaveLength(2);
+    const unscoped = await one<{ n: string }>(`SELECT count(*) AS n FROM "GradeBoundary" WHERE "levelId" IS NOT NULL OR "termId" IS NOT NULL`);
+    expect(Number(unscoped.n)).toBe(0); // existing boundaries stay school-wide
   });
 
   it('give existing users safe defaults', async () => {

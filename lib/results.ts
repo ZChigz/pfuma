@@ -84,7 +84,8 @@ export function summariseStudent(marks: MarkEntry[], offered: OfferedSubject[], 
   return { totalMarks, averagePercentage, subjectsTaken: counted.length, subjectsPassed: passed, subjectsOffered: offered.length, ranked };
 }
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
+/** Rounds to 2 decimal places without binary floating-point noise (1.005 -> 1.01). */
+export const round2 = (n: number) => Number(Math.round(Number(`${n}e2`)) + 'e-2');
 
 /** Position for every RANKED student. Unranked students are absent from the map. */
 export function assignPositions(
@@ -107,12 +108,69 @@ export function assignPositions(
   return positions;
 }
 
-export function getLetterGrade(
-  percentage: number,
-  boundaries: { minPercent: number; maxPercent: number; letterGrade: string }[],
-): string | null {
-  const boundary = boundaries.find((b) => percentage >= b.minPercent && percentage <= b.maxPercent);
-  return boundary?.letterGrade ?? null;
+// ─── Grade boundaries ────────────────────────────────────────────────────────
+
+export interface BoundaryRow {
+  minPercent: number;
+  maxPercent: number;
+  letterGrade: string;
+  levelId?: string | null;
+  termId?: string | null;
+}
+
+/**
+ * The boundary set for a level and term: the most specific non-empty set wins —
+ * level + term, then level, then term, then the school-wide set.
+ */
+export function boundariesFor<T extends BoundaryRow>(rows: T[], levelId: string | null, termId: string | null): T[] {
+  const pick = (l: string | null, t: string | null) => rows.filter((r) => (r.levelId ?? null) === l && (r.termId ?? null) === t);
+  const tries: [string | null, string | null][] = [[levelId, termId], [levelId, null], [null, termId], [null, null]];
+  for (const [l, t] of tries) {
+    const set = pick(l, t);
+    if (set.length > 0) return set;
+  }
+  return [];
+}
+
+/**
+ * A set must start at 0, end at 100, not overlap and leave no gaps. Marks are
+ * percentages with decimals, so a band belongs to the lowest mark it starts at:
+ * the next band may start 1 point (whole-number bands: 70–79, 80–100) or 0.01
+ * (70–79.99, 80–100) above the previous maximum.
+ */
+export function validateBoundaries(rows: { minPercent: number; maxPercent: number; letterGrade: string }[]): string | null {
+  if (rows.length === 0) return 'At least one boundary is required';
+  for (const r of rows) {
+    if (!(r.minPercent >= 0 && r.maxPercent <= 100)) return 'Values must be between 0 and 100';
+    if (r.minPercent > r.maxPercent) return `${r.letterGrade}: min % must not be above max %`;
+    if (!r.letterGrade.trim()) return 'Letter grade cannot be empty';
+  }
+  const letters = rows.map((r) => r.letterGrade.trim().toLowerCase());
+  if (new Set(letters).size !== letters.length) return 'Each letter grade can only be used once';
+  const sorted = [...rows].sort((x, y) => x.minPercent - y.minPercent);
+  if (sorted[0].minPercent !== 0) return `The lowest range must start at 0% (it starts at ${sorted[0].minPercent}%)`;
+  if (sorted[sorted.length - 1].maxPercent !== 100) return `The highest range must end at 100% (it ends at ${sorted[sorted.length - 1].maxPercent}%)`;
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const cur = sorted[i];
+    if (cur.minPercent <= prev.maxPercent) return `Ranges overlap: ${prev.letterGrade} (${prev.minPercent}–${prev.maxPercent}%) and ${cur.letterGrade} (${cur.minPercent}–${cur.maxPercent}%)`;
+    const step = round2(cur.minPercent - prev.maxPercent);
+    if (step !== 1 && step !== 0.01) return `Gap between ${prev.maxPercent}% and ${cur.minPercent}%`;
+  }
+  return null;
+}
+
+/** The boundary a percentage falls in: the highest band whose minimum it reaches. */
+export function gradeFor<T extends BoundaryRow>(percentage: number, boundaries: T[]): T | null {
+  let best: T | null = null;
+  for (const b of boundaries) {
+    if (percentage >= b.minPercent && (best === null || b.minPercent > best.minPercent)) best = b;
+  }
+  return best;
+}
+
+export function getLetterGrade(percentage: number, boundaries: BoundaryRow[]): string | null {
+  return gradeFor(percentage, boundaries)?.letterGrade ?? null;
 }
 
 export const ASSIGNMENT_STATUS_LABELS: Record<AssignmentMarkStatus, string> = {
