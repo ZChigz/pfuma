@@ -41,8 +41,9 @@ const VIA_PARENT: Record<string, string> = {
   ExpenseRequestItem: 'request',
 };
 
-// Auth.js adapter tables: unused (JWT sessions) and not tied to a school.
-const BLOCKED = new Set(['Account', 'Session', 'VerificationToken']);
+// Models that must never be reached through the school-scoped client (none at the moment;
+// the Auth.js adapter tables were removed).
+const BLOCKED = new Set<string>();
 
 const WHERE_UNIQUE_OPS = new Set(['findUnique', 'findUniqueOrThrow', 'update', 'delete']);
 const WHERE_FILTER_OPS = new Set([

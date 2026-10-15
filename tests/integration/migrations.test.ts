@@ -52,6 +52,7 @@ beforeAll(async () => {
     '20261019000000_absences_and_averages',
     '20261020000000_report_cards',
     '20261021000000_library_members_and_copies',
+    '20261022000000_rates_resets_assets',
   ]) await applyMigration(pg, m);
 }, 300_000);
 
@@ -125,6 +126,17 @@ describe('migrations on top of the live demo data', () => {
     expect([school.studentLoanLimit, school.staffLoanLimit]).toEqual([2, 5]);
     const cols = await all(`SELECT 1 FROM information_schema.columns WHERE table_name = 'Book' AND column_name = 'totalCopies'`);
     expect(cols).toHaveLength(0);
+  });
+
+  it('give rates an effective date, drop the NextAuth tables and add the new tables', async () => {
+    const dropped = await all(`SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('Account','Session','VerificationToken')`);
+    expect(dropped).toHaveLength(0);
+    for (const table of ['PasswordResetToken', 'AssetTransfer', 'Income']) {
+      const r = await one<{ relrowsecurity: boolean; relforcerowsecurity: boolean }>(`SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = $1`, [table]);
+      expect(r, table).toEqual({ relrowsecurity: true, relforcerowsecurity: true });
+    }
+    const dupes = await one<{ n: string }>(`SELECT count(*) AS n FROM (SELECT 1 FROM "Asset" GROUP BY "schoolId", "tagNumber" HAVING count(*) > 1) d`);
+    expect(Number(dupes.n)).toBe(0);
   });
 
   it('give existing users safe defaults', async () => {

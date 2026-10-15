@@ -98,7 +98,7 @@ export default auth(async (req: NextRequest & { auth: { user?: { id?: string; ro
   const limiters = getLimiters();
 
   // Parent portal: 30 requests a minute per IP.
-  if (pathname.startsWith('/portal') || pathname.startsWith('/api/portal/')) {
+  if (pathname.startsWith('/portal') || pathname.startsWith('/api/portal/') || pathname.startsWith('/reset-password') || pathname.startsWith('/api/password-reset')) {
     const r = await limiters.portal.check(ip);
     if (!r.allowed) return tooManyRequests(r.retryAfter);
   }
@@ -106,7 +106,7 @@ export default auth(async (req: NextRequest & { auth: { user?: { id?: string; ro
   // Everything else under /api: 100 a minute per signed-in user, or per IP when
   // not signed in. Signed-in requests also count against a looser per-IP ceiling,
   // because a whole school's staff may share one address.
-  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/portal/')) {
+  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/portal/') && !pathname.startsWith('/api/password-reset')) {
     const userId = req.auth?.user?.id;
     const checks = userId
       ? [limiters.api.check(`user:${userId}`), limiters.apiPerIp.check(ip)]
@@ -123,6 +123,8 @@ export default auth(async (req: NextRequest & { auth: { user?: { id?: string; ro
     pathname.startsWith('/login') ||
     pathname.startsWith('/portal') ||
     pathname.startsWith('/api/portal/') ||
+    pathname.startsWith('/reset-password') ||
+    pathname.startsWith('/api/password-reset') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/upload') ||
     pathname.startsWith('/api/health');

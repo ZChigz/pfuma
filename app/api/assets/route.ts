@@ -3,8 +3,9 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { canManageAssets } from '@/lib/permissions';
-import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
+import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { CreateAssetSchema } from '@/lib/validations/assets';
+import { resolveCustodian } from '@/lib/assets';
 import type { SessionUser } from '@/types';
 
 async function _GET(req: NextRequest) {
@@ -57,6 +58,11 @@ async function _POST(req: NextRequest) {
   const category = await db.assetCategory.findFirst({ where: { id: parsed.data.categoryId, schoolId: user.schoolId } });
   if (!category) return apiNotFound('Category');
 
+  const duplicate = await db.asset.findFirst({ where: { schoolId: user.schoolId, tagNumber: parsed.data.tagNumber } });
+  if (duplicate) return apiError(`Tag number ${parsed.data.tagNumber} is already used by ${duplicate.name}`, 409);
+  const who = await resolveCustodian(db, { custodianId: parsed.data.custodianId, custodian: parsed.data.custodian });
+  if (!who) return apiNotFound('Custodian');
+
   const asset = await db.$tx(async (tx) => {
     const a = await tx.asset.create({
       data: {
@@ -69,7 +75,8 @@ async function _POST(req: NextRequest) {
         acquisitionCost: parsed.data.acquisitionCost,
         currency:        parsed.data.currency,
         location:        parsed.data.location,
-        custodian:       parsed.data.custodian      || null,
+        custodian:       who.custodian,
+        custodianId:     who.custodianId,
         condition:       parsed.data.condition,
         imageUrl:        parsed.data.imageUrl       || null,
       },

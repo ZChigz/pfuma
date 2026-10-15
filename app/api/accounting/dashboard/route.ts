@@ -22,6 +22,8 @@ async function _GET(req: NextRequest) {
     collectedZiGRaw,
     spentUSDRaw,
     spentZiGRaw,
+    otherIncomeUSDRaw,
+    otherIncomeZiGRaw,
     expCatRaw,
     pmRaw,
     students,
@@ -31,6 +33,9 @@ async function _GET(req: NextRequest) {
     db.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'ZIG' }, _sum: { amount: true } }),
     db.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'USD' }, _sum: { amount: true } }),
     db.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'ZIG' }, _sum: { amount: true } }),
+    // Other income, e.g. proceeds from disposed assets
+    db.income.aggregate({ where: { schoolId, currency: 'USD' }, _sum: { amount: true } }),
+    db.income.aggregate({ where: { schoolId, currency: 'ZIG' }, _sum: { amount: true } }),
     db.expense.groupBy({
       by: ['category'],
       where: { schoolId, status: 'ACTIVE', currency },
@@ -71,6 +76,8 @@ async function _GET(req: NextRequest) {
   const collectedZiG = collectedZiGRaw._sum.amount?.toNumber() ?? 0;
   const spentUSD     = spentUSDRaw._sum.amount?.toNumber() ?? 0;
   const spentZiG     = spentZiGRaw._sum.amount?.toNumber() ?? 0;
+  const otherIncomeUSD = otherIncomeUSDRaw._sum.amount?.toNumber() ?? 0;
+  const otherIncomeZiG = otherIncomeZiGRaw._sum.amount?.toNumber() ?? 0;
 
   // ── Per-student balances ──────────────────────────────────────────────────
   let outstandingUSD = 0;
@@ -166,8 +173,10 @@ async function _GET(req: NextRequest) {
     collectedZiG,
     spentUSD,
     spentZiG,
-    netUSD: collectedUSD - spentUSD,
-    netZiG: collectedZiG - spentZiG,
+    otherIncomeUSD,
+    otherIncomeZiG,
+    netUSD: collectedUSD + otherIncomeUSD - spentUSD,
+    netZiG: collectedZiG + otherIncomeZiG - spentZiG,
     outstandingUSD,
     outstandingZiG,
     expensesByCategory,

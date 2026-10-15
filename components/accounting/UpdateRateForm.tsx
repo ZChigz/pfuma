@@ -13,6 +13,8 @@ const Schema = z.object({
     .number({ error: 'Please enter a rate' })
     .positive('Rate must be positive'),
   note: z.string().optional(),
+  effectiveFrom: z.string().optional(),
+  source: z.enum(['RBZ', 'SCHOOL', 'OTHER']),
 });
 
 type FormValues = z.infer<typeof Schema>;
@@ -32,14 +34,14 @@ export function UpdateRateForm({ currentRate }: Props) {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(Schema),
-    defaultValues: { usdToZig: currentRate ?? undefined, note: '' },
+    defaultValues: { usdToZig: currentRate ?? undefined, note: '', effectiveFrom: '', source: 'SCHOOL' },
   });
 
   async function onSubmit(values: FormValues) {
     const res  = await fetch('/api/accounting/exchange-rate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(values),
+      body:    JSON.stringify({ ...values, effectiveFrom: values.effectiveFrom ? new Date(values.effectiveFrom).toISOString() : undefined }),
     });
     const body = await res.json();
     if (!res.ok) {
@@ -47,7 +49,7 @@ export function UpdateRateForm({ currentRate }: Props) {
       return;
     }
     toast.success('Exchange rate updated');
-    reset({ usdToZig: values.usdToZig, note: '' });
+    reset({ usdToZig: values.usdToZig, note: '', effectiveFrom: '', source: values.source });
     router.refresh();
   }
 
@@ -64,6 +66,21 @@ export function UpdateRateForm({ currentRate }: Props) {
         error={errors.usdToZig?.message}
         {...register('usdToZig', { valueAsNumber: true })}
       />
+      <Input
+        id="effectiveFrom"
+        label="Effective from (leave empty for now)"
+        type="datetime-local"
+        {...register('effectiveFrom')}
+      />
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
+        Source
+        <select {...register('source')} className="min-h-[44px] rounded-xl border border-line bg-canvas px-3 text-sm font-normal">
+          <option value="SCHOOL">School</option>
+          <option value="RBZ">RBZ</option>
+          <option value="OTHER">Other</option>
+        </select>
+      </label>
+      <p className="-mt-2 text-xs text-muted">Rates are history and cannot be edited. To correct a mistake, enter a new rate.</p>
       <Input
         id="note"
         label="Note (optional)"

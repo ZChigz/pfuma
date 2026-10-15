@@ -34,7 +34,7 @@ const TABLES = [
   'User', 'SchoolClass', 'Level', 'AcademicYear', 'AcademicTerm', 'Enrollment', 'Student', 'Guardian', 'FeeStructure',
   'Charge', 'Payment', 'Expense', 'ExpenseRequest', 'AuditLog', 'Subject', 'SubjectAssignment', 'Mark', 'TermResult',
   'GradeBoundary', 'AssetCategory', 'Asset', 'AssetMaintenance', 'AssetDisposal', 'Book', 'BookCopy', 'LibraryMember',
-  'Borrowing', 'ExchangeRate', 'PortalAccessLog',
+  'Borrowing', 'ExchangeRate', 'PortalAccessLog', 'PasswordResetToken', 'AssetTransfer', 'Income', 'MarkChange',
 ];
 
 /** Every row of school B (and its child rows), as stable JSON. */
@@ -171,6 +171,7 @@ const ATTACKS: Attack[] = [
   { name: 'subjects (list)', file: 'admin/subjects', method: 'GET', as: 'ADMIN', expect: 'ok' },
   { name: 'subject create (own school)', file: 'admin/subjects', method: 'POST', as: 'ADMIN', body: () => ({ name: 'Physics', code: 'PHY1' }), expect: 'ok' },
   { name: "log out B's user", file: 'admin/users/[id]/logout', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },
+  { name: 'reset link for a B user', file: 'admin/users/[id]/reset-link', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },
   { name: "reset B's user password", file: 'admin/users/[id]/reset-password', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },
   { name: "deactivate B's user", file: 'admin/users/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: b().users.HEAD.id }), body: () => ({ active: false }), expect: 404 },
   { name: "change B user's role", file: 'admin/users/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), body: () => ({ role: 'ADMIN' }), expect: 404 },
@@ -235,6 +236,7 @@ const EXEMPT: Record<string, string> = {
   'health': 'public liveness check; reads nothing school-specific',
   'upload': 'UploadThing handler; school id comes from the session, files are keyed pop:<schoolId>:…',
   'account/change-password': "changes the signed-in user's own password; no id is accepted",
+  'password-reset': 'public; the single-use reset link is the credential (tests/integration/rates-resets-assets.test.ts)',
   'portal/verify-pin': 'public; looks the student up by the hash of a secret link token (tests/integration/portal.test.ts)',
 };
 

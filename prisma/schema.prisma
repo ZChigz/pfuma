@@ -169,6 +169,18 @@ enum CopyStatus {
   WITHDRAWN // taken out of circulation
 }
 
+// Where an exchange rate came from.
+enum RateSource {
+  RBZ
+  SCHOOL
+  OTHER
+}
+
+enum IncomeSource {
+  ASSET_DISPOSAL
+  OTHER
+}
+
 enum MemberType {
   STAFF
   STUDENT
@@ -244,6 +256,11 @@ enum AuditAction {
   UPDATE_BOOK_COPY
   SETTLE_LIBRARY_FINE
   UPDATE_LIBRARY_SETTINGS
+  SET_EXCHANGE_RATE
+  TRANSFER_ASSET
+  RECORD_INCOME
+  CREATE_PASSWORD_RESET
+  USE_PASSWORD_RESET
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
@@ -297,6 +314,9 @@ model School {
   borrowings         Borrowing[]
   exchangeRates      ExchangeRate[]
   schoolClasses      SchoolClass[]
+  passwordResetTokens PasswordResetToken[]
+  assetTransfers     AssetTransfer[]
+  incomes            Income[]
 }
 
 model User {
@@ -338,9 +358,14 @@ model User {
   classesTaught       SchoolClass[]
   closedTerms         AcademicTerm[]      @relation("ClosedTerms")
 
-  accounts      Account[]
-  sessions      Session[]
   exchangeRates ExchangeRate[]
+  resetTokens        PasswordResetToken[] @relation("ResetTokenUser")
+  resetTokensCreated PasswordResetToken[] @relation("ResetTokenCreator")
+  custodianOf        Asset[]              @relation("AssetCustodian")
+  transfersFrom      AssetTransfer[]      @relation("TransferFrom")
+  transfersTo        AssetTransfer[]      @relation("TransferTo")
+  transfersRecorded  AssetTransfer[]      @relation("TransfersRecorded")
+  incomeRecorded     Income[]
 
   @@unique([schoolId, email])
   @@index([schoolId])
@@ -619,12 +644,15 @@ model Payment {
   paidInZig        Boolean       @default(false)
   zigAmountPaid    Decimal?      @db.Decimal(14, 2)
   exchangeRateUsed Decimal?      @db.Decimal(14, 2)
+  // The exact rate row used for a ZiG payment.
+  exchangeRateId   String?
 
   school   School  @relation(fields: [schoolId], references: [id])
   student  Student @relation(fields: [studentId], references: [id])
   recorder User    @relation("RecordedPayments", fields: [recordedBy], references: [id])
   verifier User?   @relation("VerifiedPayments", fields: [verifiedBy], references: [id])
   voider   User?   @relation("VoidedPayments", fields: [voidedBy], references: [id])
+  exchangeRate ExchangeRate? @relation(fields: [exchangeRateId], references: [id])
 
   @@index([schoolId])
   @@index([schoolId, status])
@@ -934,7 +962,9 @@ model Asset {
   acquisitionCost Decimal        @db.Decimal(14, 2)
   currency        Currency
   location        String
+  // Who looks after it: a staff member (custodianId) or, for anyone else, a name.
   custodian       String?
+  custodianId     String?
   condition       AssetCondition @default(GOOD)
   status          AssetStatus    @default(ACTIVE)
   imageUrl        String?
@@ -944,9 +974,60 @@ model Asset {
   category    AssetCategory      @relation(fields: [categoryId], references: [id])
   maintenance AssetMaintenance[]
   disposal    AssetDisposal?
+  custodianUser User?            @relation("AssetCustodian", fields: [custodianId], references: [id])
+  transfers   AssetTransfer[]
 
+  @@unique([schoolId, tagNumber])
   @@index([schoolId])
   @@index([schoolId, status])
+}
+
+// Every change of an asset's location or custodian, kept for good (append-only).
+model AssetTransfer {
+  id                String   @id @default(cuid())
+  schoolId          String
+  assetId           String
+  fromLocation      String
+  toLocation        String
+  fromCustodianId   String?
+  toCustodianId     String?
+  fromCustodianName String?
+  toCustodianName   String?
+  transferDate      DateTime
+  note              String?
+  recordedById      String
+  createdAt         DateTime @default(now())
+
+  school         School @relation(fields: [schoolId], references: [id])
+  asset          Asset  @relation(fields: [assetId], references: [id])
+  fromCustodian  User?  @relation("TransferFrom", fields: [fromCustodianId], references: [id])
+  toCustodian    User?  @relation("TransferTo", fields: [toCustodianId], references: [id])
+  recordedBy     User   @relation("TransfersRecorded", fields: [recordedById], references: [id])
+
+  @@index([schoolId])
+  @@index([assetId, transferDate])
+}
+
+// Money the school receives that is not a student payment (e.g. selling a disposed asset).
+// Finance reports add it to the net position.
+model Income {
+  id              String       @id @default(cuid())
+  schoolId        String
+  source          IncomeSource
+  amount          Decimal      @db.Decimal(14, 2)
+  currency        Currency
+  receivedOn      DateTime
+  description     String
+  assetDisposalId String?      @unique
+  recordedById    String
+  createdAt       DateTime     @default(now())
+
+  school     School         @relation(fields: [schoolId], references: [id])
+  disposal   AssetDisposal? @relation(fields: [assetDisposalId], references: [id])
+  recordedBy User           @relation(fields: [recordedById], references: [id])
+
+  @@index([schoolId])
+  @@index([schoolId, currency])
 }
 
 model AssetMaintenance {
@@ -984,6 +1065,7 @@ model AssetDisposal {
   school   School @relation(fields: [schoolId], references: [id])
   asset    Asset  @relation(fields: [assetId], references: [id])
   recorder User   @relation(fields: [recordedBy], references: [id])
+  income   Income?
 
   @@index([schoolId])
 }
@@ -1071,54 +1153,43 @@ model Borrowing {
 
 // ─── Finance Settings ────────────────────────────────────────────────────────
 
+// Append-only: a correction is a new row (the database refuses UPDATE and DELETE).
+// The rate for a date is the latest row whose effectiveFrom is on or before it.
 model ExchangeRate {
-  id        String   @id @default(cuid())
-  schoolId  String
-  school    School   @relation(fields: [schoolId], references: [id])
-  usdToZig  Decimal
-  setBy     String
-  user      User     @relation(fields: [setBy], references: [id])
-  note      String?
-  createdAt DateTime @default(now())
+  id            String     @id @default(cuid())
+  schoolId      String
+  school        School     @relation(fields: [schoolId], references: [id])
+  usdToZig      Decimal
+  effectiveFrom DateTime   @default(now())
+  source        RateSource @default(SCHOOL)
+  setBy         String
+  user          User       @relation(fields: [setBy], references: [id])
+  note          String?
+  createdAt     DateTime   @default(now())
+  payments      Payment[]
 
   @@index([schoolId])
   @@index([schoolId, createdAt])
+  @@index([schoolId, effectiveFrom])
 }
 
-// ─── Auth.js (NextAuth) ─────────────────────────────────────────────────────
+// ─── Password reset ──────────────────────────────────────────────────────────
+// Sessions are JWTs, so the Auth.js Account / Session / VerificationToken tables are gone.
+// A staff password reset is a single-use link valid for 30 minutes; only the SHA-256 of the token is stored.
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  schoolId    String
+  userId      String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
+  school    School @relation(fields: [schoolId], references: [id])
+  user      User   @relation("ResetTokenUser", fields: [userId], references: [id])
+  createdBy User   @relation("ResetTokenCreator", fields: [createdById], references: [id])
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
+  @@index([schoolId])
+  @@index([userId])
 }
