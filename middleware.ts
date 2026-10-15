@@ -36,7 +36,7 @@ const PORTAL_ADMIN_API = ['/api/portal-links'];
 
 const ROLE_ALLOWED: Record<UserRole, (pathname: string) => boolean> = {
   // Admin subjects page manages grade boundaries via the results API.
-  ADMIN: (p) => startsWithAny(p, ['/admin', '/api/admin', '/api/results/grade-boundaries', ...PORTAL_ADMIN_API]),
+  ADMIN: (p) => startsWithAny(p, ['/admin', '/api/admin', '/api/results/grade-boundaries', '/api/results/settings', ...PORTAL_ADMIN_API]),
 
   DIRECTOR: (p) =>
     startsWithAny(p, ['/director', '/api/director', '/accounting/dashboard', '/api/accounting/dashboard', '/api/accounting/requests']) ||

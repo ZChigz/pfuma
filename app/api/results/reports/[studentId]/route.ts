@@ -53,7 +53,7 @@ async function _GET(
     term,
     classPosition: termResult?.classPosition ?? null,
     rankedOutOf:   termResult?.rankedOutOf ?? null,
-    subjectsSat:   termResult?.subjectsSat ?? null,
+    subjectsSat:   termResult?.subjectsTaken ?? termResult?.subjectsSat ?? null,
     subjectsOffered: termResult?.subjectsOffered ?? null,
     percentage:    termResult?.percentage?.toNumber() ?? 0,
     headRemark:    termResult?.headRemark ?? null,
@@ -63,6 +63,8 @@ async function _GET(
       maxMark:     m.subject.maxMark,
       percentage:  m.percentage?.toNumber() ?? 0,
       letterGrade: m.letterGrade,
+      note:
+        m.status === 'EXEMPT' ? 'Exempt' : m.status === 'ABSENT' ? (m.excused ? 'Absent (excused)' : 'Absent') : null,
     })),
   };
 

@@ -7,6 +7,7 @@ import { SubjectRowActions } from '@/components/admin/SubjectRowActions';
 import { AssignSubjectModal } from '@/components/admin/AssignSubjectModal';
 import { RemoveAssignmentButton } from '@/components/admin/RemoveAssignmentButton';
 import { GradeBoundariesManager } from '@/components/results/GradeBoundariesManager';
+import { ResultsSettings } from '@/components/results/ResultsSettings';
 import { canManageSubjects } from '@/lib/permissions';
 import { getOpenTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
@@ -20,6 +21,8 @@ export default async function AdminSubjectsPage() {
   try { await canManageSubjects(user.role); } catch { redirect('/'); }
 
   const { schoolId } = user;
+
+  const resultsSchool = await db.school.findUnique({ where: { id: schoolId }, select: { passGrade: true, oLevelRanking: true } });
 
   const [subjects, classes, teachers, openTerm] = await Promise.all([
     db.subject.findMany({
@@ -199,6 +202,8 @@ export default async function AdminSubjectsPage() {
       <section className="rounded-2xl bg-white p-5">
         <GradeBoundariesManager />
       </section>
+
+      <ResultsSettings passGrade={resultsSchool?.passGrade ?? 'C'} oLevelRanking={resultsSchool?.oLevelRanking ?? 'AVERAGE'} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { PublishResultsButton } from '@/components/results/PublishResultsButton'
 import { ExportResultsButton } from '@/components/results/ExportResultsButton';
 import { UnlockSubjectLink } from '@/components/results/UnlockSubjectLink';
 import { ReopenResultsButton } from '@/components/results/ReopenResultsButton';
+import { ExcuseAbsenceButton } from '@/components/results/ExcuseAbsenceButton';
 import { listTerms } from '@/lib/academic/terms';
 import { classRosterIds } from '@/lib/academic/roster';
 import type { SessionUser, AssignmentMarkStatus } from '@/types';
@@ -77,6 +78,22 @@ export default async function HeadResultsPage({
       orderBy: { subject: { name: 'asc' } },
     });
   }
+
+  // Absences in this class and term: the Head can excuse them (left out instead of counting as 0).
+  const absences =
+    selectedClass && term && assignments.length > 0
+      ? await db.mark.findMany({
+          where: {
+            schoolId,
+            termId: selectedTermId,
+            status: 'ABSENT',
+            subjectId: { in: assignments.map((a) => a.subjectId) },
+            studentId: { in: await classRosterIds(selectedClass.id, selectedTermId, db) },
+          },
+          include: { student: { select: { fullName: true } }, subject: { select: { name: true } } },
+          orderBy: [{ student: { fullName: 'asc' } }],
+        })
+      : [];
 
   const verifiedCount = assignments.filter((a) => a.marksStatus === 'VERIFIED' || a.marksStatus === 'PUBLISHED').length;
   const allVerified = assignments.length > 0 && verifiedCount === assignments.length;
@@ -205,6 +222,31 @@ export default async function HeadResultsPage({
               </tbody>
             </table>
           </div>
+
+          {absences.length > 0 && (
+            <div className="overflow-hidden rounded-2xl bg-white">
+              <p className="border-b border-line px-4 py-3 text-xs font-medium text-muted">
+                Absences — count as 0 unless excused{user.role === 'HEAD' && !isPublished ? '' : ' (unpublish the class to change)'}
+              </p>
+              <table className="w-full text-left text-sm text-ink">
+                <tbody className="divide-y divide-line">
+                  {absences.map((m) => (
+                    <tr key={m.id}>
+                      <td className="px-4 py-3 font-medium">{m.student.fullName}</td>
+                      <td className="px-4 py-3 text-muted">{m.subject.name}</td>
+                      <td className="px-4 py-3 text-muted">{m.absenceReason ?? '—'}</td>
+                      <td className="px-4 py-3">{m.excused ? 'Excused' : 'Counts as 0'}</td>
+                      <td className="px-4 py-3">
+                        {user.role === 'HEAD' && !isPublished && term?.status !== 'CLOSED' && (
+                          <ExcuseAbsenceButton markId={m.id} excused={m.excused} />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <p className="text-sm font-medium text-ink">
             {verifiedCount} of {assignments.length} subjects verified

@@ -32,30 +32,39 @@ beforeAll(async () => {
     });
   }
 
-  const sat: Record<string, Record<string, number>> = {
+  // Every student has a row for every subject: a score, ABSENT or EXEMPT.
+  const ALL = ['eng', 'math', 'sci', 'hist', 'art', 'music'];
+  type Cell = number | 'ABSENT' | 'EXEMPT';
+  const rows: Record<string, Record<string, Cell>> = {
     // sat everything, average 60
     allSubjects: { eng: 60, math: 60, sci: 60, hist: 60, art: 60, music: 60 },
-    // missed the two electives and one core paper, but scored 75 in what they sat
-    missedExams: { eng: 75, math: 75, sci: 75 },
-    // sat a single core paper (a perfect score must not put them top)
-    onePaper: { eng: 100 },
-    // two students tied on 50 %
-    tieOne: { eng: 50, math: 50 },
-    tieTwo: { eng: 50, math: 50, sci: 50 },
-    // absent for everything
-    absent: {},
+    // takes different subjects: exempt from history and both electives, 75 in the rest
+    missedExams: { eng: 75, math: 75, sci: 75, hist: 'EXEMPT', art: 'EXEMPT', music: 'EXEMPT' },
+    // counts for only one core subject: a perfect score must not put them top
+    onePaper: { eng: 100, math: 'EXEMPT', sci: 'EXEMPT', hist: 'EXEMPT', art: 'EXEMPT', music: 'EXEMPT' },
+    // two students on the same 50 % average
+    tieOne: { eng: 50, math: 50, sci: 'EXEMPT', hist: 'EXEMPT', art: 'EXEMPT', music: 'EXEMPT' },
+    tieTwo: { eng: 50, math: 50, sci: 50, hist: 'EXEMPT', art: 'EXEMPT', music: 'EXEMPT' },
+    // absent for everything: counts as 0 % but is still ranked (last)
+    absent: Object.fromEntries(ALL.map((k) => [k, 'ABSENT' as Cell])),
   };
   let n = 0;
-  for (const [key, marks] of Object.entries(sat)) {
+  for (const [key, cells] of Object.entries(rows)) {
     n++;
     const st = await prisma.student.create({
       data: { schoolId: A.schoolId, admissionNumber: `STU2026W${n}`, firstName: key, surname: 'Test', fullName: `${key} Test`, gender: 'M', admissionDate: new Date('2026-01-10'), currentClassId: classId },
     });
     students[key] = st.id;
     await prisma.enrollment.create({ data: { schoolId: A.schoolId, studentId: st.id, classId, termId: A.termId, startDate: new Date('2026-01-10') } });
-    for (const [subj, raw] of Object.entries(marks)) {
+    for (const subj of ALL) {
+      const cell = cells[subj];
+      const scored = typeof cell === 'number';
       await prisma.mark.create({
-        data: { schoolId: A.schoolId, studentId: st.id, subjectId: subjects[subj], termId: A.termId, rawMark: raw, percentage: raw, status: 'VERIFIED', firstVerifiedAt: new Date(), enteredBy: A.users.TEACHER.id },
+        data: {
+          schoolId: A.schoolId, studentId: st.id, subjectId: subjects[subj], termId: A.termId,
+          rawMark: scored ? cell : 0, percentage: scored ? cell : null,
+          status: scored ? 'VERIFIED' : cell, firstVerifiedAt: new Date(), enteredBy: A.users.TEACHER.id,
+        },
       });
     }
   }
@@ -75,38 +84,49 @@ describe('publishing ranks fairly', () => {
   it('publishes and reports how many students were ranked', async () => {
     const r = await publish();
     expect(r.status).toBe(200);
-    expect(r.json.data).toMatchObject({ published: 6, ranked: 4, notRanked: 2 });
+    expect(r.json.data).toMatchObject({ published: 6, ranked: 5, notRanked: 1 });
   });
 
-  it('ranks by average over the papers sat, so a missed exam is not a zero', async () => {
-    const missed = await result('missedExams');
+  it('ranks by the average over the subjects that count, so different subjects are not penalised', async () => {
+    const other = await result('missedExams');
     const all = await result('allSubjects');
-    expect(missed.totalMarks.toNumber()).toBe(225);
+    expect(other.totalMarks.toNumber()).toBe(225);
     expect(all.totalMarks.toNumber()).toBe(360); // higher total …
-    expect(missed.percentage.toNumber()).toBeCloseTo(75);
-    expect(all.percentage.toNumber()).toBeCloseTo(60);
-    expect(missed.classPosition).toBe(1); // … but a lower average, so a lower position
+    expect(other.averagePercentage?.toNumber()).toBeCloseTo(75);
+    expect(all.averagePercentage?.toNumber()).toBeCloseTo(60);
+    expect(other.percentage.toNumber()).toBeCloseTo(75); // older column kept in step
+    expect(other.classPosition).toBe(1); // … but a lower average, so a lower position
     expect(all.classPosition).toBe(2);
-    expect(missed.subjectsSat).toBe(3);
-    expect(missed.subjectsOffered).toBe(6);
-    expect(missed.rankedOutOf).toBe(4);
+    expect(other.subjectsTaken).toBe(3); // exempt subjects are not counted
+    expect(other.subjectsOffered).toBe(6);
+    expect(other.rankedOutOf).toBe(5);
+    expect(all.subjectsTaken).toBe(6);
   });
 
-  it('does not rank a student who sat one paper, or none', async () => {
+  it('counts subjects passed (default pass grade: the boundary of C, else 50 %)', async () => {
+    expect((await result('allSubjects')).subjectsPassed).toBe(6);
+    expect((await result('missedExams')).subjectsPassed).toBe(3);
+    expect((await result('tieOne')).subjectsPassed).toBe(2);
+    expect((await result('absent')).subjectsPassed).toBe(0);
+  });
+
+  it('does not rank a student for whom only one core subject counts', async () => {
     const one = await result('onePaper');
-    expect(one.percentage.toNumber()).toBe(100);
+    expect(one.averagePercentage?.toNumber()).toBe(100);
     expect(one.classPosition).toBeNull();
-    expect(one.subjectsSat).toBe(1);
+    expect(one.subjectsTaken).toBe(1);
+  });
+
+  it('an absent student counts as 0 % and is ranked last', async () => {
     const none = await result('absent');
-    expect(none.classPosition).toBeNull();
-    expect(none.percentage.toNumber()).toBe(0);
-    expect(none.subjectsSat).toBe(0);
+    expect(none.averagePercentage?.toNumber()).toBe(0);
+    expect(none.subjectsTaken).toBe(6);
+    expect(none.classPosition).toBe(5);
   });
 
   it('gives students on the same average the same position and skips the next', async () => {
-    const [a, b] = [await result('tieOne'), await result('tieTwo')];
-    expect(a.classPosition).toBe(3);
-    expect(b.classPosition).toBe(3);
+    expect((await result('tieOne')).classPosition).toBe(3);
+    expect((await result('tieTwo')).classPosition).toBe(3);
   });
 
   it('locks the marks and marks everything published', async () => {
@@ -144,7 +164,8 @@ describe('correcting published results (4.1)', () => {
     const assignments = await prisma.subjectAssignment.findMany({ where: { classId, termId: A.termId } });
     expect(assignments.every((x) => x.marksStatus === 'VERIFIED')).toBe(true);
     const marks = await prisma.mark.findMany({ where: { termId: A.termId, subjectId: { in: Object.values(subjects) } } });
-    expect(marks.every((m) => m.status === 'VERIFIED')).toBe(true);
+    expect(marks.some((m) => m.status === 'PUBLISHED')).toBe(false); // scores back to VERIFIED; absences and exemptions stay as entered
+    expect(marks.filter((m) => m.status === 'VERIFIED').length).toBeGreaterThan(0);
     const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: 'UNPUBLISH_RESULTS' }, orderBy: { createdAt: 'desc' } });
     expect(audit.actorId).toBe(A.users.HEAD.id);
     expect(audit.detail).toContain('Maths marks were entered under wrong names');
@@ -176,9 +197,9 @@ describe('correcting published results (4.1)', () => {
     expect((await call('results/marks', 'POST', { as: A.users.TEACHER, body: { ...body, reason: 'x' } })).status).toBe(422);
     expect(await prisma.markChange.count()).toBe(0);
 
-    // A mark that was never verified needs no reason.
-    const fresh = await call('results/marks', 'POST', { as: A.users.TEACHER, body: { ...body, studentId: students.absent, rawMark: 40 } });
-    expect(fresh.status).toBe(200);
+    // Replacing an absence with a score is also a change to a verified row.
+    const absentToScore = await call('results/marks', 'POST', { as: A.users.TEACHER, body: { ...body, studentId: students.absent, rawMark: 40 } });
+    expect(absentToScore.status).toBe(422);
     expect(await prisma.markChange.count()).toBe(0);
 
     const ok = await call('results/marks', 'POST', { as: A.users.TEACHER, body: { ...body, reason: 'Paper was marked out of the wrong total' } });
@@ -206,7 +227,8 @@ describe('correcting published results (4.1)', () => {
     expect(r.json.data).toMatchObject({ published: 6 });
     const fixed = await result('missedExams');
     expect(fixed.published).toBe(true);
-    expect(fixed.totalMarks.toNumber()).toBe(240); // 75 + 90 + 75
+    expect(fixed.totalMarks.toNumber()).toBe(240); // 90 + 75 + 75
+    expect(fixed.averagePercentage?.toNumber()).toBeCloseTo(80);
     expect(fixed.classPosition).toBe(1);
     expect((await result('allSubjects')).classPosition).toBe(2);
   });

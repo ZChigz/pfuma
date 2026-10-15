@@ -19,7 +19,7 @@ async function _POST(req: NextRequest) {
 
   const parsed = await parseBody(req, VerifyMarksSchema);
   if ('error' in parsed) return parsed.error;
-  const { assignmentId, force } = parsed.data;
+  const { assignmentId } = parsed.data;
 
   const assignment = await db.subjectAssignment.findFirst({
     where: { id: assignmentId, schoolId: user.schoolId },
@@ -48,13 +48,14 @@ async function _POST(req: NextRequest) {
   const missingStudents = students.filter((s) => !enteredStudentIds.has(s.id));
   const missingCount = missingStudents.length;
 
-  if (missingCount > 0 && force !== true) {
-    return apiSuccess({
-      requiresConfirmation: true,
-      missingCount,
-      missingStudents: missingStudents.map((s) => s.fullName),
-      message: `${missingCount} student${missingCount !== 1 ? 's' : ''} have no mark entered. Submit anyway?`,
-    });
+  // Every enrolled student needs a mark, ABSENT or EXEMPT before the subject can be verified.
+  if (missingCount > 0) {
+    const names = missingStudents.map((s) => s.fullName);
+    const shown = names.slice(0, 5).join(', ') + (names.length > 5 ? ` and ${names.length - 5} more` : '');
+    return apiError(
+      `${missingCount} student${missingCount !== 1 ? 's have' : ' has'} no mark: ${shown}. Enter a mark, Absent or Exempt for everyone before verifying.`,
+      422,
+    );
   }
 
   const result = await db.$tx(async (tx) => {
@@ -66,7 +67,7 @@ async function _POST(req: NextRequest) {
     });
     // Remember that these marks have been verified once; later changes need a reason.
     await tx.mark.updateMany({
-      where: { schoolId: user.schoolId, subjectId: assignment.subjectId, termId: assignment.termId, status: 'VERIFIED', firstVerifiedAt: null, studentId: { in: studentIds } },
+      where: { schoolId: user.schoolId, subjectId: assignment.subjectId, termId: assignment.termId, status: { in: ['VERIFIED', 'ABSENT', 'EXEMPT'] }, firstVerifiedAt: null, studentId: { in: studentIds } },
       data: { firstVerifiedAt: now },
     });
 

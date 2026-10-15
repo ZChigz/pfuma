@@ -49,6 +49,7 @@ beforeAll(async () => {
     '20261017000100_security_backfill',
     '20261017000200_security_rls_audit',
     '20261018000000_results_corrections',
+    '20261019000000_absences_and_averages',
   ]) await applyMigration(pg, m);
 }, 300_000);
 
@@ -96,6 +97,13 @@ describe('migrations on top of the live demo data', () => {
     const before = await all(`SELECT "id","portalTokenHash","portalTokenExpiresAt" FROM "Student" ORDER BY "id"`);
     await pg.exec(fs.readFileSync(path.join(MIGRATIONS, '20261017000100_security_backfill/migration.sql'), 'utf8'));
     expect(await all(`SELECT "id","portalTokenHash","portalTokenExpiresAt" FROM "Student" ORDER BY "id"`)).toEqual(before);
+  });
+
+  it('start schools on pass grade C and ranking by average, and copy old results forward', async () => {
+    const schools = await all<{ passGrade: string; oLevelRanking: string }>(`SELECT "passGrade","oLevelRanking" FROM "School"`);
+    for (const s of schools) expect(s).toEqual({ passGrade: 'C', oLevelRanking: 'AVERAGE' });
+    const bad = await one<{ n: string }>(`SELECT count(*) AS n FROM "TermResult" WHERE "subjectsTaken" IS DISTINCT FROM "subjectsSat" OR "averagePercentage" IS DISTINCT FROM "percentage"`);
+    expect(Number(bad.n)).toBe(0);
   });
 
   it('give existing users safe defaults', async () => {

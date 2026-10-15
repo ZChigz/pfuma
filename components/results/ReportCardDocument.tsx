@@ -17,6 +17,8 @@ export interface ReportCardData {
     maxMark:     number;
     percentage:  number;
     letterGrade: string | null;
+    /** 'Absent', 'Absent (excused)' or 'Exempt' instead of a score. */
+    note?:       string | null;
   }>;
 }
 
@@ -104,7 +106,7 @@ export function ReportCardDocument({ data }: Props) {
             { label: 'Term',          value: term },
             { label: 'Class Position', value: classPosition != null ? `${classPosition}${data.rankedOutOf ? ` of ${data.rankedOutOf}` : ''}` : data.subjectsSat != null ? 'Not ranked' : '—' },
             { label: 'Overall %',     value: `${percentage.toFixed(1)}%` },
-            { label: 'Subjects sat', value: data.subjectsSat != null && data.subjectsOffered != null ? `${data.subjectsSat} of ${data.subjectsOffered}` : `${marks.length}` },
+            { label: 'Subjects taken', value: data.subjectsSat != null && data.subjectsOffered != null ? `${data.subjectsSat} of ${data.subjectsOffered}` : `${marks.length}` },
           ].map(({ label, value }) => (
             <View key={label} style={S.infoCell}>
               <Text style={S.infoLabel}>{label}</Text>
@@ -129,10 +131,10 @@ export function ReportCardDocument({ data }: Props) {
         {marks.map((m, i) => (
           <View key={i} style={[S.row, i % 2 === 1 ? S.rowAlt : {}]}>
             <Text style={S.colSubject}>{m.subjectName}</Text>
-            <Text style={S.colMark}>{m.rawMark.toFixed(1)}</Text>
+            <Text style={S.colMark}>{m.note && m.note !== 'Absent' ? '—' : m.rawMark.toFixed(1)}</Text>
             <Text style={S.colMax}>{m.maxMark}</Text>
-            <Text style={S.colPct}>{m.percentage.toFixed(1)}%</Text>
-            <Text style={S.colGrade}>{m.letterGrade ?? '—'}</Text>
+            <Text style={S.colPct}>{m.note && m.note !== 'Absent' ? '—' : `${m.percentage.toFixed(1)}%`}</Text>
+            <Text style={S.colGrade}>{m.note ?? m.letterGrade ?? '—'}</Text>
           </View>
         ))}
 

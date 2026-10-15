@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
 import { formatDateTime } from '@/lib/utils';
@@ -20,6 +19,9 @@ interface MarkCell {
   status: 'idle' | 'saving' | 'saved' | 'error';
   error?: string;
   saved: string;
+  /** Every student needs a score, Absent or Exempt before the subject can be verified. */
+  kind?: 'SCORE' | 'ABSENT' | 'EXEMPT';
+  absenceReason?: string;
 }
 
 interface Props {
@@ -41,8 +43,7 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
   const [loading, setLoading] = useState(true);
 
   const [verifying, setVerifying] = useState(false);
-  const [missingModal, setMissingModal] = useState<{ count: number; names: string[] } | null>(null);
-
+  
   useEffect(() => {
     setLoading(true);
     fetch(`/api/results/marks?classId=${classId}&subjectId=${subjectId}&termId=${termId}`)
@@ -59,16 +60,19 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
 
         const cells: Record<string, MarkCell> = {};
         for (const student of s as StudentRow[]) {
-          const existing = (m as Array<{ studentId: string; rawMark: number; percentage: number | null; letterGrade: string | null }>).find(
+          const existing = (m as Array<{ studentId: string; rawMark: number; percentage: number | null; letterGrade: string | null; status: string; absenceReason: string | null }>).find(
             (mk) => mk.studentId === student.id,
           );
-          const raw = existing != null ? String(existing.rawMark) : '';
+          const kind = existing?.status === 'ABSENT' || existing?.status === 'EXEMPT' ? existing.status : 'SCORE';
+          const raw = existing != null && kind === 'SCORE' ? String(existing.rawMark) : '';
           cells[student.id] = {
             raw,
             pct:   existing?.percentage ?? null,
             grade: existing?.letterGrade ?? null,
             status: 'idle',
             saved: raw,
+            kind,
+            absenceReason: existing?.absenceReason ?? '',
           };
         }
         setMarks(cells);
@@ -79,7 +83,7 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
   }, []);
 
   const isLocked = marksStatus === 'VERIFIED' || marksStatus === 'PUBLISHED';
-  const enteredCount = Object.values(marks).filter((c) => c.raw !== '').length;
+  const enteredCount = Object.values(marks).filter((c) => c.raw !== '' || (c.kind ?? 'SCORE') !== 'SCORE').length;
 
   function isInvalid(raw: string): boolean {
     if (raw === '') return false;
@@ -87,25 +91,15 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
     return isNaN(n) || n < 0 || n > maxMark;
   }
 
-  async function handleBlur(studentId: string) {
-    const cell = marks[studentId];
-    if (!cell || cell.raw === cell.saved) return;
-
-    if (isInvalid(cell.raw)) {
-      setMarks((prev) => ({ ...prev, [studentId]: { ...prev[studentId], status: 'error', error: `Must be 0–${maxMark}` } }));
-      return;
-    }
-    if (cell.raw === '') return;
-
-    const rawNum = parseFloat(cell.raw);
+  // Saves one student's row: a score, Absent (with an optional reason) or Exempt.
+  async function persist(studentId: string, payload: { rawMark?: number; status?: 'SCORE' | 'ABSENT' | 'EXEMPT'; absenceReason?: string }) {
     setMarks((prev) => ({ ...prev, [studentId]: { ...prev[studentId], status: 'saving' } }));
-
     try {
       const send = (reason?: string) =>
         fetch('/api/results/marks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ studentId, subjectId, classId, termId, rawMark: rawNum, ...(reason ? { reason } : {}) }),
+          body: JSON.stringify({ studentId, subjectId, classId, termId, ...payload, ...(reason ? { reason } : {}) }),
         });
       let res = await send();
       let body = await res.json();
@@ -125,14 +119,17 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
         return;
       }
       const saved = body.data.mark;
+      const kind = saved.status === 'ABSENT' || saved.status === 'EXEMPT' ? saved.status : 'SCORE';
       setMarks((prev) => ({
         ...prev,
         [studentId]: {
-          raw:    String(saved.rawMark),
+          raw:    kind === 'SCORE' ? String(saved.rawMark) : '',
           pct:    saved.percentage,
           grade:  saved.letterGrade,
           status: 'saved',
-          saved:  String(saved.rawMark),
+          saved:  kind === 'SCORE' ? String(saved.rawMark) : '',
+          kind,
+          absenceReason: saved.absenceReason ?? '',
         },
       }));
 
@@ -150,24 +147,44 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
     }
   }
 
-  async function handleVerify(force = false) {
+  async function handleBlur(studentId: string) {
+    const cell = marks[studentId];
+    if (!cell || (cell.kind ?? 'SCORE') !== 'SCORE' || cell.raw === cell.saved) return;
+
+    if (isInvalid(cell.raw)) {
+      setMarks((prev) => ({ ...prev, [studentId]: { ...prev[studentId], status: 'error', error: `Must be 0–${maxMark}` } }));
+      return;
+    }
+    if (cell.raw === '') return;
+    await persist(studentId, { rawMark: parseFloat(cell.raw) });
+  }
+
+  async function changeKind(studentId: string, kind: 'SCORE' | 'ABSENT' | 'EXEMPT') {
+    setMarks((prev) => ({
+      ...prev,
+      [studentId]: { ...(prev[studentId] ?? { raw: '', pct: null, grade: null, saved: '' }), kind, status: 'idle' as const },
+    }));
+    if (kind !== 'SCORE') await persist(studentId, { status: kind });
+  }
+
+  async function saveReason(studentId: string) {
+    const cell = marks[studentId];
+    if (cell?.kind === 'ABSENT') await persist(studentId, { status: 'ABSENT', absenceReason: cell.absenceReason ?? '' });
+  }
+
+  async function handleVerify() {
     setVerifying(true);
     try {
       const res = await fetch('/api/results/marks/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignmentId, force }),
+        body: JSON.stringify({ assignmentId }),
       });
       const body = await res.json();
       if (!res.ok || !body.success) {
         toast.error(body.message ?? 'Failed to verify marks');
         return;
       }
-      if (body.data.requiresConfirmation) {
-        setMissingModal({ count: body.data.missingCount, names: body.data.missingStudents });
-        return;
-      }
-      setMissingModal(null);
       setMarksStatus('VERIFIED');
       setMarksVerifiedAt(new Date().toISOString());
       toast.success(`Verified ${body.data.marksCount} marks`);
@@ -225,7 +242,7 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
           <table className="w-full text-left text-sm text-ink">
             <thead className="border-b border-line bg-white">
               <tr>
-                {['No.', 'Student Name', 'Mark', '%', 'Grade'].map((h) => (
+                {['No.', 'Student Name', 'Mark / Absent / Exempt', '%', 'Grade'].map((h) => (
                   <th key={h} className="px-4 py-3.5 text-xs font-medium text-subtle">
                     {h}
                   </th>
@@ -241,8 +258,30 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
                     <td className="w-10 px-4 py-3 text-muted">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium">{s.fullName}</td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <input
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          aria-label={`Status for ${s.fullName}`}
+                          disabled={isLocked}
+                          value={cell?.kind ?? 'SCORE'}
+                          onChange={(e) => changeKind(s.id, e.target.value as 'SCORE' | 'ABSENT' | 'EXEMPT')}
+                          className="rounded-xl border border-line bg-white px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+                        >
+                          <option value="SCORE">Mark</option>
+                          <option value="ABSENT">Absent</option>
+                          <option value="EXEMPT">Exempt</option>
+                        </select>
+                        {(cell?.kind ?? 'SCORE') === 'ABSENT' && (
+                          <input
+                            type="text"
+                            placeholder="Reason (optional)"
+                            disabled={isLocked}
+                            value={cell?.absenceReason ?? ''}
+                            onChange={(e) => setMarks((prev) => ({ ...prev, [s.id]: { ...prev[s.id], absenceReason: e.target.value } }))}
+                            onBlur={() => saveReason(s.id)}
+                            className="w-40 rounded-xl border border-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+                          />
+                        )}
+                        {(cell?.kind ?? 'SCORE') === 'SCORE' && <input
                           type="number"
                           min={0}
                           max={maxMark}
@@ -263,7 +302,7 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
                           className={`w-24 rounded-xl border bg-white px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60 ${
                             invalid ? 'border-danger' : 'border-line'
                           }`}
-                        />
+                        />}
                         {cell?.status === 'saving' && (
                           <svg className="h-4 w-4 animate-spin text-muted" viewBox="0 0 24 24" fill="none">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -311,41 +350,13 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
           variant="primary"
           size="lg"
           loading={verifying}
-          onClick={() => handleVerify(false)}
+          onClick={() => handleVerify()}
           className="w-full"
         >
           Submit and verify marks for {className} {subjectName}
         </Button>
       )}
 
-      <Modal
-        open={missingModal != null}
-        onClose={() => setMissingModal(null)}
-        title="Missing marks"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setMissingModal(null)} disabled={verifying}>
-              Go back and complete
-            </Button>
-            <Button variant="primary" loading={verifying} onClick={() => handleVerify(true)}>
-              Submit anyway
-            </Button>
-          </>
-        }
-      >
-        {missingModal && (
-          <>
-            <p className="text-sm text-ink">
-              {missingModal.count} student{missingModal.count !== 1 ? 's have' : ' has'} no mark entered. Submit anyway?
-            </p>
-            <ul className="mt-3 max-h-48 list-disc overflow-y-auto pl-5 text-sm text-muted">
-              {missingModal.names.map((name) => (
-                <li key={name}>{name}</li>
-              ))}
-            </ul>
-          </>
-        )}
-      </Modal>
     </div>
   );
 }

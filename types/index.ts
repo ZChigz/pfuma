@@ -30,7 +30,7 @@ export type ExpenseRequestType =
 
 export type SubjectType = 'CORE' | 'ELECTIVE';
 
-export type MarkStatus = 'DRAFT' | 'VERIFIED' | 'PUBLISHED';
+export type MarkStatus = 'DRAFT' | 'VERIFIED' | 'PUBLISHED' | 'ABSENT' | 'EXEMPT';
 
 export type AssignmentMarkStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'VERIFIED' | 'PUBLISHED';
 

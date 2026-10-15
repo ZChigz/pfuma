@@ -110,10 +110,21 @@ enum SubjectType {
   ELECTIVE
 }
 
+// DRAFT / VERIFIED / PUBLISHED are the workflow of a score. ABSENT and EXEMPT are
+// entered by the teacher instead of a score: ABSENT counts as 0 unless the Head
+// excuses it, EXEMPT is left out of the student's subjects.
 enum MarkStatus {
   DRAFT
   VERIFIED
   PUBLISHED
+  ABSENT
+  EXEMPT
+}
+
+// How O Level classes are ranked.
+enum RankingMode {
+  AVERAGE
+  PASSES_THEN_AVERAGE
 }
 
 enum AssignmentMarkStatus {
@@ -218,6 +229,7 @@ enum AuditAction {
   UNPUBLISH_RESULTS
   REOPEN_TERM
   CHANGE_MARK
+  EXCUSE_ABSENCE
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
@@ -228,6 +240,10 @@ model School {
   location     String?
   // Default capacity for newly created classes.
   maxClassSize Int      @default(45)
+  // Lowest grade that counts as a pass ("C or better" = C), looked up in GradeBoundary.
+  passGrade    String   @default("C")
+  // O Level classes: rank by average percentage, or by number of passes then average.
+  oLevelRanking RankingMode @default(AVERAGE)
   createdAt    DateTime @default(now())
   // Legacy column "currentTerm" still exists in the database until the
   // contract migration; the current term is now the OPEN AcademicTerm.
@@ -767,6 +783,9 @@ model Mark {
   // Set the first time the mark is verified and never cleared: any change after
   // this moment needs a reason and is recorded in MarkChange.
   firstVerifiedAt DateTime?
+  // Why the student was absent (status ABSENT), and whether the Head excused it.
+  absenceReason   String?
+  excused         Boolean   @default(false)
   enteredBy   String
   enteredAt   DateTime   @default(now())
 
@@ -816,6 +835,12 @@ model TermResult {
   subjectsSat     Int?
   subjectsOffered Int?
   rankedOutOf     Int?
+  // 4.3: subjects counted (EXEMPT and excused absences left out), their average
+  // percentage, and how many reached the school's pass grade. subjectsSat and
+  // percentage are older copies of subjectsTaken and averagePercentage.
+  subjectsTaken     Int?
+  averagePercentage Decimal? @db.Decimal(14, 2)
+  subjectsPassed    Int?
   headRemark    String?
   published     Boolean   @default(false)
   publishedAt   DateTime?
