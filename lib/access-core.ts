@@ -52,7 +52,8 @@ export const PERMISSIONS = {
   'system.subscription.manage': 'Switch modules on and off',
 
   'students.list.view':         'View students',
-  'students.admissions.view':   'View admissions',
+  'students.import':            'Import students',
+  'students.admissions.view':  'View admissions',
   'students.guardians.view':    'View guardians',
   'students.attendance.view':   'View attendance',
   'students.promotions.view':   'View promotions',

@@ -26,10 +26,16 @@ export function SummaryCardSkeleton() {
   return <div aria-hidden="true" className="min-h-[140px] animate-pulse rounded-2xl bg-white" />;
 }
 
-export function SummaryCardEmpty({ label, message }: { label: string; message: string }) {
+/** A card with nothing to count: a dash instead of a zero, and a link to the step that fills it. */
+export function SummaryCardEmpty({ label, message, action }: { label: string; message: string; action?: { label: string; href: string } }) {
   return (
-    <SummaryCard label={label} value="—">
+    <SummaryCard label={label} value={<span aria-label="no data">—</span>}>
       <p>{message}</p>
+      {action && (
+        <Link href={action.href} className="inline-flex min-h-[44px] items-center font-semibold text-primary hover:underline">
+          {action.label}
+        </Link>
+      )}
     </SummaryCard>
   );
 }

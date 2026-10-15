@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
@@ -63,6 +63,13 @@ export function UsersClient(props: Props) {
     reset(next.mode === 'edit' ? { fullName: next.user.fullName, email: next.user.email, role: next.user.role as FormInput['role'] } : { fullName: '', email: '', role: undefined });
     setDrawer(next);
   }
+
+  // The dashboard's "Add user" quick action links here with ?new=1.
+  const wantsNew = useSearchParams().get('new') === '1';
+  useEffect(() => {
+    if (wantsNew && props.canCreate) openDrawer({ mode: 'create' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function save(values: FormOutput) {
     const edit = drawer?.mode === 'edit' ? drawer.user : null;

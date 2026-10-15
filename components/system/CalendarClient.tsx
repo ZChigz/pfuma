@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
@@ -56,6 +56,13 @@ export function CalendarClient({ year, items, canCreate, canUpdate, canDelete }:
       : { title: '', kind: 'OTHER', startDate: '', endDate: '', notes: '' });
     setDrawer({ id: item?.id ?? null });
   }
+
+  // The dashboard's "Add event" quick action links here with ?new=1.
+  const wantsNew = useSearchParams().get('new') === '1';
+  useEffect(() => {
+    if (wantsNew && canCreate) open();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function save(values: FormOutput) {
     const id = drawer?.id;
