@@ -98,7 +98,9 @@ async function _DELETE(req: Request) {
   if (!levelId && !termId) return apiError('The school-wide boundaries cannot be removed; edit them instead', 409);
 
   await db.$tx(async (tx) => {
-    await tx.gradeBoundary.deleteMany({ where: { schoolId: user.schoolId, levelId, termId } });
+    const { count } = await tx.gradeBoundary.deleteMany({ where: { schoolId: user.schoolId, levelId, termId } });
+    // Nothing removed (an unknown or foreign level id): nothing changed, so nothing to record.
+    if (count === 0) return;
     await logAudit(
       {
         schoolId:   user.schoolId,
