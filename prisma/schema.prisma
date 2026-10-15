@@ -281,12 +281,30 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+// Term dates are not a stored type: they come from AcademicTerm and show as TERM in the calendar.
 enum CalendarEventKind {
-  HOLIDAY
+  PUBLIC_HOLIDAY
   EXAM
   SPORTS
   MEETING
+  CULTURAL
+  VISITING_DAY
+  PRIZE_GIVING
   OTHER
+}
+
+enum CalendarRepeat {
+  NONE
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum CalendarAudience {
+  ALL_STAFF
+  FORMS
+  CLASSES
+  BOARDERS
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
@@ -364,6 +382,7 @@ model School {
   rolePermissions     RolePermission[]
   notifications       Notification[]
   calendarEvents      CalendarEvent[]
+  CalendarHolidayYear CalendarHolidayYear[]
 }
 
 model User {
@@ -1311,18 +1330,46 @@ model Notification {
 }
 
 model CalendarEvent {
-  id          String            @id @default(cuid())
-  schoolId    String
-  title       String
-  kind        CalendarEventKind @default(OTHER)
-  startDate   DateTime          @db.Date
-  endDate     DateTime          @db.Date
-  notes       String?
-  createdById String
-  createdAt   DateTime          @default(now())
+  id               String            @id @default(cuid())
+  schoolId         String
+  title            String
+  kind             CalendarEventKind @default(OTHER)
+  startDate        DateTime          @db.Date
+  endDate          DateTime          @db.Date
+  // The description. Dates are school-local calendar days; times are school-local "HH:MM" text.
+  notes            String?
+  allDay           Boolean           @default(true)
+  startTime        String?
+  endTime          String?
+  location         String?
+  repeat           CalendarRepeat    @default(NONE)
+  // Last day an occurrence may start on; required when repeat is not NONE.
+  repeatUntil      DateTime?         @db.Date
+  // Who it is for. Stored now; used by messages later.
+  audience         CalendarAudience  @default(ALL_STAFF)
+  audienceLevelIds String[]          @default([])
+  audienceClassIds String[]          @default([])
+  // Set on the preloaded public holidays (e.g. "HEROES_DAY:2026") so they are loaded once.
+  autoKey          String?
+  createdById      String
+  createdAt        DateTime          @default(now())
 
   school    School @relation(fields: [schoolId], references: [id])
   createdBy User   @relation(fields: [createdById], references: [id])
 
+  @@unique([schoolId, autoKey])
   @@index([schoolId, startDate])
+}
+
+// One row per school and year once that year's public holidays have been preloaded, so a
+// holiday an administrator deletes is not put back.
+model CalendarHolidayYear {
+  id       String   @id @default(cuid())
+  schoolId String
+  year     Int
+  loadedAt DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, year])
 }

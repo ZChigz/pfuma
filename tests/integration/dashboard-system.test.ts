@@ -341,35 +341,39 @@ describe('school settings', () => {
 
 describe('calendar', () => {
   let id: string;
-  const ev = { title: 'Heroes Day', kind: 'HOLIDAY', startDate: '2026-08-10', endDate: '2026-08-11', notes: 'No school' };
+  const ev = { title: 'Mock exams', kind: 'EXAM', startDate: '2026-08-24', endDate: '2026-08-25', notes: 'Bring pens' };
 
-  it('adds an event and shows it with the term dates', async () => {
+  it('adds an event and shows it with the term dates and the public holidays', async () => {
+    await call('system/calendar', 'GET', { as: admin(), query: '?from=2026-08-01&to=2026-08-31' }); // loads 2026's holidays once
     const n = await auditCount({ action: 'CREATE_CALENDAR_EVENT' });
     const r = await call('system/calendar', 'POST', { as: admin(), body: ev });
     expect(r.status).toBe(201);
     id = r.json.data.event.id;
     expect(await auditCount({ action: 'CREATE_CALENDAR_EVENT' })).toBe(n + 1);
 
-    const list = await call('system/calendar', 'GET', { as: admin(), query: '?from=2026-08-01&to=2026-08-31' });
-    expect(list.json.data.items.filter((i: { source: string }) => i.source === 'event').map((i: { title: string }) => i.title)).toEqual(['Heroes Day']);
-    expect(list.json.data.items.some((i: { source: string; title: string }) => i.source === 'term' && i.title === 'Term 1 2026')).toBe(true);
+    const list = await call('system/calendar', 'GET', { as: admin(), query: '?from=2026-08-01&to=2026-12-31' });
+    const items = list.json.data.items as { source: string; title: string; kind: string }[];
+    expect(items.filter((i) => i.source === 'event' && i.kind === 'EXAM').map((i) => i.title)).toEqual(['Mock exams']);
+    expect(items.some((i) => i.source === 'term' && i.title === 'Term 1 2026 ends')).toBe(true);
+    expect(items.some((i) => i.kind === 'PUBLIC_HOLIDAY' && i.title === "Heroes' Day")).toBe(true);
   });
 
-  it('shows an event only to days it overlaps', async () => {
-    const inside = await call('system/calendar', 'GET', { as: admin(), query: '?from=2026-08-11&to=2026-08-20' });
+  it('shows an event only on the days it overlaps', async () => {
+    const inside = await call('system/calendar', 'GET', { as: admin(), query: '?from=2026-08-25&to=2026-08-30' });
     expect(inside.json.data.items.some((i: { id: string }) => i.id === id)).toBe(true);
-    const outside = await call('system/calendar', 'GET', { as: admin(), query: '?from=2026-08-12&to=2026-08-20' });
+    const outside = await call('system/calendar', 'GET', { as: admin(), query: '?from=2026-08-26&to=2026-08-30' });
     expect(outside.json.data.items.some((i: { id: string }) => i.id === id)).toBe(false);
     expect((await call('system/calendar', 'GET', { as: admin(), query: '?from=2026-08-12&to=2026-08-01' })).status).toBe(422);
     expect((await call('system/calendar', 'GET', { as: admin(), query: '?from=yesterday' })).status).toBe(422);
+    expect((await call('system/calendar', 'GET', { as: admin(), query: '?type=PARTY' })).status).toBe(422);
   });
 
   it('edits and deletes with audit rows', async () => {
-    const r = await call('system/calendar/[id]', 'PATCH', { as: admin(), params: { id }, body: { ...ev, title: 'Heroes and Defence Forces Days', endDate: '2026-08-12' } });
+    const r = await call('system/calendar/[id]', 'PATCH', { as: admin(), params: { id }, body: { ...ev, title: 'Mock and trial exams', endDate: '2026-08-26' } });
     expect(r.status).toBe(200);
     const entry = await prisma.auditLog.findFirstOrThrow({ where: { action: 'UPDATE_CALENDAR_EVENT', entityId: id } });
-    expect(entry.before).toMatchObject({ title: 'Heroes Day', endDate: '2026-08-11' });
-    expect(entry.after).toMatchObject({ title: 'Heroes and Defence Forces Days', endDate: '2026-08-12' });
+    expect(entry.before).toMatchObject({ title: 'Mock exams', endDate: '2026-08-25' });
+    expect(entry.after).toMatchObject({ title: 'Mock and trial exams', endDate: '2026-08-26' });
 
     const del = await call('system/calendar/[id]', 'DELETE', { as: admin(), params: { id } });
     expect(del.status).toBe(200);
@@ -379,7 +383,7 @@ describe('calendar', () => {
   });
 
   it('rejects bad events', async () => {
-    for (const bad of [{ title: '' }, { kind: 'PARTY' }, { endDate: '2026-08-09' }, { startDate: '2026-02-30', endDate: '2026-03-01' }, { startDate: 'soon' }]) {
+    for (const bad of [{ title: '' }, { title: 'x'.repeat(121) }, { kind: 'PARTY' }, { kind: 'TERM' }, { endDate: '2026-08-23' }, { startDate: '2026-02-30', endDate: '2026-03-01' }, { startDate: 'soon' }]) {
       expect((await call('system/calendar', 'POST', { as: admin(), body: { ...ev, ...bad } })).status, JSON.stringify(bad)).toBe(422);
     }
   });

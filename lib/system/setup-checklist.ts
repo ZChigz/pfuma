@@ -14,7 +14,7 @@ export interface SetupFacts {
   receiptPrefix: string | null;
   activeUsers: number;
   students: number;
-  /** Calendar events inside the term being viewed; null when there is no term. */
+  /** Events the school added itself (not the preloaded public holidays) inside the term being viewed; null when there is no term. */
   termEvents: number | null;
 }
 
@@ -88,7 +88,7 @@ export async function loadSetupFacts(
     db.user.count({ where: { schoolId, active: true } }),
     db.student.count({ where: { schoolId } }),
     term
-      ? db.calendarEvent.count({ where: { schoolId, startDate: { lte: term.endDate }, endDate: { gte: term.startDate } } })
+      ? db.calendarEvent.count({ where: { schoolId, autoKey: null, startDate: { lte: term.endDate }, endDate: { gte: term.startDate } } })
       : Promise.resolve(null),
   ]);
   return {

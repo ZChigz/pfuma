@@ -54,7 +54,7 @@ describe('Dashboard & System migrations', () => {
     expect(rows).toHaveLength(2);
     for (const r of rows) expect(r.lastLoginAt).toBeNull();
     await pg.exec(`UPDATE "User" SET "lastLoginAt" = CURRENT_TIMESTAMP WHERE "id" = 'u1'`);
-    expect((await one<{ n: string }>(`SELECT count(*) AS n FROM "User" WHERE "lastLoginAt" IS NOT NULL`)).n).toBe('1');
+    expect(Number((await one<{ n: string | number }>(`SELECT count(*) AS n FROM "User" WHERE "lastLoginAt" IS NOT NULL`)).n)).toBe(1);
   });
 
   it('give every existing school one active subscription with no end date and no student limit', async () => {
