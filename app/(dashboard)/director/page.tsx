@@ -9,6 +9,7 @@ import { CollectionTrendChart } from '@/components/accounting/CollectionTrendCha
 import { RequestReviewModal } from '@/components/accounting/RequestReviewModal';
 import { REQUEST_INCLUDE, REQUEST_TYPE_LABELS, serializeExpenseRequest } from '@/lib/expense-requests';
 import { Badge } from '@/components/ui/Badge';
+import { ReopenTermButton } from '@/components/results/ReopenTermButton';
 import type { SessionUser } from '@/types';
 import type { Currency } from '@prisma/client';
 
@@ -31,6 +32,8 @@ export default async function DirectorDashboard({
     collectedZiGRaw,
     spentUSDRaw,
     spentZiGRaw,
+    otherIncomeUSDRaw,
+    otherIncomeZiGRaw,
     expCatRaw,
     pmRaw,
     students,
@@ -41,6 +44,9 @@ export default async function DirectorDashboard({
     db.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'ZIG' }, _sum: { amount: true } }),
     db.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'USD' }, _sum: { amount: true } }),
     db.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'ZIG' }, _sum: { amount: true } }),
+    // Other income, e.g. proceeds from disposed assets
+    db.income.aggregate({ where: { schoolId, currency: 'USD' }, _sum: { amount: true } }),
+    db.income.aggregate({ where: { schoolId, currency: 'ZIG' }, _sum: { amount: true } }),
     db.expense.groupBy({
       by: ['category'],
       where: { schoolId, status: 'ACTIVE', currency },
@@ -85,8 +91,10 @@ export default async function DirectorDashboard({
   const collectedZiG = collectedZiGRaw._sum.amount?.toNumber() ?? 0;
   const spentUSD     = spentUSDRaw._sum.amount?.toNumber() ?? 0;
   const spentZiG     = spentZiGRaw._sum.amount?.toNumber() ?? 0;
-  const netUSD       = collectedUSD - spentUSD;
-  const netZiG       = collectedZiG - spentZiG;
+  const otherIncomeUSD = otherIncomeUSDRaw._sum.amount?.toNumber() ?? 0;
+  const otherIncomeZiG = otherIncomeZiGRaw._sum.amount?.toNumber() ?? 0;
+  const netUSD       = collectedUSD + otherIncomeUSD - spentUSD;
+  const netZiG       = collectedZiG + otherIncomeZiG - spentZiG;
 
   // ── Per-student: balances + cleared/owing ───────────────────────────────────
   let outstandingUSD = 0;
@@ -164,6 +172,9 @@ export default async function DirectorDashboard({
     .filter((r) => r.requestedAt <= twoDaysAgo)
     .map(serializeExpenseRequest);
 
+  const lastClosedTerm = await db.academicTerm.findFirst({ where: { schoolId, status: 'CLOSED' }, orderBy: { startDate: 'desc' } });
+  const hasOpenTerm = !!(await db.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } }));
+
   const fmt = (n: number) => (currency === 'USD' ? formatUSD(n) : formatZiG(n));
 
   return (
@@ -182,20 +193,27 @@ export default async function DirectorDashboard({
         </Link>
       </div>
 
+      {lastClosedTerm && !hasOpenTerm && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
+          <p className="text-sm text-ink">{lastClosedTerm.name} is closed and its results are locked.</p>
+          <ReopenTermButton termId={lastClosedTerm.id} termName={lastClosedTerm.name} />
+        </div>
+      )}
+
       {/* ── Net position cards ───────────────────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="term-card rounded-2xl p-6 text-white">
           <p className="text-sm font-semibold text-emerald-100">USD net position</p>
           <p className="mt-2 text-4xl font-bold tabular-nums">{formatUSD(netUSD)}</p>
           <p className="relative mt-2 text-xs text-emerald-100/90">
-            Collected {formatUSD(collectedUSD)} · Spent {formatUSD(spentUSD)}
+            Collected {formatUSD(collectedUSD)}{otherIncomeUSD > 0 ? ` · Other income ${formatUSD(otherIncomeUSD)}` : ''} · Spent {formatUSD(spentUSD)}
           </p>
         </div>
         <div className="rounded-2xl bg-white p-5">
           <p className="text-xs font-medium text-muted">ZiG net position</p>
           <p className="mt-2 text-4xl font-bold tabular-nums text-ink">{formatZiG(netZiG)}</p>
           <p className="mt-2 text-xs text-muted">
-            Collected {formatZiG(collectedZiG)} · Spent {formatZiG(spentZiG)}
+            Collected {formatZiG(collectedZiG)}{otherIncomeZiG > 0 ? ` · Other income ${formatZiG(otherIncomeZiG)}` : ''} · Spent {formatZiG(spentZiG)}
           </p>
         </div>
       </div>

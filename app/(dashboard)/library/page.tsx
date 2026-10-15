@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { LibraryOverviewClient } from '@/components/library/LibraryOverviewClient';
+import { memberName } from '@/lib/library';
 import { getDaysOverdue } from '@/lib/utils';
 import type { SessionUser } from '@/types';
 
@@ -26,7 +27,7 @@ export default async function LibraryPage() {
       db.borrowing.findMany({
         where:   { schoolId, returnDate: null, dueDate: { lt: now } },
         include: {
-          member: { include: { user: { select: { fullName: true } } } },
+          member: { include: { user: { select: { fullName: true } }, student: { select: { fullName: true } } } },
           copy:   { include: { book: { select: { title: true } } } },
         },
         orderBy: { dueDate: 'asc' },
@@ -38,10 +39,12 @@ export default async function LibraryPage() {
     id:          b.id,
     bookTitle:   b.copy.book.title,
     accession:   b.copy.accessionNumber,
-    memberName:  b.member.user.fullName,
+    memberName:  memberName(b.member),
     dueDate:     b.dueDate.toISOString(),
     daysOverdue: getDaysOverdue(b.dueDate),
   }));
+
+  const school = await db.school.findUnique({ where: { id: schoolId }, select: { libraryFineLimit: true, studentLoanLimit: true, staffLoanLimit: true } });
 
   return (
     <LibraryOverviewClient
@@ -53,6 +56,11 @@ export default async function LibraryPage() {
       }}
       overdueList={overdueList}
       userRole={role}
+      settings={{
+        libraryFineLimit: school?.libraryFineLimit.toNumber() ?? 5,
+        studentLoanLimit: school?.studentLoanLimit ?? 2,
+        staffLoanLimit: school?.staffLoanLimit ?? 5,
+      }}
     />
   );
 }

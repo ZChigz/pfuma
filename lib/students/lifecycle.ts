@@ -8,6 +8,7 @@
 // Admission lives in lib/students/server.ts (admitStudent).
 import type { Prisma, StudentStatus } from '@prisma/client';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
+import { suspendStudentMembers } from '@/lib/library';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canGraduate, nextLevelOrder } from '@/lib/academic/rules';
@@ -241,6 +242,8 @@ async function leave(schoolId: string, actorId: string, studentIds: string[], mo
         tx,
       );
     }
+    // They can no longer borrow; books they still hold stay on loan until returned.
+    await suspendStudentMembers(tx, schoolId, actorId, students.map((s) => s.id), `Student ${rule.verb}`);
     return { count: students.length };
   });
 }

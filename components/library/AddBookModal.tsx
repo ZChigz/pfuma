@@ -20,7 +20,8 @@ type FormValues = {
   year?:          number;
   shelfLocation?: string;
   coverUrl?:      string;
-  totalCopies:    number;
+  copies:         number;
+  replacementCost?: number;
 };
 
 export function AddBookModal() {
@@ -37,7 +38,7 @@ export function AddBookModal() {
     reset,
   } = useForm<FormValues>({
     resolver: zodResolver(CreateBookSchema) as unknown as Resolver<FormValues>,
-    defaultValues: { totalCopies: 1 },
+    defaultValues: { copies: 1 },
   });
 
   const coverUrl = watch('coverUrl');
@@ -51,7 +52,8 @@ export function AddBookModal() {
       body: JSON.stringify({
         ...values,
         year:        values.year        ? Number(values.year)        : undefined,
-        totalCopies: Number(values.totalCopies),
+        copies: Number(values.copies),
+        ...(values.replacementCost ? { replacementCost: Number(values.replacementCost) } : {}),
       }),
     });
     const data = await res.json();
@@ -142,13 +144,23 @@ export function AddBookModal() {
           </div>
 
           <Input
-            id="totalCopies"
+            id="copies"
             label="Number of Copies"
             type="number"
             min="1"
             required
-            error={errors.totalCopies?.message}
-            {...register('totalCopies', { valueAsNumber: true })}
+            error={errors.copies?.message}
+            {...register('copies', { valueAsNumber: true })}
+          />
+
+          <Input
+            id="replacementCost"
+            label="Replacement cost, USD (optional)"
+            type="number"
+            min="0"
+            step="0.01"
+            hint="Charged to a student who loses a copy"
+            {...register('replacementCost', { valueAsNumber: true, setValueAs: (v) => (v === '' || Number.isNaN(Number(v)) ? undefined : Number(v)) })}
           />
 
           <FileUpload

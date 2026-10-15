@@ -2,13 +2,17 @@ import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
-import { parseBody, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
+import { parseBody, apiSuccess, apiUnauthorized, withApi, apiError } from '@/lib/api';
 import { z } from 'zod';
+import { rateFor } from '@/lib/exchange-rate';
 import type { SessionUser } from '@/types';
 
 const SetExchangeRateSchema = z.object({
   usdToZig: z.number({ error: 'Please enter a rate' }).positive('Rate must be positive'),
   note: z.string().optional(),
+  // When the rate starts to apply (default: now). Rows are never edited: a correction is a new row.
+  effectiveFrom: z.coerce.date().optional(),
+  source: z.enum(['RBZ', 'SCHOOL', 'OTHER']).optional().default('SCHOOL'),
 });
 
 const ALLOWED_ROLES = ['BURSAR', 'HEAD', 'DIRECTOR'] as const;
@@ -19,11 +23,8 @@ async function _GET(_req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  const rate = await db.exchangeRate.findFirst({
-    where: { schoolId: user.schoolId },
-    orderBy: { createdAt: 'desc' },
-    include: { user: { select: { fullName: true } } },
-  });
+  // The rate in force now: latest effectiveFrom on or before now, not simply the newest row.
+  const rate = await rateFor(db, new Date());
 
   if (!rate) {
     return apiSuccess({ rate: null });
@@ -47,6 +48,9 @@ async function _POST(req: NextRequest) {
 
   const parsed = await parseBody(req, SetExchangeRateSchema);
   if ('error' in parsed) return parsed.error;
+  if (parsed.data.effectiveFrom && parsed.data.effectiveFrom.getTime() > Date.now() + 60 * 864e5) {
+    return apiError('A rate cannot start more than 60 days from now', 422);
+  }
 
   const rate = await db.$tx(async (tx) => {
     const r = await tx.exchangeRate.create({
@@ -55,6 +59,8 @@ async function _POST(req: NextRequest) {
         usdToZig: parsed.data.usdToZig,
         setBy:    user.id,
         note:     parsed.data.note || null,
+        effectiveFrom: parsed.data.effectiveFrom ?? new Date(),
+        source:   parsed.data.source,
       },
       include: { user: { select: { fullName: true } } },
     });
@@ -62,10 +68,10 @@ async function _POST(req: NextRequest) {
       {
         schoolId:   user.schoolId,
         actorId:    user.id,
-        action:     'UPDATE_ASSET',
+        action:     'SET_EXCHANGE_RATE',
         entityType: 'ExchangeRate',
         entityId:   r.id,
-        detail:     `1 USD = ZiG ${parsed.data.usdToZig}${parsed.data.note ? ` — ${parsed.data.note}` : ''}`,
+        detail:     `1 USD = ZiG ${parsed.data.usdToZig} from ${(parsed.data.effectiveFrom ?? new Date()).toISOString()} (${parsed.data.source})${parsed.data.note ? ` — ${parsed.data.note}` : ''}`,
       },
       tx,
     );

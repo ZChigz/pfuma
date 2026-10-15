@@ -9,7 +9,10 @@ export const CreateBookSchema = z.object({
   year:          z.number().int().min(1000).max(new Date().getFullYear() + 1).optional(),
   shelfLocation: z.string().optional(),
   coverUrl:      z.string().url('Invalid URL').optional().or(z.literal('')),
-  totalCopies:   z.number().int().positive('Must have at least 1 copy'),
+  // How many copies to add now; the copies themselves are the count (BookCopy rows).
+  copies:        z.number().int().positive('Must have at least 1 copy').max(500),
+  replacementCost:     z.number().positive().optional(),
+  replacementCurrency: z.enum(['USD', 'ZIG']).optional(),
 });
 
 export const CheckoutSchema = z.object({

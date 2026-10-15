@@ -232,3 +232,23 @@ export async function refreshCurrentClasses(tx: Db, schoolId: string, termId: st
     await tx.student.updateMany({ where: { id: { in: studentIds } }, data: { currentClassId: classId } });
   }
 }
+
+// Reopening a CLOSED term (Director only, with a reason): results and marks of
+// that term can be corrected again. Only one term may be open at a time.
+export async function reopenTerm(schoolId: string, actorId: string, termId: string, reason: string) {
+  return getScopedDb(schoolId, actorId).$tx(async (tx) => {
+    const term = await requireTerm(schoolId, termId, tx);
+    if (term.status !== 'CLOSED') throw new ServiceError(`${term.name} is not closed`, 409);
+    const open = await getOpenTerm(schoolId, tx);
+    if (open) throw new ServiceError(`Close ${open.name} before reopening ${term.name}`, 409);
+    const t = await tx.academicTerm.update({
+      where: { id: termId },
+      data: { status: 'OPEN', closedAt: null, closedById: null },
+    });
+    await logAudit(
+      { schoolId, actorId, action: 'REOPEN_TERM', entityType: 'AcademicTerm', entityId: termId, detail: `${term.name}. Reason: ${reason}` },
+      tx,
+    );
+    return t;
+  });
+}

@@ -27,6 +27,9 @@ async function _POST(
   const parsed = await parseBody(req, DisposeAssetSchema);
   if ('error' in parsed) return parsed.error;
 
+  const proceeds = parsed.data.proceeds ?? null;
+  if (proceeds && !parsed.data.currency) return apiError('Choose the currency of the proceeds', 422);
+
   const disposal = await db.$tx(async (tx) => {
     const d = await tx.assetDisposal.create({
       data: {
@@ -44,6 +47,27 @@ async function _POST(
       where: { id: params.id },
       data:  { status: 'DISPOSED' },
     });
+    // Money received from the disposal is income, so it shows in the finance reports.
+    if (proceeds && proceeds > 0 && parsed.data.currency) {
+      const income = await tx.income.create({
+        data: {
+          source:          'ASSET_DISPOSAL',
+          amount:          proceeds,
+          currency:        parsed.data.currency,
+          receivedOn:      parsed.data.disposalDate,
+          description:     `Disposal of ${asset.name} (${asset.tagNumber}) — ${parsed.data.method.toLowerCase()}`,
+          assetDisposalId: d.id,
+          recordedById:    user.id,
+        } as never,
+      });
+      await logAudit(
+        {
+          schoolId: user.schoolId, actorId: user.id, action: 'RECORD_INCOME', entityType: 'Income', entityId: income.id,
+          detail: `${parsed.data.currency} ${proceeds} from disposing of ${asset.name}`,
+        },
+        tx,
+      );
+    }
     await logAudit(
       {
         schoolId:   user.schoolId,

@@ -32,8 +32,12 @@ export const Permission = {
   manageGuardians:    ['ADMIN', 'HEAD', 'DIRECTOR']                    as UserRole[],
   // Parent-portal links and PINs.
   managePortalLinks:  ['ADMIN', 'HEAD', 'BURSAR']                      as UserRole[],
-  // Reopen published results for a correction.
-  unpublishResults:   ['HEAD', 'DIRECTOR']                             as UserRole[],
+  // Unpublish a class's results for a correction: Head only.
+  unpublishResults:   ['HEAD']                                         as UserRole[],
+  // Mark an absence as excused (leaves it out of the student's subjects): Head only.
+  excuseAbsence:      ['HEAD']                                         as UserRole[],
+  // Reopen a CLOSED term: Director only.
+  reopenTerm:         ['DIRECTOR']                                     as UserRole[],
 } satisfies Record<string, UserRole[]>;
 
 const forbidden = () =>
@@ -78,6 +82,8 @@ export async function canManageEnrollment(role: UserRole): Promise<void> { await
 export async function canManageGuardians(role: UserRole): Promise<void> { await guard(role, Permission.manageGuardians); }
 
 export async function canManagePortalLinks(role: UserRole): Promise<void> { await guard(role, Permission.managePortalLinks); }
+export async function canExcuseAbsence(role: UserRole): Promise<void> { await guard(role, Permission.excuseAbsence); }
+export async function canReopenTerm(role: UserRole): Promise<void> { await guard(role, Permission.reopenTerm); }
 export async function canUnpublishResults(role: UserRole): Promise<void> { await guard(role, Permission.unpublishResults); }
 
 export function canEnterMarksSync(role: UserRole): void {

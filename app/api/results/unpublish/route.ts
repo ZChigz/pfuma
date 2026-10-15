@@ -9,12 +9,14 @@ import { requireTerm } from '@/lib/academic/terms';
 import { classRosterIds } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
 
-// What happens after publishing:
-//   • published results are locked: marks cannot be edited and parents see them;
-//   • to correct a mistake the Head or Director REOPENS the class's results here,
-//     giving a reason (audited). Parents stop seeing the term until it is
-//     published again; positions are recalculated on the next publish;
-//   • once the term is CLOSED the results are final and cannot be reopened.
+// Unpublish a class's results (HEAD only, reason required):
+//   • the class's TermResults become unpublished, so parents no longer see them;
+//   • every subject of the class goes back to VERIFIED (marks stay locked);
+//   • the Head then unlocks the ONE subject that needs fixing ("Unlock subject"),
+//     the teacher corrects it (the change is recorded in MarkChange), the subject
+//     is verified again, and the Head republishes — totals and positions are
+//     recalculated for the whole class;
+//   • once the term is CLOSED all results are locked.
 async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
@@ -26,13 +28,13 @@ async function _POST(req: NextRequest) {
 
   const parsed = await parseBody(req, UnpublishResultsSchema);
   if ('error' in parsed) return parsed.error;
-  const { classId, termId, reason, unlockMarks } = parsed.data;
+  const { classId, termId, reason } = parsed.data;
 
   const schoolClass = await db.schoolClass.findFirst({ where: { id: classId, schoolId: user.schoolId } });
   if (!schoolClass) return apiNotFound('Class');
   const term = await requireTerm(user.schoolId, termId, db);
   if (term.status === 'CLOSED') {
-    return apiError(`${term.name} is closed, so its results are final and cannot be reopened`, 409);
+    return apiError(`${term.name} is closed, so its results are locked and final. The Director can reopen the term.`, 409);
   }
 
   const assignments = await db.subjectAssignment.findMany({
@@ -53,13 +55,11 @@ async function _POST(req: NextRequest) {
     });
     await tx.mark.updateMany({
       where: { schoolId: user.schoolId, termId, subjectId: { in: subjectIds }, studentId: { in: studentIds }, status: 'PUBLISHED' },
-      data: unlockMarks ? { status: 'DRAFT', verifiedAt: null } : { status: 'VERIFIED' },
+      data: { status: 'VERIFIED' },
     });
     await tx.subjectAssignment.updateMany({
       where: { schoolId: user.schoolId, classId, termId, marksStatus: 'PUBLISHED' },
-      data: unlockMarks
-        ? { marksStatus: 'IN_PROGRESS', marksVerifiedAt: null, marksVerifiedById: null }
-        : { marksStatus: 'VERIFIED' },
+      data: { marksStatus: 'VERIFIED' },
     });
     await logAudit(
       {
@@ -68,13 +68,13 @@ async function _POST(req: NextRequest) {
         action:     'UNPUBLISH_RESULTS',
         entityType: 'TermResult',
         entityId:   `${classId}:${termId}`,
-        detail:     `Reopened ${count} results for ${schoolClass.name} — ${term.name}${unlockMarks ? ' (marks unlocked)' : ''}. Reason: ${reason}`,
+        detail:     `Unpublished ${count} results for ${schoolClass.name} — ${term.name}. Reason: ${reason}`,
       },
       tx,
     );
   });
 
-  return apiSuccess({ reopened: true, marksUnlocked: unlockMarks });
+  return apiSuccess({ unpublished: true });
 }
 
 type H = (req: Request, ctx?: unknown) => Promise<Response>;

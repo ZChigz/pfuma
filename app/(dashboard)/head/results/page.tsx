@@ -8,8 +8,10 @@ import { PublishResultsButton } from '@/components/results/PublishResultsButton'
 import { ExportResultsButton } from '@/components/results/ExportResultsButton';
 import { UnlockSubjectLink } from '@/components/results/UnlockSubjectLink';
 import { ReopenResultsButton } from '@/components/results/ReopenResultsButton';
+import { ExcuseAbsenceButton } from '@/components/results/ExcuseAbsenceButton';
+import { ReportCardDetails, type DetailRow } from '@/components/results/ReportCardDetails';
 import { listTerms } from '@/lib/academic/terms';
-import { classRosterIds } from '@/lib/academic/roster';
+import { classRoster, classRosterIds } from '@/lib/academic/roster';
 import type { SessionUser, AssignmentMarkStatus } from '@/types';
 
 const STATUS_DISPLAY: Record<AssignmentMarkStatus, { icon: string; label: string; className: string }> = {
@@ -78,6 +80,41 @@ export default async function HeadResultsPage({
     });
   }
 
+  // Absences in this class and term: the Head can excuse them (left out instead of counting as 0).
+  const absences =
+    selectedClass && term && assignments.length > 0
+      ? await db.mark.findMany({
+          where: {
+            schoolId,
+            termId: selectedTermId,
+            status: 'ABSENT',
+            subjectId: { in: assignments.map((a) => a.subjectId) },
+            studentId: { in: await classRosterIds(selectedClass.id, selectedTermId, db) },
+          },
+          include: { student: { select: { fullName: true } }, subject: { select: { name: true } } },
+          orderBy: [{ student: { fullName: 'asc' } }],
+        })
+      : [];
+
+  // Report-card extras (remarks, days present / absent) for everyone in the class.
+  let detailRows: DetailRow[] = [];
+  if (selectedClass && term && user.role === 'HEAD') {
+    const roster = await classRoster(selectedClass.id, selectedTermId, db);
+    const saved = await db.termResult.findMany({ where: { schoolId, termId: selectedTermId, studentId: { in: roster.map((s) => s.id) } } });
+    const byStudent = new Map(saved.map((r) => [r.studentId, r]));
+    detailRows = roster.map((s) => {
+      const r = byStudent.get(s.id);
+      return {
+        studentId: s.id,
+        fullName: s.fullName,
+        classTeacherRemark: r?.classTeacherRemark ?? '',
+        headRemark: r?.headRemark ?? '',
+        daysPresent: r?.daysPresent != null ? String(r.daysPresent) : '',
+        daysAbsent: r?.daysAbsent != null ? String(r.daysAbsent) : '',
+      };
+    });
+  }
+
   const verifiedCount = assignments.filter((a) => a.marksStatus === 'VERIFIED' || a.marksStatus === 'PUBLISHED').length;
   const allVerified = assignments.length > 0 && verifiedCount === assignments.length;
   const isPublished = assignments.length > 0 && assignments.every((a) => a.marksStatus === 'PUBLISHED');
@@ -131,7 +168,7 @@ export default async function HeadResultsPage({
                 ✓ Published
               </span>
             )}
-            {isPublished && term?.status !== 'CLOSED' && (
+            {isPublished && term?.status !== 'CLOSED' && user.role === 'HEAD' && (
               <ReopenResultsButton classId={selectedClass.id} className={selectedClass.name} termId={selectedTermId} termName={selectedTerm} />
             )}
             {isPublished && <ExportResultsButton classId={selectedClass.id} className={selectedClass.name} termId={selectedTermId} termName={selectedTerm} />}
@@ -206,6 +243,31 @@ export default async function HeadResultsPage({
             </table>
           </div>
 
+          {absences.length > 0 && (
+            <div className="overflow-hidden rounded-2xl bg-white">
+              <p className="border-b border-line px-4 py-3 text-xs font-medium text-muted">
+                Absences — count as 0 unless excused{user.role === 'HEAD' && !isPublished ? '' : ' (unpublish the class to change)'}
+              </p>
+              <table className="w-full text-left text-sm text-ink">
+                <tbody className="divide-y divide-line">
+                  {absences.map((m) => (
+                    <tr key={m.id}>
+                      <td className="px-4 py-3 font-medium">{m.student.fullName}</td>
+                      <td className="px-4 py-3 text-muted">{m.subject.name}</td>
+                      <td className="px-4 py-3 text-muted">{m.absenceReason ?? '—'}</td>
+                      <td className="px-4 py-3">{m.excused ? 'Excused' : 'Counts as 0'}</td>
+                      <td className="px-4 py-3">
+                        {user.role === 'HEAD' && !isPublished && term?.status !== 'CLOSED' && (
+                          <ExcuseAbsenceButton markId={m.id} excused={m.excused} />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <p className="text-sm font-medium text-ink">
             {verifiedCount} of {assignments.length} subjects verified
           </p>
@@ -274,6 +336,8 @@ export default async function HeadResultsPage({
           )}
         </>
       )}
+
+      {detailRows.length > 0 && term?.status !== 'CLOSED' && <ReportCardDetails key={`${selectedClassId}-${selectedTermId}`} termId={selectedTermId} rows={detailRows} />}
     </div>
   );
 }

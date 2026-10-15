@@ -37,11 +37,11 @@ function conditionBadge(c: CopyCondition) {
 }
 
 function statusBadge(s: CopyStatus) {
-  const map: Record<CopyStatus, 'success' | 'warning' | 'neutral'> = {
-    AVAILABLE: 'success', BORROWED: 'warning', LOST: 'neutral',
+  const map: Record<CopyStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
+    AVAILABLE: 'success', BORROWED: 'warning', LOST: 'neutral', DAMAGED: 'danger', WITHDRAWN: 'neutral',
   };
   const labels: Record<CopyStatus, string> = {
-    AVAILABLE: 'Available', BORROWED: 'Borrowed', LOST: 'Lost',
+    AVAILABLE: 'Available', BORROWED: 'Borrowed', LOST: 'Lost', DAMAGED: 'Damaged', WITHDRAWN: 'Withdrawn',
   };
   return <Badge variant={map[s] ?? 'neutral'} label={labels[s] ?? s} />;
 }

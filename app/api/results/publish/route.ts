@@ -5,7 +5,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiNotFound, parseBody, withApi 
 import { canPublishResults } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { PublishResultsSchema } from '@/lib/validations/results';
-import { assignPositions, getLetterGrade, summariseStudent, type OfferedSubject } from '@/lib/results';
+import { assignPositions, boundariesFor, getLetterGrade, gradeFor, passThreshold, summariseStudent, type OfferedSubject } from '@/lib/results';
 import { requireTerm } from '@/lib/academic/terms';
 import { classRoster } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
@@ -25,10 +25,12 @@ async function _POST(req: NextRequest) {
 
   const schoolClass = await db.schoolClass.findFirst({
     where: { id: classId, schoolId: user.schoolId },
+    include: { level: { select: { category: true } } },
   });
   if (!schoolClass) return apiNotFound('Class');
   const termRow = await requireTerm(user.schoolId, termId, db);
   const term = termRow.name;
+  if (termRow.status === 'CLOSED') return apiError(`${termRow.name} is closed, so its results are locked. The Director can reopen the term.`, 409);
 
   const assignments = await db.subjectAssignment.findMany({
     where: { schoolId: user.schoolId, classId, termId },
@@ -58,11 +60,23 @@ async function _POST(req: NextRequest) {
   ]);
   const studentIds = students.map((s) => s.id);
 
-  const boundaries = boundaryRows.map((b) => ({
-    minPercent:  b.minPercent.toNumber(),
-    maxPercent:  b.maxPercent.toNumber(),
-    letterGrade: b.letterGrade,
-  }));
+  // The boundaries for this class's level and this term (most specific set wins).
+  const boundaries = boundariesFor(
+    boundaryRows.map((b) => ({
+      minPercent:  b.minPercent.toNumber(),
+      maxPercent:  b.maxPercent.toNumber(),
+      letterGrade: b.letterGrade,
+      levelId:     b.levelId,
+      termId:      b.termId,
+    })),
+    schoolClass.levelId,
+    termId,
+  );
+  const nextTerm = await db.academicTerm.findFirst({
+    where: { schoolId: user.schoolId, startDate: { gt: termRow.startDate } },
+    orderBy: { startDate: 'asc' },
+    select: { startDate: true },
+  });
 
   const offered: OfferedSubject[] = assignments.map((a) => ({
     id: a.subjectId,
@@ -76,25 +90,32 @@ async function _POST(req: NextRequest) {
       schoolId:  user.schoolId,
       subjectId: { in: subjectIds },
       termId,
-      status:    'VERIFIED',
+      status:    { in: ['VERIFIED', 'ABSENT', 'EXEMPT'] },
       studentId: { in: studentIds },
     },
   });
 
-  // Fair ranking: average % over the subjects each student actually sat; a student
-  // who sat too few subjects is not ranked (see lib/results.ts).
+  // Overall % = average of the per-subject percentages over the subjects that count
+  // (EXEMPT and excused absences left out, other absences as 0). See lib/results.ts.
+  const school = await db.school.findUnique({ where: { id: user.schoolId }, select: { passGrade: true, oLevelRanking: true } });
+  const passMark = passThreshold(boundaries, school?.passGrade ?? 'C');
+  const mode = schoolClass.level.category === 'O_LEVEL' ? school?.oLevelRanking ?? 'AVERAGE' : 'AVERAGE';
+
   const summaries = students.map((s) => {
-    const sat = allMarks
+    const entries = allMarks
       .filter((m) => m.studentId === s.id)
-      .map((m) => ({ subjectId: m.subjectId, rawMark: m.rawMark.toNumber() }));
-    const summary = summariseStudent(sat, offered);
-    const letterGrade = getLetterGrade(summary.percentage, boundaries);
+      .map((m) => ({ subjectId: m.subjectId, rawMark: m.rawMark.toNumber(), status: m.status, excused: m.excused }));
+    const summary = summariseStudent(entries, offered, passMark);
+    const letterGrade = getLetterGrade(summary.averagePercentage, boundaries);
     return { studentId: s.id, fullName: s.fullName, letterGrade, ...summary };
   });
 
-  const positions = assignPositions(summaries.map((s) => ({ id: s.studentId, percentage: s.percentage, ranked: s.ranked })));
+  const positions = assignPositions(
+    summaries.map((s) => ({ id: s.studentId, averagePercentage: s.averagePercentage, subjectsPassed: s.subjectsPassed, ranked: s.ranked })),
+    mode,
+  );
   const rankedOutOf = positions.size;
-  summaries.sort((a, b) => (positions.get(a.studentId) ?? Infinity) - (positions.get(b.studentId) ?? Infinity) || b.percentage - a.percentage);
+  summaries.sort((a, b) => (positions.get(a.studentId) ?? Infinity) - (positions.get(b.studentId) ?? Infinity) || b.averagePercentage - a.averagePercentage);
 
   const now = new Date();
 
@@ -104,11 +125,17 @@ async function _POST(req: NextRequest) {
         where:  { studentId_termId: { studentId: s.studentId, termId } },
         update: {
           totalMarks:    s.totalMarks,
-          percentage:    s.percentage,
+          percentage:    s.averagePercentage,
+          averagePercentage: s.averagePercentage,
           classPosition: positions.get(s.studentId) ?? null,
-          subjectsSat:     s.subjectsSat,
+          subjectsSat:     s.subjectsTaken,
+          subjectsTaken:   s.subjectsTaken,
+          subjectsPassed:  s.subjectsPassed,
           subjectsOffered: s.subjectsOffered,
           rankedOutOf,
+          classSize:     students.length,
+          letterGrade:   s.letterGrade,
+          nextTermStartDate: nextTerm?.startDate ?? null,
           published:     true,
           publishedAt:   now,
         },
@@ -117,15 +144,39 @@ async function _POST(req: NextRequest) {
           studentId:     s.studentId,
           termId,
           totalMarks:    s.totalMarks,
-          percentage:    s.percentage,
+          percentage:    s.averagePercentage,
+          averagePercentage: s.averagePercentage,
           classPosition: positions.get(s.studentId) ?? null,
-          subjectsSat:     s.subjectsSat,
+          subjectsSat:     s.subjectsTaken,
+          subjectsTaken:   s.subjectsTaken,
+          subjectsPassed:  s.subjectsPassed,
           subjectsOffered: s.subjectsOffered,
           rankedOutOf,
+          classSize:     students.length,
+          letterGrade:   s.letterGrade,
+          nextTermStartDate: nextTerm?.startDate ?? null,
           published:     true,
           publishedAt:   now,
         },
       });
+    }
+
+    // Freeze each score's grade with the boundaries in force now (only rows that differ are touched).
+    const maxBySubject = new Map(offered.map((o) => [o.id, o.maxMark]));
+    for (const m of allMarks) {
+      if (m.status !== 'VERIFIED') continue;
+      const max = maxBySubject.get(m.subjectId) ?? 0;
+      const pct = max > 0 ? (m.rawMark.toNumber() / max) * 100 : 0;
+      const band = gradeFor(pct, boundaries);
+      const min = band?.minPercent ?? null;
+      const top = band?.maxPercent ?? null;
+      if (
+        (band?.letterGrade ?? null) !== m.letterGrade ||
+        min !== (m.gradeMinPercent?.toNumber() ?? null) ||
+        top !== (m.gradeMaxPercent?.toNumber() ?? null)
+      ) {
+        await tx.mark.update({ where: { id: m.id }, data: { letterGrade: band?.letterGrade ?? null, gradeMinPercent: min, gradeMaxPercent: top } });
+      }
     }
 
     await tx.mark.updateMany({
@@ -158,7 +209,7 @@ async function _POST(req: NextRequest) {
   });
 
   const classAverage = summaries.length > 0
-    ? summaries.reduce((n, s) => n + s.percentage, 0) / summaries.length
+    ? summaries.reduce((n, s) => n + s.averagePercentage, 0) / summaries.length
     : 0;
 
   return apiSuccess({

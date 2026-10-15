@@ -110,10 +110,21 @@ enum SubjectType {
   ELECTIVE
 }
 
+// DRAFT / VERIFIED / PUBLISHED are the workflow of a score. ABSENT and EXEMPT are
+// entered by the teacher instead of a score: ABSENT counts as 0 unless the Head
+// excuses it, EXEMPT is left out of the student's subjects.
 enum MarkStatus {
   DRAFT
   VERIFIED
   PUBLISHED
+  ABSENT
+  EXEMPT
+}
+
+// How O Level classes are ranked.
+enum RankingMode {
+  AVERAGE
+  PASSES_THEN_AVERAGE
 }
 
 enum AssignmentMarkStatus {
@@ -154,6 +165,25 @@ enum CopyStatus {
   AVAILABLE
   BORROWED
   LOST
+  DAMAGED   // in the library but not lendable until repaired
+  WITHDRAWN // taken out of circulation
+}
+
+// Where an exchange rate came from.
+enum RateSource {
+  RBZ
+  SCHOOL
+  OTHER
+}
+
+enum IncomeSource {
+  ASSET_DISPOSAL
+  OTHER
+}
+
+enum MemberType {
+  STAFF
+  STUDENT
 }
 
 enum AuditAction {
@@ -216,6 +246,21 @@ enum AuditAction {
   SET_PORTAL_PIN
   VOID_WITHOUT_SECOND_APPROVER
   UNPUBLISH_RESULTS
+  REOPEN_TERM
+  CHANGE_MARK
+  EXCUSE_ABSENCE
+  UPDATE_GRADE_BOUNDARIES
+  UPDATE_REPORT_CARD
+  CREATE_LIBRARY_MEMBER
+  SUSPEND_LIBRARY_MEMBER
+  UPDATE_BOOK_COPY
+  SETTLE_LIBRARY_FINE
+  UPDATE_LIBRARY_SETTINGS
+  SET_EXCHANGE_RATE
+  TRANSFER_ASSET
+  RECORD_INCOME
+  CREATE_PASSWORD_RESET
+  USE_PASSWORD_RESET
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
@@ -226,6 +271,15 @@ model School {
   location     String?
   // Default capacity for newly created classes.
   maxClassSize Int      @default(45)
+  // Lowest grade that counts as a pass ("C or better" = C), looked up in GradeBoundary.
+  passGrade    String   @default("C")
+  // O Level classes: rank by average percentage, or by number of passes then average.
+  oLevelRanking RankingMode @default(AVERAGE)
+  // Library: checkout is blocked above this much unpaid fines (in the fine currency),
+  // and each kind of member has its own loan limit.
+  libraryFineLimit  Decimal @default(5) @db.Decimal(14, 2)
+  studentLoanLimit  Int     @default(2)
+  staffLoanLimit    Int     @default(5)
   createdAt    DateTime @default(now())
   // Legacy column "currentTerm" still exists in the database until the
   // contract migration; the current term is now the OPEN AcademicTerm.
@@ -247,6 +301,7 @@ model School {
   subjects           Subject[]
   subjectAssignments SubjectAssignment[]
   marks              Mark[]
+  markChanges        MarkChange[]
   termResults        TermResult[]
   gradeBoundaries    GradeBoundary[]
   assetCategories    AssetCategory[]
@@ -259,6 +314,9 @@ model School {
   borrowings         Borrowing[]
   exchangeRates      ExchangeRate[]
   schoolClasses      SchoolClass[]
+  passwordResetTokens PasswordResetToken[]
+  assetTransfers     AssetTransfer[]
+  incomes            Income[]
 }
 
 model User {
@@ -293,15 +351,21 @@ model User {
   subjectAssignments  SubjectAssignment[]
   verifiedAssignments SubjectAssignment[] @relation("VerifiedAssignments")
   marks               Mark[]
+  markChanges         MarkChange[]
   assetMaintenances   AssetMaintenance[]
   assetDisposals      AssetDisposal[]
   libraryMember       LibraryMember?
   classesTaught       SchoolClass[]
   closedTerms         AcademicTerm[]      @relation("ClosedTerms")
 
-  accounts      Account[]
-  sessions      Session[]
   exchangeRates ExchangeRate[]
+  resetTokens        PasswordResetToken[] @relation("ResetTokenUser")
+  resetTokensCreated PasswordResetToken[] @relation("ResetTokenCreator")
+  custodianOf        Asset[]              @relation("AssetCustodian")
+  transfersFrom      AssetTransfer[]      @relation("TransferFrom")
+  transfersTo        AssetTransfer[]      @relation("TransferTo")
+  transfersRecorded  AssetTransfer[]      @relation("TransfersRecorded")
+  incomeRecorded     Income[]
 
   @@unique([schoolId, email])
   @@index([schoolId])
@@ -346,6 +410,7 @@ model Level {
   school        School         @relation(fields: [schoolId], references: [id])
   classes       SchoolClass[]
   feeStructures FeeStructure[]
+  gradeBoundaries GradeBoundary[]
 
   @@unique([schoolId, name])
   @@unique([schoolId, order])
@@ -392,6 +457,7 @@ model AcademicTerm {
   marks              Mark[]
   termResults        TermResult[]
   enrollments        Enrollment[]
+  gradeBoundaries    GradeBoundary[]
 
   @@unique([academicYearId, termNumber])
   @@index([schoolId])
@@ -468,6 +534,7 @@ model Student {
   marks        Mark[]
   termResults  TermResult[]
   portalViews  PortalAccessLog[]
+  libraryMember LibraryMember?
 
   @@unique([schoolId, admissionNumber])
   @@unique([schoolId, birthCertificateNumber])
@@ -577,12 +644,15 @@ model Payment {
   paidInZig        Boolean       @default(false)
   zigAmountPaid    Decimal?      @db.Decimal(14, 2)
   exchangeRateUsed Decimal?      @db.Decimal(14, 2)
+  // The exact rate row used for a ZiG payment.
+  exchangeRateId   String?
 
   school   School  @relation(fields: [schoolId], references: [id])
   student  Student @relation(fields: [studentId], references: [id])
   recorder User    @relation("RecordedPayments", fields: [recordedBy], references: [id])
   verifier User?   @relation("VerifiedPayments", fields: [verifiedBy], references: [id])
   voider   User?   @relation("VoidedPayments", fields: [voidedBy], references: [id])
+  exchangeRate ExchangeRate? @relation(fields: [exchangeRateId], references: [id])
 
   @@index([schoolId])
   @@index([schoolId, status])
@@ -760,6 +830,17 @@ model Mark {
   letterGrade String?
   status      MarkStatus @default(DRAFT)
   verifiedAt  DateTime?
+  // Set the first time the mark is verified and never cleared: any change after
+  // this moment needs a reason and is recorded in MarkChange.
+  firstVerifiedAt DateTime?
+  // Why the student was absent (status ABSENT), and whether the Head excused it.
+  absenceReason   String?
+  excused         Boolean   @default(false)
+  // The boundary the letter grade came from, copied when the mark is entered and
+  // again when the class is published, so later boundary edits never change a
+  // published grade.
+  gradeMinPercent Decimal?  @db.Decimal(14, 2)
+  gradeMaxPercent Decimal?  @db.Decimal(14, 2)
   enteredBy   String
   enteredAt   DateTime   @default(now())
 
@@ -768,11 +849,31 @@ model Mark {
   subject Subject      @relation(fields: [subjectId], references: [id])
   enterer User         @relation(fields: [enteredBy], references: [id])
   term    AcademicTerm @relation(fields: [termId], references: [id])
+  changes MarkChange[]
 
   @@unique([studentId, subjectId, termId])
   @@index([termId])
   @@index([schoolId])
   @@index([schoolId, studentId])
+}
+
+// History of every change to a mark after it was first verified.
+model MarkChange {
+  id          String   @id @default(cuid())
+  schoolId    String
+  markId      String
+  oldRawMark  Decimal  @db.Decimal(14, 2)
+  newRawMark  Decimal  @db.Decimal(14, 2)
+  changedById String
+  reason      String
+  changedAt   DateTime @default(now())
+
+  school    School @relation(fields: [schoolId], references: [id])
+  mark      Mark   @relation(fields: [markId], references: [id])
+  changedBy User   @relation(fields: [changedById], references: [id])
+
+  @@index([schoolId])
+  @@index([markId])
 }
 
 model TermResult {
@@ -789,6 +890,20 @@ model TermResult {
   subjectsSat     Int?
   subjectsOffered Int?
   rankedOutOf     Int?
+  // 4.3: subjects counted (EXEMPT and excused absences left out), their average
+  // percentage, and how many reached the school's pass grade. subjectsSat and
+  // percentage are older copies of subjectsTaken and averagePercentage.
+  subjectsTaken     Int?
+  averagePercentage Decimal? @db.Decimal(14, 2)
+  subjectsPassed    Int?
+  // 4.4 / 4.6: students in the class ("Position 2 of 42"), the overall grade as
+  // published, and the report-card extras.
+  classSize         Int?
+  letterGrade       String?
+  classTeacherRemark String?
+  daysPresent       Int?
+  daysAbsent        Int?
+  nextTermStartDate DateTime? @db.Date
   headRemark    String?
   published     Boolean   @default(false)
   publishedAt   DateTime?
@@ -803,16 +918,24 @@ model TermResult {
   @@index([schoolId, studentId])
 }
 
+// A set of boundaries is all rows sharing the same (levelId, termId). The most
+// specific set wins: level + term, then level, then term, then the school-wide set
+// (both null). This lets O Level and A Level use different boundaries.
 model GradeBoundary {
   id          String  @id @default(cuid())
   schoolId    String
+  levelId     String?
+  termId      String?
   minPercent  Decimal @db.Decimal(14, 2)
   maxPercent  Decimal @db.Decimal(14, 2)
   letterGrade String
 
-  school School @relation(fields: [schoolId], references: [id])
+  school School        @relation(fields: [schoolId], references: [id])
+  level  Level?        @relation(fields: [levelId], references: [id])
+  term   AcademicTerm? @relation(fields: [termId], references: [id])
 
   @@index([schoolId])
+  @@index([schoolId, levelId, termId])
 }
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -839,7 +962,9 @@ model Asset {
   acquisitionCost Decimal        @db.Decimal(14, 2)
   currency        Currency
   location        String
+  // Who looks after it: a staff member (custodianId) or, for anyone else, a name.
   custodian       String?
+  custodianId     String?
   condition       AssetCondition @default(GOOD)
   status          AssetStatus    @default(ACTIVE)
   imageUrl        String?
@@ -849,9 +974,60 @@ model Asset {
   category    AssetCategory      @relation(fields: [categoryId], references: [id])
   maintenance AssetMaintenance[]
   disposal    AssetDisposal?
+  custodianUser User?            @relation("AssetCustodian", fields: [custodianId], references: [id])
+  transfers   AssetTransfer[]
 
+  @@unique([schoolId, tagNumber])
   @@index([schoolId])
   @@index([schoolId, status])
+}
+
+// Every change of an asset's location or custodian, kept for good (append-only).
+model AssetTransfer {
+  id                String   @id @default(cuid())
+  schoolId          String
+  assetId           String
+  fromLocation      String
+  toLocation        String
+  fromCustodianId   String?
+  toCustodianId     String?
+  fromCustodianName String?
+  toCustodianName   String?
+  transferDate      DateTime
+  note              String?
+  recordedById      String
+  createdAt         DateTime @default(now())
+
+  school         School @relation(fields: [schoolId], references: [id])
+  asset          Asset  @relation(fields: [assetId], references: [id])
+  fromCustodian  User?  @relation("TransferFrom", fields: [fromCustodianId], references: [id])
+  toCustodian    User?  @relation("TransferTo", fields: [toCustodianId], references: [id])
+  recordedBy     User   @relation("TransfersRecorded", fields: [recordedById], references: [id])
+
+  @@index([schoolId])
+  @@index([assetId, transferDate])
+}
+
+// Money the school receives that is not a student payment (e.g. selling a disposed asset).
+// Finance reports add it to the net position.
+model Income {
+  id              String       @id @default(cuid())
+  schoolId        String
+  source          IncomeSource
+  amount          Decimal      @db.Decimal(14, 2)
+  currency        Currency
+  receivedOn      DateTime
+  description     String
+  assetDisposalId String?      @unique
+  recordedById    String
+  createdAt       DateTime     @default(now())
+
+  school     School         @relation(fields: [schoolId], references: [id])
+  disposal   AssetDisposal? @relation(fields: [assetDisposalId], references: [id])
+  recordedBy User           @relation(fields: [recordedById], references: [id])
+
+  @@index([schoolId])
+  @@index([schoolId, currency])
 }
 
 model AssetMaintenance {
@@ -889,6 +1065,7 @@ model AssetDisposal {
   school   School @relation(fields: [schoolId], references: [id])
   asset    Asset  @relation(fields: [assetId], references: [id])
   recorder User   @relation(fields: [recordedBy], references: [id])
+  income   Income?
 
   @@index([schoolId])
 }
@@ -906,7 +1083,10 @@ model Book {
   year          Int?
   shelfLocation String?
   coverUrl      String?
-  totalCopies   Int     @default(1)
+  // What a student is charged when they lose a copy (Part 2.7 charge).
+  replacementCost     Decimal?  @db.Decimal(14, 2)
+  replacementCurrency Currency  @default(USD)
+  // Copy counts are not stored: they are counted from BookCopy (lib/library.ts).
 
   school School     @relation(fields: [schoolId], references: [id])
   copies BookCopy[]
@@ -930,15 +1110,21 @@ model BookCopy {
   @@index([schoolId])
 }
 
+// Exactly one of userId (STAFF) and studentId (STUDENT) is set — enforced by the
+// check constraints "LibraryMember_exactly_one_person" and "LibraryMember_type_matches"
+// (SQL only; keep them when writing migrations).
 model LibraryMember {
-  id                 String  @id @default(cuid())
+  id                 String     @id @default(cuid())
   schoolId           String
-  userId             String  @unique
-  borrowingSuspended Boolean @default(false)
+  memberType         MemberType @default(STAFF)
+  userId             String?    @unique
+  studentId          String?    @unique
+  borrowingSuspended Boolean    @default(false)
   suspensionReason   String?
 
   school     School      @relation(fields: [schoolId], references: [id])
-  user       User        @relation(fields: [userId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
+  student    Student?    @relation(fields: [studentId], references: [id])
   borrowings Borrowing[]
 
   @@index([schoolId])
@@ -967,54 +1153,43 @@ model Borrowing {
 
 // ─── Finance Settings ────────────────────────────────────────────────────────
 
+// Append-only: a correction is a new row (the database refuses UPDATE and DELETE).
+// The rate for a date is the latest row whose effectiveFrom is on or before it.
 model ExchangeRate {
-  id        String   @id @default(cuid())
-  schoolId  String
-  school    School   @relation(fields: [schoolId], references: [id])
-  usdToZig  Decimal
-  setBy     String
-  user      User     @relation(fields: [setBy], references: [id])
-  note      String?
-  createdAt DateTime @default(now())
+  id            String     @id @default(cuid())
+  schoolId      String
+  school        School     @relation(fields: [schoolId], references: [id])
+  usdToZig      Decimal
+  effectiveFrom DateTime   @default(now())
+  source        RateSource @default(SCHOOL)
+  setBy         String
+  user          User       @relation(fields: [setBy], references: [id])
+  note          String?
+  createdAt     DateTime   @default(now())
+  payments      Payment[]
 
   @@index([schoolId])
   @@index([schoolId, createdAt])
+  @@index([schoolId, effectiveFrom])
 }
 
-// ─── Auth.js (NextAuth) ─────────────────────────────────────────────────────
+// ─── Password reset ──────────────────────────────────────────────────────────
+// Sessions are JWTs, so the Auth.js Account / Session / VerificationToken tables are gone.
+// A staff password reset is a single-use link valid for 30 minutes; only the SHA-256 of the token is stored.
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  schoolId    String
+  userId      String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
+  school    School @relation(fields: [schoolId], references: [id])
+  user      User   @relation("ResetTokenUser", fields: [userId], references: [id])
+  createdBy User   @relation("ResetTokenCreator", fields: [createdById], references: [id])
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
+  @@index([schoolId])
+  @@index([userId])
 }

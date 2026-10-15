@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { proofKeyBelongsTo } from '@/lib/proof-of-payment';
+import { rateFor } from '@/lib/exchange-rate';
 import { logAudit } from '@/lib/audit';
 import { canRecordPayment } from '@/lib/permissions';
 import { CreatePaymentSchema } from '@/lib/validations/accounting';
@@ -74,6 +75,21 @@ async function _POST(req: NextRequest) {
   const isCash = parsed.data.method === 'CASH';
   const now    = new Date();
 
+  // A ZiG payment uses the rate in force on the payment date (latest effectiveFrom on or
+  // before it) and links to that exact row. The browser may only confirm it.
+  let rateRow: Awaited<ReturnType<typeof rateFor>> = null;
+  if (parsed.data.paidInZig) {
+    rateRow = await rateFor(db, now);
+    if (!rateRow) return apiError('No exchange rate is in force. Set one under Settings first.', 409);
+    const rate = rateRow.usdToZig.toNumber();
+    if (parsed.data.exchangeRateUsed && Math.abs(parsed.data.exchangeRateUsed - rate) > 0.0001) {
+      return apiError(`The exchange rate in force is ZiG ${rate}, not ${parsed.data.exchangeRateUsed}. Reload the page and try again.`, 409);
+    }
+    if (parsed.data.zigAmountPaid && Math.abs(parsed.data.amount - parsed.data.zigAmountPaid / rate) > 0.02) {
+      return apiError('Amount does not match ZiG conversion', 422);
+    }
+  }
+
   const payment = await db.$tx(async (tx) => {
     const p = await tx.payment.create({
       data: {
@@ -91,7 +107,8 @@ async function _POST(req: NextRequest) {
         verifiedAt:      isCash ? now    : null,
         paidInZig:        parsed.data.paidInZig,
         zigAmountPaid:    parsed.data.zigAmountPaid    ?? null,
-        exchangeRateUsed: parsed.data.exchangeRateUsed ?? null,
+        exchangeRateUsed: rateRow ? rateRow.usdToZig.toNumber() : null,
+        exchangeRateId:   rateRow?.id ?? null,
       },
     });
     await logAudit(

@@ -44,7 +44,7 @@ describe('assets', () => {
 
 describe('library', () => {
   it('add a book, check a copy out, list, return it, change a copy', async () => {
-    const book = await call('library/books', 'POST', { as: A.users.LIBRARIAN, body: { title: 'Physics 1', author: 'Newton', totalCopies: 2 } });
+    const book = await call('library/books', 'POST', { as: A.users.LIBRARIAN, body: { title: 'Physics 1', author: 'Newton', copies: 2 } });
     expect(book.status).toBe(201);
     const bookId = book.json.data.book.id;
     const copies = await prisma.bookCopy.findMany({ where: { bookId }, orderBy: { accessionNumber: 'asc' } });
@@ -170,12 +170,20 @@ describe('results', () => {
     expect(mark.status).toBe(200);
     expect(mark.json.data.mark.letterGrade).toBe('P');
 
-    const verify = await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId, force: true } });
+    // Verifying needs a row for every enrolled student: the others (imported earlier) are marked absent.
+    const refused = await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId } });
+    expect(refused.status).toBe(422);
+    const others = await prisma.enrollment.findMany({ where: { classId: A.classId, termId: A.termId, studentId: { not: A.studentId } } });
+    for (const e of others) {
+      const abs = await call('results/marks', 'POST', { as: A.users.TEACHER, body: { studentId: e.studentId, subjectId: A.subjectId, classId: A.classId, termId: A.termId, status: 'ABSENT' } });
+      expect(abs.status).toBe(200);
+    }
+    const verify = await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId } });
     expect(verify.status).toBe(200);
     expect((await prisma.subjectAssignment.findUniqueOrThrow({ where: { id: A.assignmentId } })).marksStatus).toBe('VERIFIED');
     expect((await call('results/marks/unverify', 'POST', { as: A.users.HEAD, body: { assignmentId: A.assignmentId } })).status).toBe(200);
     expect((await prisma.subjectAssignment.findUniqueOrThrow({ where: { id: A.assignmentId } })).marksStatus).toBe('IN_PROGRESS');
-    await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId, force: true } });
+    await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId } });
     expect((await call('results/publish', 'POST', { as: A.users.HEAD, body: { classId: A.classId, termId: A.termId } })).status).toBe(200);
 
     const xlsx = await call('results/export', 'GET', { as: A.users.HEAD, query: `?classId=${A.classId}&termId=${A.termId}` });

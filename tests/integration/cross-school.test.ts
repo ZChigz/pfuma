@@ -34,7 +34,7 @@ const TABLES = [
   'User', 'SchoolClass', 'Level', 'AcademicYear', 'AcademicTerm', 'Enrollment', 'Student', 'Guardian', 'FeeStructure',
   'Charge', 'Payment', 'Expense', 'ExpenseRequest', 'AuditLog', 'Subject', 'SubjectAssignment', 'Mark', 'TermResult',
   'GradeBoundary', 'AssetCategory', 'Asset', 'AssetMaintenance', 'AssetDisposal', 'Book', 'BookCopy', 'LibraryMember',
-  'Borrowing', 'ExchangeRate', 'PortalAccessLog',
+  'Borrowing', 'ExchangeRate', 'PortalAccessLog', 'PasswordResetToken', 'AssetTransfer', 'Income', 'MarkChange',
 ];
 
 /** Every row of school B (and its child rows), as stable JSON. */
@@ -171,6 +171,7 @@ const ATTACKS: Attack[] = [
   { name: 'subjects (list)', file: 'admin/subjects', method: 'GET', as: 'ADMIN', expect: 'ok' },
   { name: 'subject create (own school)', file: 'admin/subjects', method: 'POST', as: 'ADMIN', body: () => ({ name: 'Physics', code: 'PHY1' }), expect: 'ok' },
   { name: "log out B's user", file: 'admin/users/[id]/logout', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },
+  { name: 'reset link for a B user', file: 'admin/users/[id]/reset-link', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },
   { name: "reset B's user password", file: 'admin/users/[id]/reset-password', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },
   { name: "deactivate B's user", file: 'admin/users/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: b().users.HEAD.id }), body: () => ({ active: false }), expect: 404 },
   { name: "change B user's role", file: 'admin/users/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), body: () => ({ role: 'ADMIN' }), expect: 404 },
@@ -189,12 +190,15 @@ const ATTACKS: Attack[] = [
   { name: "read B's book", file: 'library/books/[id]', method: 'GET', as: 'LIBRARIAN', params: () => ({ id: b().bookId }), expect: 404 },
   { name: "edit B's book", file: 'library/books/[id]', method: 'PATCH', as: 'LIBRARIAN', params: () => ({ id: b().bookId }), body: () => ({ title: 'Hacked' }), expect: 404 },
   { name: 'books (list)', file: 'library/books', method: 'GET', as: 'LIBRARIAN', expect: 'ok' },
-  { name: 'book create (own school)', file: 'library/books', method: 'POST', as: 'LIBRARIAN', body: () => ({ title: 'Geometry', author: 'Jones', totalCopies: 1 }), expect: 'ok' },
+  { name: 'book create (own school)', file: 'library/books', method: 'POST', as: 'LIBRARIAN', body: () => ({ title: 'Geometry', author: 'Jones', copies: 1 }), expect: 'ok' },
   { name: "return B's borrowing", file: 'library/borrowing/[id]/return', method: 'POST', as: 'LIBRARIAN', params: () => ({ id: b().borrowingId }), body: () => ({ conditionOnReturn: 'GOOD' }), expect: 404 },
   { name: 'borrowing (list)', file: 'library/borrowing', method: 'GET', as: 'LIBRARIAN', url: () => `?history=true&memberId=${b().memberId}`, expect: 'ok' },
   { name: "check out B's copy", file: 'library/borrowing', method: 'POST', as: 'LIBRARIAN', body: () => ({ copyId: b().copyId, memberId: a().memberId }), expect: 404 },
   { name: 'check out to a B member', file: 'library/borrowing', method: 'POST', as: 'LIBRARIAN', body: () => ({ copyId: a().copyId, memberId: b().memberId }), expect: 404 },
   { name: "edit B's copy", file: 'library/copies/[id]', method: 'PATCH', as: 'LIBRARIAN', params: () => ({ id: b().copyId }), body: () => ({ condition: 'DAMAGED' }), expect: 404 },
+  { name: 'library settings (read own)', file: 'library/settings', method: 'GET', as: 'LIBRARIAN', expect: 'ok' },
+  { name: 'library settings (change own)', file: 'library/settings', method: 'PATCH', as: 'LIBRARIAN', body: () => ({ studentLoanLimit: 2 }), expect: 'ok' },
+  { name: 'settle fine of B', file: 'library/borrowing/[id]/settle-fine', method: 'POST', as: 'LIBRARIAN', params: () => ({ id: b().borrowingId }), expect: 404 },
   { name: 'library members (list)', file: 'library/members', method: 'GET', as: 'LIBRARIAN', expect: 'ok' },
 
   // ── Parent portal links ──
@@ -214,8 +218,14 @@ const ATTACKS: Attack[] = [
   { name: "unlock B's marks", file: 'results/marks/unverify', method: 'POST', as: 'HEAD', body: () => ({ assignmentId: b().assignmentId }), expect: 404 },
   { name: "verify B's marks", file: 'results/marks/verify', method: 'POST', as: 'HEAD', body: () => ({ assignmentId: b().assignmentId, force: true }), expect: 404 },
   { name: "publish B's class", file: 'results/publish', method: 'POST', as: 'HEAD', body: () => ({ classId: b().classId, termId: a().termId }), expect: 404 },
+  { name: 'excuse an absence of B', file: 'results/marks/excuse', method: 'POST', as: 'HEAD', body: () => ({ markId: b().markId, excused: true, reason: 'Trying to reach another school' }), expect: 404 },
+  { name: 'remarks of a B student', file: 'results/remarks', method: 'PATCH', as: 'HEAD', body: () => ({ studentId: b().studentId, termId: a().termId, headRemark: 'Hello' }), expect: 404 },
+  { name: 'remove a B level boundary set', file: 'results/grade-boundaries', method: 'DELETE', as: 'HEAD', url: () => `?levelId=${b().levelId}`, expect: 'ok' },
+  { name: 'results settings (read own)', file: 'results/settings', method: 'GET', as: 'HEAD', expect: 'ok' },
+  { name: 'results settings (change own)', file: 'results/settings', method: 'PATCH', as: 'HEAD', body: () => ({ oLevelRanking: 'AVERAGE' }), expect: 'ok' },
   { name: "unpublish B's class", file: 'results/unpublish', method: 'POST', as: 'HEAD', body: () => ({ classId: b().classId, termId: a().termId, reason: 'Wrong marks entered' }), expect: 404 },
   { name: "report card of a B student", file: 'results/reports/[studentId]', method: 'GET', as: 'HEAD', params: () => ({ studentId: b().studentId }), url: () => `?termId=${a().termId}`, expect: 404 },
+  { name: 'reopen a B term', file: 'director/terms/[id]/reopen', method: 'POST', as: 'DIRECTOR', params: () => ({ id: b().termId }), body: () => ({ reason: 'Trying to reach another school' }), expect: 404 },
   // Also bump every A user: must not touch B's.
   { name: 'log out all sessions (own school only)', file: 'admin/users/logout-all', method: 'POST', as: 'ADMIN', expect: 'ok' },
 ];
@@ -226,6 +236,7 @@ const EXEMPT: Record<string, string> = {
   'health': 'public liveness check; reads nothing school-specific',
   'upload': 'UploadThing handler; school id comes from the session, files are keyed pop:<schoolId>:…',
   'account/change-password': "changes the signed-in user's own password; no id is accepted",
+  'password-reset': 'public; the single-use reset link is the credential (tests/integration/rates-resets-assets.test.ts)',
   'portal/verify-pin': 'public; looks the student up by the hash of a secret link token (tests/integration/portal.test.ts)',
 };
 

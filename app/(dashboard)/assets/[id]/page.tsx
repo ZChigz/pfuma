@@ -25,6 +25,10 @@ export default async function AssetDetailPage({
       disposal: {
         include: { recorder: { select: { fullName: true } } },
       },
+      transfers: {
+        orderBy: { transferDate: 'desc' },
+        include: { recordedBy: { select: { fullName: true } } },
+      },
     },
   });
 
@@ -41,6 +45,16 @@ export default async function AssetDetailPage({
     acquisitionCost: asset.acquisitionCost.toNumber(),
     acquisitionDate: asset.acquisitionDate.toISOString(),
     createdAt:       asset.createdAt.toISOString(),
+    transfers: asset.transfers.map((t) => ({
+      id: t.id,
+      date: t.transferDate.toISOString(),
+      fromLocation: t.fromLocation,
+      toLocation: t.toLocation,
+      fromCustodian: t.fromCustodianName,
+      toCustodian: t.toCustodianName,
+      recordedBy: t.recordedBy.fullName,
+      note: t.note,
+    })),
     maintenance: asset.maintenance.map((m) => ({
       ...m,
       cost:            m.cost?.toNumber() ?? null,

@@ -609,7 +609,6 @@ async function main() {
         publisher:     b.publisher ?? undefined,
         year:          b.year,
         shelfLocation: b.shelf,
-        totalCopies:   2,
       },
     });
 

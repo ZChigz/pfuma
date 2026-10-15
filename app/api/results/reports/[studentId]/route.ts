@@ -7,6 +7,7 @@ import { ReportCardDocument, type ReportCardData } from '@/components/results/Re
 import { createElement } from 'react';
 import { requireTerm } from '@/lib/academic/terms';
 import { enrollmentFor } from '@/lib/academic/roster';
+import { isoDate } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 
 export const runtime = 'nodejs';
@@ -46,23 +47,43 @@ async function _GET(
   // The class the student was in for that term, not their class today.
   const enrollment = await enrollmentFor(student.id, termId, db);
 
+  // The date the next term starts: stored when the class was published, otherwise looked up now.
+  const nextTermStart =
+    termResult?.nextTermStartDate ??
+    (await db.academicTerm.findFirst({
+      where: { schoolId: user.schoolId, startDate: { gt: termRow.startDate } },
+      orderBy: { startDate: 'asc' },
+      select: { startDate: true },
+    }))?.startDate ??
+    null;
+
   const reportData: ReportCardData = {
     schoolName:    student.school.name,
     studentName:   student.fullName,
+    admissionNumber: student.admissionNumber,
+    level:         enrollment?.class.level.name,
+    stream:        enrollment?.class.stream || undefined,
     grade:         enrollment?.class.name ?? '—',
     term,
     classPosition: termResult?.classPosition ?? null,
+    classSize:     termResult?.classSize ?? null,
     rankedOutOf:   termResult?.rankedOutOf ?? null,
-    subjectsSat:   termResult?.subjectsSat ?? null,
+    subjectsSat:   termResult?.subjectsTaken ?? termResult?.subjectsSat ?? null,
     subjectsOffered: termResult?.subjectsOffered ?? null,
     percentage:    termResult?.percentage?.toNumber() ?? 0,
     headRemark:    termResult?.headRemark ?? null,
+    classTeacherRemark: termResult?.classTeacherRemark ?? null,
+    daysPresent:   termResult?.daysPresent ?? null,
+    daysAbsent:    termResult?.daysAbsent ?? null,
+    nextTermStartDate: nextTermStart ? isoDate(nextTermStart) : null,
     marks: student.marks.map((m) => ({
       subjectName: m.subject.name,
       rawMark:     m.rawMark.toNumber(),
       maxMark:     m.subject.maxMark,
       percentage:  m.percentage?.toNumber() ?? 0,
       letterGrade: m.letterGrade,
+      note:
+        m.status === 'EXEMPT' ? 'Exempt' : m.status === 'ABSENT' ? (m.excused ? 'Absent (excused)' : 'Absent') : null,
     })),
   };
 

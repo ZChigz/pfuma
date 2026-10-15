@@ -48,6 +48,11 @@ beforeAll(async () => {
     '20261017000000_security_expand',
     '20261017000100_security_backfill',
     '20261017000200_security_rls_audit',
+    '20261018000000_results_corrections',
+    '20261019000000_absences_and_averages',
+    '20261020000000_report_cards',
+    '20261021000000_library_members_and_copies',
+    '20261022000000_rates_resets_assets',
   ]) await applyMigration(pg, m);
 }, 300_000);
 
@@ -95,6 +100,43 @@ describe('migrations on top of the live demo data', () => {
     const before = await all(`SELECT "id","portalTokenHash","portalTokenExpiresAt" FROM "Student" ORDER BY "id"`);
     await pg.exec(fs.readFileSync(path.join(MIGRATIONS, '20261017000100_security_backfill/migration.sql'), 'utf8'));
     expect(await all(`SELECT "id","portalTokenHash","portalTokenExpiresAt" FROM "Student" ORDER BY "id"`)).toEqual(before);
+  });
+
+  it('start schools on pass grade C and ranking by average, and copy old results forward', async () => {
+    const schools = await all<{ passGrade: string; oLevelRanking: string }>(`SELECT "passGrade","oLevelRanking" FROM "School"`);
+    for (const s of schools) expect(s).toEqual({ passGrade: 'C', oLevelRanking: 'AVERAGE' });
+    const bad = await one<{ n: string }>(`SELECT count(*) AS n FROM "TermResult" WHERE "subjectsTaken" IS DISTINCT FROM "subjectsSat" OR "averagePercentage" IS DISTINCT FROM "percentage"`);
+    expect(Number(bad.n)).toBe(0);
+  });
+
+  it('add per-level grade boundaries with the same-school check', async () => {
+    const cols = await all<{ column_name: string }>(`SELECT column_name FROM information_schema.columns WHERE table_name = 'GradeBoundary' AND column_name IN ('levelId','termId')`);
+    expect(cols).toHaveLength(2);
+    const unscoped = await one<{ n: string }>(`SELECT count(*) AS n FROM "GradeBoundary" WHERE "levelId" IS NOT NULL OR "termId" IS NOT NULL`);
+    expect(Number(unscoped.n)).toBe(0); // existing boundaries stay school-wide
+  });
+
+  it('give every current student a library membership and keep staff members', async () => {
+    const students = await one<{ n: string }>(`SELECT count(*) AS n FROM "LibraryMember" WHERE "memberType" = 'STUDENT' AND "studentId" IS NOT NULL AND "userId" IS NULL AND NOT "borrowingSuspended"`);
+    expect(Number(students.n)).toBe(500);
+    const bad = await one<{ n: string }>(`SELECT count(*) AS n FROM "LibraryMember" WHERE ("userId" IS NOT NULL) = ("studentId" IS NOT NULL)`);
+    expect(Number(bad.n)).toBe(0);
+    const school = await one<{ libraryFineLimit: string; studentLoanLimit: number; staffLoanLimit: number }>(`SELECT "libraryFineLimit","studentLoanLimit","staffLoanLimit" FROM "School" LIMIT 1`);
+    expect(Number(school.libraryFineLimit)).toBe(5);
+    expect([school.studentLoanLimit, school.staffLoanLimit]).toEqual([2, 5]);
+    const cols = await all(`SELECT 1 FROM information_schema.columns WHERE table_name = 'Book' AND column_name = 'totalCopies'`);
+    expect(cols).toHaveLength(0);
+  });
+
+  it('give rates an effective date, drop the NextAuth tables and add the new tables', async () => {
+    const dropped = await all(`SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('Account','Session','VerificationToken')`);
+    expect(dropped).toHaveLength(0);
+    for (const table of ['PasswordResetToken', 'AssetTransfer', 'Income']) {
+      const r = await one<{ relrowsecurity: boolean; relforcerowsecurity: boolean }>(`SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = $1`, [table]);
+      expect(r, table).toEqual({ relrowsecurity: true, relforcerowsecurity: true });
+    }
+    const dupes = await one<{ n: string }>(`SELECT count(*) AS n FROM (SELECT 1 FROM "Asset" GROUP BY "schoolId", "tagNumber" HAVING count(*) > 1) d`);
+    expect(Number(dupes.n)).toBe(0);
   });
 
   it('give existing users safe defaults', async () => {

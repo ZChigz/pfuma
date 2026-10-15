@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
+import { copyCounts } from '@/lib/library';
 import { CatalogClient } from '@/components/library/CatalogClient';
 import type { SessionUser } from '@/types';
 
@@ -20,9 +21,12 @@ export default async function CatalogPage() {
     orderBy: { title: 'asc' },
   });
 
+  const counts = await copyCounts(db, books.map((b) => b.id));
   const serialized = books.map((b) => ({
     ...b,
-    availableCopiesCount: b.copies.filter((c) => c.status === 'AVAILABLE').length,
+    replacementCost: b.replacementCost?.toNumber() ?? null,
+    availableCopiesCount: counts.get(b.id)?.available ?? 0,
+    copyCounts: counts.get(b.id)!,
   }));
 
   return <CatalogClient initialBooks={serialized} userRole={user.role} />;

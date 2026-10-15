@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
-import { apiSuccess, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
+import { apiError, apiSuccess, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { canUnverifyMarks } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { UnverifyMarksSchema } from '@/lib/validations/results';
@@ -23,9 +23,14 @@ async function _POST(req: NextRequest) {
 
   const assignment = await db.subjectAssignment.findFirst({
     where: { id: assignmentId, schoolId: user.schoolId },
-    include: { subject: { select: { name: true } }, class: { select: { name: true } }, term: { select: { name: true } } },
+    include: { subject: { select: { name: true } }, class: { select: { name: true } }, term: { select: { name: true, status: true } } },
   });
   if (!assignment) return apiNotFound('Assignment');
+  if (assignment.term.status === 'CLOSED') return apiError(`${assignment.term.name} is closed, so its results are locked. The Director can reopen the term.`, 409);
+  if (assignment.marksStatus === 'PUBLISHED') {
+    return apiError('These results are published. Unpublish the class results first, then unlock the subject.', 409);
+  }
+
 
   const studentIds = await classRosterIds(assignment.classId, assignment.termId, db);
 

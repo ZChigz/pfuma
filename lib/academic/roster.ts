@@ -23,6 +23,6 @@ export async function classRosterIds(classId: string, termId: string, db: Db) {
 export async function enrollmentFor(studentId: string, termId: string, db: Db) {
   return db.enrollment.findUnique({
     where: { studentId_termId: { studentId, termId } },
-    include: { class: { select: { id: true, name: true, level: { select: { name: true } } } } },
+    include: { class: { select: { id: true, name: true, stream: true, level: { select: { name: true } } } } },
   });
 }
