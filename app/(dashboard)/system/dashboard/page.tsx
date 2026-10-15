@@ -1,4 +1,10 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
+import { ClassesCard } from '@/components/system/cards/ClassesCard';
+import { StaffCard } from '@/components/system/cards/StaffCard';
+import { StudentsCard } from '@/components/system/cards/StudentsCard';
+import { SummaryCardSkeleton } from '@/components/system/cards/SummaryCard';
+import { TermCard } from '@/components/system/cards/TermCard';
 import { getAccess } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { getViewTerm } from '@/lib/system/view-term';
@@ -67,31 +73,15 @@ export default async function DashboardPage() {
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard hero label="Students enrolled" value={data.enrolled} note={term ? termLabel(term.name) : 'No term'} />
-        <StatCard label="Active classes" value={data.classes} note="Streams in use" />
-        <StatCard label="Staff accounts" value={data.staff} note="Active users" href={can('system.users.view') ? '/system/users' : undefined} />
-        {showFinance ? (
-          <StatCard label="Payments to verify" value={data.pendingPayments} tone={data.pendingPayments > 0 ? 'warning' : 'default'} note="Recorded, not yet verified" />
-        ) : (
-          <StatCard label="Upcoming events" value={data.upcoming.length} note="Next on the calendar" href={can('system.calendar.view') ? '/system/calendar' : undefined} />
-        )}
+        <Suspense fallback={<SummaryCardSkeleton />}><StudentsCard user={user} term={term} /></Suspense>
+        <Suspense fallback={<SummaryCardSkeleton />}><StaffCard user={user} /></Suspense>
+        <TermCard user={user} term={term} />
+        <Suspense fallback={<SummaryCardSkeleton />}><ClassesCard user={user} term={term} /></Suspense>
       </div>
 
-      {data.progress && term && (
-        <Card title="Term progress" subtitle={`${formatDate(term.startDate)} to ${formatDate(term.endDate)}`}>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-tint" role="progressbar" aria-valuenow={data.progress.percent} aria-valuemin={0} aria-valuemax={100} aria-label="Term progress">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${data.progress.percent}%` }} />
-          </div>
-          <p className="mt-2 text-sm text-muted">
-            {data.progress.state === 'upcoming' && 'This term has not started yet.'}
-            {data.progress.state === 'running' && `${data.progress.percent}% through, ${data.progress.daysLeft} day${data.progress.daysLeft === 1 ? '' : 's'} left.`}
-            {data.progress.state === 'ended' && 'This term has ended.'}
-          </p>
-        </Card>
-      )}
-
       {showFinance && term && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard label="Payments to verify" value={data.pendingPayments} tone={data.pendingPayments > 0 ? 'warning' : 'default'} note="Recorded, not yet verified" />
           <Card title="Fees billed" subtitle={termLabel(term.name)}><p className="text-2xl font-semibold tabular-nums text-ink">{money(data.billed)}</p></Card>
           <Card title="Fees collected" subtitle="Verified payments in this term"><p className="text-2xl font-semibold tabular-nums text-ink">{money(data.collected)}</p></Card>
         </div>

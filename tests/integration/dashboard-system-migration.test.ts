@@ -24,6 +24,7 @@ beforeAll(async () => {
   await applyMigration(pg, '20261023000000_dashboard_system');
   await applyMigration(pg, '20261023000100_dashboard_system_backfill');
   await applyMigration(pg, '20261024000000_setup_checklist');
+  await applyMigration(pg, '20261025000000_user_last_login');
 }, 300_000);
 
 afterAll(async () => { await pg.close(); });
@@ -46,6 +47,14 @@ describe('Dashboard & System migrations', () => {
     expect(rows).toHaveLength(2);
     for (const r of rows) expect(r).toEqual({ province: null, zimsecCentreNumber: null, receiptPrefix: null, receiptNextNumber: 1, setupChecklistPinned: false });
     await expect(pg.exec(`UPDATE "School" SET "receiptNextNumber" = 0 WHERE "id" = 's1'`)).rejects.toThrow();
+  });
+
+  it('user last login: existing users start empty and the column accepts a time', async () => {
+    const rows = await all<{ lastLoginAt: unknown }>(`SELECT "lastLoginAt" FROM "User"`);
+    expect(rows).toHaveLength(2);
+    for (const r of rows) expect(r.lastLoginAt).toBeNull();
+    await pg.exec(`UPDATE "User" SET "lastLoginAt" = CURRENT_TIMESTAMP WHERE "id" = 'u1'`);
+    expect((await one<{ n: string }>(`SELECT count(*) AS n FROM "User" WHERE "lastLoginAt" IS NOT NULL`)).n).toBe('1');
   });
 
   it('give every existing school one active subscription with no end date and no student limit', async () => {
