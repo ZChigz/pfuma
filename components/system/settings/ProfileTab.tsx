@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,12 +36,43 @@ export interface ProfileValues {
   website: string | null;
   headName: string | null;
   headSignatureUrl: string | null;
+  setupChecklistPinned: boolean;
 }
 
 const TYPE_LABELS = { GOVERNMENT: 'Government', COUNCIL: 'Council', MISSION_CHURCH: 'Mission / Church', TRUST: 'Trust', PRIVATE: 'Private' } as const;
 const BOARDING_LABELS = { DAY: 'Day', BOARDING: 'Boarding', DAY_AND_BOARDING: 'Day and Boarding' } as const;
 const GENDER_LABELS = { BOYS: 'Boys', GIRLS: 'Girls', CO_ED: 'Co-educational' } as const;
 const opts = <T extends string>(values: readonly T[], labels: Record<T, string>) => values.map((v) => ({ value: v, label: labels[v] }));
+
+/** Brings the dashboard's setup checklist back after every step is done. Saves as soon as it is ticked. */
+function ChecklistSwitch({ pinned, canUpdate }: { pinned: boolean; canUpdate: boolean }) {
+  const router = useRouter();
+  const [value, setValue] = useState(pinned);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setValue(pinned), [pinned]);
+
+  async function change(next: boolean) {
+    setBusy(true);
+    setValue(next);
+    try {
+      const res = await fetch('/api/system/settings/defaults', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setupChecklistPinned: next }) });
+      if (!res.ok) { setValue(!next); toast.error((await res.json()).message ?? 'Could not save'); return; }
+      toast.success(next ? 'The setup checklist will stay on the dashboard' : 'The setup checklist hides when every step is done');
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title="Dashboard">
+      <label className="flex min-h-[44px] items-center gap-3 text-sm text-ink">
+        <input type="checkbox" className="h-5 w-5 accent-primary" checked={value} disabled={!canUpdate || busy} onChange={(e) => change(e.target.checked)} />
+        Show the setup checklist on the dashboard even when every step is done
+      </label>
+    </Card>
+  );
+}
 
 export function ProfileTab({ school, canUpdate }: { school: ProfileValues; canUpdate: boolean }) {
   const router = useRouter();
@@ -88,6 +120,7 @@ export function ProfileTab({ school, canUpdate }: { school: ProfileValues; canUp
     );
 
   return (
+    <div className="flex flex-col gap-4">
     <form onSubmit={handleSubmit(save)} className="flex flex-col gap-4" noValidate>
       <fieldset disabled={!canUpdate} className="contents">
         <Card title="Identity" subtitle="Printed on report cards and receipts">
@@ -154,5 +187,7 @@ export function ProfileTab({ school, canUpdate }: { school: ProfileValues; canUp
         <p className="text-sm text-muted">You can view the school profile but not change it.</p>
       )}
     </form>
+    <ChecklistSwitch pinned={school.setupChecklistPinned} canUpdate={canUpdate} />
+    </div>
   );
 }

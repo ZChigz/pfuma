@@ -20,8 +20,9 @@ async function _GET() {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
+  // The O Level and A Level scales of Settings → Grading are managed there, not here.
   const boundaries = await db.gradeBoundary.findMany({
-    where: { schoolId: user.schoolId },
+    where: { schoolId: user.schoolId, category: null },
     orderBy: { minPercent: 'desc' },
   });
   return apiSuccess({ boundaries: boundaries.map(serialize) });
@@ -59,7 +60,7 @@ async function _POST(req: Request) {
   if (termId && !term) return apiNotFound('Term');
 
   await db.$tx(async (tx) => {
-    await tx.gradeBoundary.deleteMany({ where: { schoolId: user.schoolId, levelId, termId } });
+    await tx.gradeBoundary.deleteMany({ where: { schoolId: user.schoolId, levelId, termId, category: null } });
     await tx.gradeBoundary.createMany({ data: rows.map((b) => ({ ...b, schoolId: user.schoolId, levelId, termId })) });
     await logAudit(
       {
@@ -74,7 +75,7 @@ async function _POST(req: Request) {
     );
   });
 
-  const boundaries = await db.gradeBoundary.findMany({ where: { schoolId: user.schoolId }, orderBy: { minPercent: 'desc' } });
+  const boundaries = await db.gradeBoundary.findMany({ where: { schoolId: user.schoolId, category: null }, orderBy: { minPercent: 'desc' } });
   return apiSuccess({ boundaries: boundaries.map(serialize) });
 }
 
@@ -98,7 +99,7 @@ async function _DELETE(req: Request) {
   if (!levelId && !termId) return apiError('The school-wide boundaries cannot be removed; edit them instead', 409);
 
   await db.$tx(async (tx) => {
-    const { count } = await tx.gradeBoundary.deleteMany({ where: { schoolId: user.schoolId, levelId, termId } });
+    const { count } = await tx.gradeBoundary.deleteMany({ where: { schoolId: user.schoolId, levelId, termId, category: null } });
     // Nothing removed (an unknown or foreign level id): nothing changed, so nothing to record.
     if (count === 0) return;
     await logAudit(

@@ -64,7 +64,7 @@ export async function ensureLevels(schoolId: string, db: Db) {
 export async function createAcademicYear(
   schoolId: string,
   actorId: string,
-  input: { year: number; startDate?: string; endDate?: string },
+  input: { year: number; startDate?: string; endDate?: string; terms?: { startDate: string; endDate: string }[] },
 ) {
   const { year } = input;
   const startDate = input.startDate ?? `${year}-01-01`;
@@ -74,7 +74,18 @@ export async function createAcademicYear(
   const exists = await getScopedDb(schoolId, actorId).academicYear.findUnique({ where: { schoolId_year: { schoolId, year } } });
   if (exists) throw new ServiceError(`The ${year} academic year already exists`, 409);
 
-  const terms = Array.from({ length: TERMS_PER_YEAR }, (_, i) => ({ termNumber: i + 1, ...defaultTermDates(year, i + 1) }))
+  // Years may not overlap each other (this matters when a year has custom start and end dates).
+  const clash = await getScopedDb(schoolId, actorId).academicYear.findFirst({
+    where: { schoolId, startDate: { lte: dateOnly(endDate) }, endDate: { gte: dateOnly(startDate) } },
+    select: { year: true },
+  });
+  if (clash) throw new ServiceError(`The ${year} academic year overlaps the ${clash.year} academic year`, 409);
+
+  const given = input.terms;
+  if (given && given.length !== TERMS_PER_YEAR) throw new ServiceError(`A year has ${TERMS_PER_YEAR} terms`, 422);
+  const terms = (given
+    ? given.map((t, i) => ({ termNumber: i + 1, startDate: t.startDate, endDate: t.endDate }))
+    : Array.from({ length: TERMS_PER_YEAR }, (_, i) => ({ termNumber: i + 1, ...defaultTermDates(year, i + 1) })))
     .map((t) => ({
       ...t,
       // Clamp the default dates into a custom year range.
@@ -116,6 +127,8 @@ export async function updateTermDates(
 ) {
   const db = getScopedDb(schoolId, actorId);
   const term = await requireTerm(schoolId, termId, db);
+  // The dates of a closed term are part of its published results and reports.
+  if (term.status === 'CLOSED') throw new ServiceError(`${term.name} is closed, so its dates cannot be changed`, 409);
   const year = await db.academicYear.findUniqueOrThrow({
     where: { id: term.academicYearId },
     include: { terms: true },

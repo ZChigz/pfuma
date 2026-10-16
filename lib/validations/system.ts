@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { MODULE_KEYS } from '@/lib/access-core';
 import { normalizeZimbabwePhone } from '@/lib/phone';
+import { maxCounter, parseFormat } from '@/lib/numbering';
+import { validateBoundaries } from '@/lib/results';
 
 export const PROVINCES = [
   'Bulawayo', 'Harare', 'Manicaland', 'Mashonaland Central', 'Mashonaland East', 'Mashonaland West',
@@ -107,22 +109,14 @@ export const SchoolProfileSchema = z.object({
   headSignatureUrl: blankToNull(uploadedImage),
 });
 
-// Tab 2 (for now): defaults other modules read
-export const SchoolDefaultsSchema = z.object({
-  defaultCurrency: z.enum(['USD', 'ZIG']),
-  maxClassSize: z.number({ error: 'Class size must be a number' }).int('Class size must be a whole number').min(1, 'At least 1').max(200, 'At most 200'),
-  receiptPrefix: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .regex(/^[A-Z0-9]{1,8}$/, 'Use 1 to 8 letters or digits, e.g. RCT')
-    .or(z.literal(''))
-    .transform((v) => (v === '' ? null : v))
-    .nullable()
-    .optional(),
-  receiptNextNumber: z.number({ error: 'Receipt number must be a number' }).int('Whole number only').min(1, 'At least 1').max(99_999_999).optional(),
-  setupChecklistPinned: z.boolean().optional(),
-});
+// Small defaults that live on other tabs: the class capacity (Forms, streams and classes) and the
+// dashboard checklist switch (School profile). Either may be sent on its own.
+export const SchoolDefaultsSchema = z
+  .object({
+    maxClassSize: z.number({ error: 'Class size must be a number' }).int('Class size must be a whole number').min(1, 'At least 1').max(200, 'At most 200').optional(),
+    setupChecklistPinned: z.boolean().optional(),
+  })
+  .refine((d) => d.maxClassSize !== undefined || d.setupChecklistPinned !== undefined, { message: 'Nothing to save' });
 
 // ─── Calendar ────────────────────────────────────────────────────────────────
 
@@ -226,3 +220,114 @@ export const NotificationReadSchema = z.union([
 ]);
 
 export const ProfileSchema = z.object({ fullName });
+
+// ─── Academic years and terms (Settings tab 2) ───────────────────────────────
+
+const termDates = z.object({ startDate: isoDate, endDate: isoDate });
+
+export const CreateYearSchema = z
+  .object({
+    year: z.number({ error: 'Year must be a number' }).int('Year must be a whole number').min(2000, 'Year must be 2000 or later').max(2100, 'Year must be 2100 or earlier'),
+    terms: z.array(termDates).length(3, 'A year has three terms'),
+  })
+  .superRefine((d, ctx) => {
+    const y = String(d.year);
+    d.terms.forEach((t, i) => {
+      const n = i + 1;
+      if (t.endDate < t.startDate) ctx.addIssue({ code: 'custom', path: ['terms', i, 'endDate'], message: `Term ${n} must end on or after the day it starts` });
+      if (t.startDate < `${y}-01-01` || t.endDate > `${y}-12-31`) ctx.addIssue({ code: 'custom', path: ['terms', i, 'startDate'], message: `Term ${n} must fall inside ${y}` });
+      if (i > 0 && t.startDate <= d.terms[i - 1].endDate) ctx.addIssue({ code: 'custom', path: ['terms', i, 'startDate'], message: `Term ${n} must start after Term ${n - 1} ends` });
+    });
+  });
+
+export const UpdateTermDatesSchema = termDates.refine((t) => t.endDate >= t.startDate, { message: 'The term must end on or after the day it starts', path: ['endDate'] });
+
+// ─── Forms, streams and classes (tab 3) ──────────────────────────────────────
+
+export const FormsSchema = z.object({
+  forms: z.array(z.object({ id: z.string().min(1).max(60), active: z.boolean() })).min(1).max(6),
+});
+
+export const StreamNameSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Enter a stream name')
+    .max(30, 'A stream name can be at most 30 characters')
+    .regex(/^[A-Za-z0-9 ]+$/, 'Use letters, numbers and spaces only'),
+});
+
+export const ClassGridSchema = z.object({
+  cells: z
+    .array(
+      z.object({
+        levelId: z.string().min(1).max(60),
+        // The stream's name; "" is a form with a single class and no stream.
+        stream: z.string().trim().max(30),
+        exists: z.boolean(),
+        capacity: z.number({ error: 'Capacity must be a number' }).int('Capacity must be a whole number').min(1, 'Capacity must be at least 1').max(200, 'Capacity can be at most 200'),
+      }),
+    )
+    .min(1)
+    .max(240),
+});
+
+// ─── Grading (tab 4) ─────────────────────────────────────────────────────────
+
+export const GRADE_CATEGORIES = ['O_LEVEL', 'A_LEVEL'] as const;
+
+export const GradeScaleSchema = z.object({
+  rows: z
+    .array(
+      z.object({
+        letterGrade: z.string().trim().min(1, 'Enter a grade').max(3, 'A grade can be at most 3 characters'),
+        minPercent: z.number({ error: 'Lowest % must be a number' }),
+        maxPercent: z.number({ error: 'Highest % must be a number' }),
+        points: z.number({ error: 'Points must be a number' }).int('Points must be a whole number').min(0, 'Points cannot be negative').max(100).nullable().optional(),
+        remark: z.string().trim().max(60, 'A remark can be at most 60 characters').or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional(),
+      }),
+    )
+    .min(2, 'A scale needs at least two grades')
+    .max(15, 'A scale can have at most 15 grades'),
+}).superRefine((d, ctx) => {
+  const problem = validateBoundaries(d.rows);
+  if (problem) ctx.addIssue({ code: 'custom', path: ['rows'], message: problem });
+});
+
+// ─── Finance basics (tab 5) ──────────────────────────────────────────────────
+
+const numberFormat = (label: string) =>
+  z.string().trim().superRefine((v, ctx) => {
+    const r = parseFormat(v);
+    if (!r.ok) ctx.addIssue({ code: 'custom', message: `${label}: ${r.error}` });
+  });
+
+const nextNumber = z.number({ error: 'Enter a number' }).int('Whole number only').min(1, 'At least 1');
+
+export const FinanceSettingsSchema = z
+  .object({
+    currencyUsdEnabled: z.boolean(),
+    currencyZigEnabled: z.boolean(),
+    defaultCurrency: z.enum(['USD', 'ZIG']),
+    receiptFormat: numberFormat('Receipt format'),
+    receiptNextNumber: nextNumber,
+    invoiceFormat: numberFormat('Invoice format'),
+    invoiceNextNumber: nextNumber,
+  })
+  .superRefine((d, ctx) => {
+    if (!d.currencyUsdEnabled && !d.currencyZigEnabled) ctx.addIssue({ code: 'custom', path: ['currencyUsdEnabled'], message: 'Switch on at least one currency' });
+    if ((d.defaultCurrency === 'USD' && !d.currencyUsdEnabled) || (d.defaultCurrency === 'ZIG' && !d.currencyZigEnabled)) {
+      ctx.addIssue({ code: 'custom', path: ['defaultCurrency'], message: 'The currency shown first must be switched on' });
+    }
+    for (const [key, fmt, n] of [['receiptNextNumber', d.receiptFormat, d.receiptNextNumber], ['invoiceNextNumber', d.invoiceFormat, d.invoiceNextNumber]] as const) {
+      const max = maxCounter(fmt);
+      if (max > 0 && n > max) ctx.addIssue({ code: 'custom', path: [key], message: `This number is too big for the format (the most it can hold is ${max})` });
+    }
+  });
+
+// ─── Numbering (tab 6) ───────────────────────────────────────────────────────
+
+export const NumberingSchema = z.object({
+  schoolCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,8}$/, 'Use 1 to 8 letters or digits, e.g. CHS'),
+  admissionFormat: numberFormat('Admission number format'),
+});

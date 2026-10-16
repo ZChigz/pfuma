@@ -30,6 +30,7 @@ let before: string;
 let bIds: string[] = [];
 let bEventId = '';
 let bNotificationId = '';
+let bStreamId = '';
 let bStrings: string[] = [];
 
 const TABLES = [
@@ -37,7 +38,7 @@ const TABLES = [
   'Charge', 'Payment', 'Expense', 'ExpenseRequest', 'AuditLog', 'Subject', 'SubjectAssignment', 'Mark', 'TermResult',
   'GradeBoundary', 'AssetCategory', 'Asset', 'AssetMaintenance', 'AssetDisposal', 'Book', 'BookCopy', 'LibraryMember',
   'Borrowing', 'ExchangeRate', 'PortalAccessLog', 'PasswordResetToken', 'AssetTransfer', 'Income', 'MarkChange',
-  'Subscription', 'SchoolModule', 'RolePermission', 'Notification', 'CalendarEvent',
+  'Subscription', 'SchoolModule', 'RolePermission', 'Notification', 'CalendarEvent', 'Stream',
 ];
 
 /** Every row of school B (and its child rows), as stable JSON. */
@@ -69,6 +70,7 @@ beforeAll(async () => {
   A = await seedSchool(prisma, 'School A');
   B = await seedSchool(prisma, 'School B');
   bEventId = (await prisma.calendarEvent.create({ data: { schoolId: B.schoolId, title: 'B event', startDate: new Date('2026-08-10'), endDate: new Date('2026-08-10'), createdById: B.users.ADMIN.id } })).id;
+  bStreamId = (await prisma.stream.create({ data: { schoolId: B.schoolId, name: 'BStream' } })).id;
   bNotificationId = (await prisma.notification.create({ data: { schoolId: B.schoolId, userId: B.users.HEAD.id, title: 'B note' } })).id;
   await prisma.subscription.create({ data: { schoolId: B.schoolId } });
   await prisma.schoolModule.create({ data: { schoolId: B.schoolId, module: 'hr', enabled: false } });
@@ -246,7 +248,22 @@ const ATTACKS: Attack[] = [
   { name: "system reset B's user password", file: 'system/users/[id]/reset-password', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },
   { name: 'system settings read', file: 'system/settings', method: 'GET', as: 'ADMIN', expect: 'ok' },
   { name: 'system settings profile change (own school)', file: 'system/settings/profile', method: 'PATCH', as: 'ADMIN', body: () => ({ name: 'School A Renamed', schoolType: 'GOVERNMENT', boarding: 'DAY', studentGender: 'CO_ED', district: 'Harare', physicalAddress: '1 Main Road' }), expect: 'ok' },
-  { name: 'system settings defaults change (own school)', file: 'system/settings/defaults', method: 'PATCH', as: 'ADMIN', body: () => ({ defaultCurrency: 'USD', maxClassSize: 44 }), expect: 'ok' },
+  { name: 'system settings defaults change (own school)', file: 'system/settings/defaults', method: 'PATCH', as: 'ADMIN', body: () => ({ maxClassSize: 44 }), expect: 'ok' },
+  { name: 'system finance settings (own school)', file: 'system/settings/finance', method: 'PATCH', as: 'ADMIN', body: () => ({ currencyUsdEnabled: true, currencyZigEnabled: true, defaultCurrency: 'USD', receiptFormat: 'RCP-{YEAR}-{000000}', receiptNextNumber: 1, invoiceFormat: 'INV-{YEAR}-{000000}', invoiceNextNumber: 1 }), expect: 'ok' },
+  { name: 'system numbering settings (own school)', file: 'system/settings/numbering', method: 'PATCH', as: 'ADMIN', body: () => ({ schoolCode: 'STU', admissionFormat: '{SCHOOLCODE}{YEAR}{0000}' }), expect: 'ok' },
+  { name: 'system academic years (list)', file: 'system/academic/years', method: 'GET', as: 'ADMIN', expect: 'ok' },
+  { name: 'system academic year (own school)', file: 'system/academic/years', method: 'POST', as: 'ADMIN', body: () => ({ year: 2031, terms: [{ startDate: '2031-01-05', endDate: '2031-04-04' }, { startDate: '2031-05-04', endDate: '2031-08-08' }, { startDate: '2031-09-07', endDate: '2031-12-05' }] }), expect: 'ok' },
+  { name: "system change B's term dates", file: 'system/academic/terms/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: b().termId }), body: () => ({ startDate: '2026-01-11', endDate: '2026-12-19' }), expect: 404 },
+  { name: "system open B's term", file: 'system/academic/terms/[id]/open', method: 'POST', as: 'ADMIN', params: () => ({ id: b().termId }), expect: 404 },
+  { name: "system close B's term", file: 'system/academic/terms/[id]/close', method: 'POST', as: 'ADMIN', params: () => ({ id: b().termId }), expect: 404 },
+  { name: 'system structure (read)', file: 'system/structure', method: 'GET', as: 'ADMIN', expect: 'ok' },
+  { name: "system switch off B's form", file: 'system/structure/forms', method: 'PATCH', as: 'ADMIN', body: () => ({ forms: [{ id: b().levelId, active: false }] }), expect: 404 },
+  { name: 'system stream add (own school)', file: 'system/structure/streams', method: 'POST', as: 'ADMIN', body: () => ({ name: 'Blue' }), expect: 'ok' },
+  { name: "system rename B's stream", file: 'system/structure/streams/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: bStreamId }), body: () => ({ name: 'Hacked' }), expect: 404 },
+  { name: "system remove B's stream", file: 'system/structure/streams/[id]', method: 'DELETE', as: 'ADMIN', params: () => ({ id: bStreamId }), expect: 404 },
+  { name: "system classes grid with B's form", file: 'system/structure/classes', method: 'PUT', as: 'ADMIN', body: () => ({ cells: [{ levelId: b().levelId, stream: '', exists: true, capacity: 40 }] }), expect: 404 },
+  { name: 'system grading scales (read)', file: 'system/grading', method: 'GET', as: 'ADMIN', expect: 'ok' },
+  { name: 'system O Level scale (own school)', file: 'system/grading/[category]', method: 'PUT', as: 'ADMIN', params: () => ({ category: 'O_LEVEL' }), body: () => ({ rows: [{ letterGrade: 'P', minPercent: 50, maxPercent: 100 }, { letterGrade: 'F', minPercent: 0, maxPercent: 49 }] }), expect: 'ok' },
   { name: 'system calendar (list)', file: 'system/calendar', method: 'GET', as: 'ADMIN', url: () => '?from=2026-01-01&to=2026-12-31', expect: 'ok' },
   { name: 'system calendar add (own school)', file: 'system/calendar', method: 'POST', as: 'ADMIN', body: () => ({ title: 'A event', kind: 'EXAM', startDate: '2026-09-01', endDate: '2026-09-02' }), expect: 'ok' },
   { name: "system edit B's event", file: 'system/calendar/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: bEventId }), body: () => ({ title: 'hacked', kind: 'EXAM', startDate: '2026-09-01', endDate: '2026-09-02' }), expect: 404 },

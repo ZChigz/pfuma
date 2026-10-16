@@ -56,7 +56,7 @@ beforeEach(async () => {
 // ─── Who may call what ───────────────────────────────────────────────────────
 
 describe('every System route goes through the permission check', () => {
-  const routes: [string, 'GET' | 'POST' | 'PATCH' | 'DELETE', Record<string, unknown>?, string?][] = [
+  const routes: [string, 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', Record<string, unknown>?, string?][] = [
     ['system/users', 'GET'],
     ['system/users', 'POST', { fullName: 'Nope Nobody', email: 'nope@a.test', role: 'TEACHER' }],
     ['system/users/[id]', 'PATCH', { fullName: 'Nope Nobody' }, 'TEACHER'],
@@ -65,7 +65,14 @@ describe('every System route goes through the permission check', () => {
     ['system/users/[id]/reset-password', 'POST', undefined, 'TEACHER'],
     ['system/settings', 'GET'],
     ['system/settings/profile', 'PATCH', { name: 'Hacked School', schoolType: 'PRIVATE', boarding: 'DAY', studentGender: 'CO_ED', district: 'Harare', physicalAddress: '1 Hacker Road' }],
-    ['system/settings/defaults', 'PATCH', { defaultCurrency: 'USD', maxClassSize: 40 }],
+    ['system/settings/defaults', 'PATCH', { maxClassSize: 40 }],
+    ['system/settings/finance', 'PATCH', { currencyUsdEnabled: true, currencyZigEnabled: true, defaultCurrency: 'USD', receiptFormat: 'RCP-{000000}', receiptNextNumber: 1, invoiceFormat: 'INV-{000000}', invoiceNextNumber: 1 }],
+    ['system/settings/numbering', 'PATCH', { schoolCode: 'HAX', admissionFormat: '{SCHOOLCODE}{0000}' }],
+    ['system/academic/years', 'POST', { year: 2031, terms: [{ startDate: '2031-01-05', endDate: '2031-04-04' }, { startDate: '2031-05-04', endDate: '2031-08-08' }, { startDate: '2031-09-07', endDate: '2031-12-05' }] }],
+    ['system/structure/forms', 'PATCH', { forms: [{ id: 'x', active: false }] }],
+    ['system/structure/streams', 'POST', { name: 'Hack' }],
+    ['system/structure/classes', 'PUT', { cells: [{ levelId: 'x', stream: '', exists: true, capacity: 40 }] }],
+    ['system/grading', 'GET'],
     ['system/calendar', 'GET'],
     ['system/calendar', 'POST', { title: 'Party', kind: 'OTHER', startDate: '2026-05-01', endDate: '2026-05-01' }],
     ['system/audit-log', 'GET'],
@@ -323,10 +330,10 @@ describe('school settings', () => {
   });
 
   it('keeps the profile and the defaults apart in the log', async () => {
-    const r = await call('system/settings/defaults', 'PATCH', { as: admin(), body: { defaultCurrency: 'ZIG', maxClassSize: 40 } });
+    const r = await call('system/settings/defaults', 'PATCH', { as: admin(), body: { maxClassSize: 40 } });
     expect(r.status).toBe(200);
     const entry = await prisma.auditLog.findFirstOrThrow({ where: { action: 'UPDATE_SCHOOL_SETTINGS', schoolId: A.schoolId }, orderBy: { createdAt: 'desc' } });
-    expect(entry.detail).toMatch(/^Defaults: changed defaultCurrency, maxClassSize/);
+    expect(entry.detail).toMatch(/^Defaults: changed maxClassSize/);
     expect(Object.keys(entry.after as object)).not.toContain('name');
     expect((await call('system/settings', 'GET', { as: admin() })).json.data.school.name).toBe('Chinhoyi High School'); // the profile did not move
   });
@@ -381,7 +388,7 @@ describe('school settings', () => {
   it('is refused to a signed-out caller and to someone without the permission', async () => {
     expect((await save(good, null)).status).toBe(401);
     expect((await save(good, A.users.HEAD)).status).toBe(403);
-    expect((await call('system/settings/defaults', 'PATCH', { as: A.users.HEAD, body: { defaultCurrency: 'USD', maxClassSize: 40 } })).status).toBe(403);
+    expect((await call('system/settings/defaults', 'PATCH', { as: A.users.HEAD, body: { maxClassSize: 40 } })).status).toBe(403);
   });
 });
 

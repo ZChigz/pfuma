@@ -5,12 +5,12 @@ import { ensureStudentMember } from '@/lib/library';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { classDisplayName } from '@/lib/academic/rules';
+import { counterPattern, DEFAULT_ADMISSION_FORMAT, formatNumber, maxCounter } from '@/lib/numbering';
 import { dateOnly, ensureLevels, getOpenTerm, requireOpenTerm } from '@/lib/academic/terms';
 import { findOrCreateGuardian, linkGuardian } from '@/lib/students/guardians';
 import {
   ageWarning,
   DEFAULT_MAX_CLASS_SIZE,
-  formatAdmissionNumber,
   type AdmissionData,
   type RegistrationWarning,
 } from '@/lib/students/registration';
@@ -45,6 +45,7 @@ export async function findOrCreateClass(tx: Tx, schoolId: string, actorId: strin
     levelByName(schoolId, levelName, tx),
     tx.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } }),
   ]);
+  if (!level.active) throw new ServiceError(`${level.name} is switched off for this school. Switch it on under Settings → Forms, streams and classes first.`, 409);
   const name = classDisplayName(level.name, stream);
   const created = await tx.schoolClass.create({
     data: { schoolId, name, levelId: level.id, stream, capacity: school?.maxClassSize ?? DEFAULT_MAX_CLASS_SIZE },
@@ -117,27 +118,48 @@ export async function checkRegistration(schoolId: string, data: AdmissionData, d
 
 // ─── Admission numbers ───────────────────────────────────────────────────────
 
-// Next free sequence number for each admission year, e.g. { 2026: 14 }.
-// Generated numbers are fixed-width, so the lexically largest is the highest.
-export async function nextSequences(tx: Tx, schoolId: string, years: number[]): Promise<Map<number, number>> {
-  const result = new Map<number, number>();
+// The next free running number for each admission year, e.g. { 2026: 14 }, worked out from the
+// school's admission-number format (Settings → Numbering): the highest number already used in
+// that year, plus one. The format travels with the map so takeAdmissionNumber builds the same shape.
+export type AdmissionSequences = Map<number, number> & { config: { format: string; code: string } };
+
+export async function nextSequences(tx: Tx, schoolId: string, years: number[]): Promise<AdmissionSequences> {
+  const school = await tx.school.findUnique({ where: { id: schoolId }, select: { admissionFormat: true, schoolCode: true } });
+  const config = { format: school?.admissionFormat ?? DEFAULT_ADMISSION_FORMAT, code: school?.schoolCode ?? 'STU' };
+  const result = Object.assign(new Map<number, number>(), { config }) as AdmissionSequences;
   for (const year of Array.from(new Set(years))) {
-    const last = await tx.student.findFirst({
-      where: { schoolId, admissionNumber: { startsWith: `STU${year}` } },
-      orderBy: { admissionNumber: 'desc' },
-      select: { admissionNumber: true },
-    });
-    const lastSeq = last && /^STU\d{8}$/.test(last.admissionNumber) ? Number(last.admissionNumber.slice(7)) : 0;
+    const pattern = counterPattern(config.format, { year, schoolCode: config.code });
+    let lastSeq = 0;
+    if (pattern) {
+      // Fixed-width numbers sort the same as text, so the highest used is near the top.
+      const candidates = await tx.student.findMany({
+        where: { schoolId, admissionNumber: { startsWith: pattern.prefix } },
+        orderBy: { admissionNumber: 'desc' },
+        select: { admissionNumber: true },
+        take: 200,
+      });
+      for (const c of candidates) {
+        const m = pattern.regex.exec(c.admissionNumber);
+        if (m) lastSeq = Math.max(lastSeq, Number(m[1]));
+      }
+    }
     result.set(year, lastSeq + 1);
   }
   return result;
 }
 
 export function takeAdmissionNumber(sequences: Map<number, number>, year: number, taken: Set<string> = new Set()): string {
+  const config = (sequences as Partial<AdmissionSequences>).config ?? { format: DEFAULT_ADMISSION_FORMAT, code: 'STU' };
+  const limit = maxCounter(config.format);
   let seq = sequences.get(year) ?? 1;
-  let candidate = formatAdmissionNumber(year, seq);
-  while (taken.has(candidate)) candidate = formatAdmissionNumber(year, ++seq);
-  if (seq > 9999) throw new ServiceError(`All 9999 admission numbers for ${year} are used`, 409);
+  const build = (n: number) => formatNumber(config.format, { year, schoolCode: config.code }, n);
+  if (seq > limit) throw new ServiceError(`All ${limit} admission numbers for ${year} are used. Change the format under Settings → Numbering.`, 409);
+  let candidate = build(seq);
+  while (taken.has(candidate)) {
+    seq++;
+    if (seq > limit) throw new ServiceError(`All ${limit} admission numbers for ${year} are used. Change the format under Settings → Numbering.`, 409);
+    candidate = build(seq);
+  }
   sequences.set(year, seq + 1);
   return candidate;
 }
