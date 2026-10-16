@@ -56,7 +56,7 @@ beforeEach(async () => {
 // ─── Who may call what ───────────────────────────────────────────────────────
 
 describe('every System route goes through the permission check', () => {
-  const routes: [string, 'GET' | 'POST' | 'PATCH' | 'DELETE', Record<string, unknown>?, string?][] = [
+  const routes: [string, 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', Record<string, unknown>?, string?][] = [
     ['system/users', 'GET'],
     ['system/users', 'POST', { fullName: 'Nope Nobody', email: 'nope@a.test', role: 'TEACHER' }],
     ['system/users/[id]', 'PATCH', { fullName: 'Nope Nobody' }, 'TEACHER'],
@@ -64,7 +64,15 @@ describe('every System route goes through the permission check', () => {
     ['system/users/[id]/reactivate', 'POST', undefined, 'TEACHER'],
     ['system/users/[id]/reset-password', 'POST', undefined, 'TEACHER'],
     ['system/settings', 'GET'],
-    ['system/settings', 'PATCH', { name: 'Hacked School', schoolType: 'PRIVATE', defaultCurrency: 'USD', maxClassSize: 40 }],
+    ['system/settings/profile', 'PATCH', { name: 'Hacked School', schoolType: 'PRIVATE', boarding: 'DAY', studentGender: 'CO_ED', district: 'Harare', physicalAddress: '1 Hacker Road' }],
+    ['system/settings/defaults', 'PATCH', { maxClassSize: 40 }],
+    ['system/settings/finance', 'PATCH', { currencyUsdEnabled: true, currencyZigEnabled: true, defaultCurrency: 'USD', receiptFormat: 'RCP-{000000}', receiptNextNumber: 1, invoiceFormat: 'INV-{000000}', invoiceNextNumber: 1 }],
+    ['system/settings/numbering', 'PATCH', { schoolCode: 'HAX', admissionFormat: '{SCHOOLCODE}{0000}' }],
+    ['system/academic/years', 'POST', { year: 2031, terms: [{ startDate: '2031-01-05', endDate: '2031-04-04' }, { startDate: '2031-05-04', endDate: '2031-08-08' }, { startDate: '2031-09-07', endDate: '2031-12-05' }] }],
+    ['system/structure/forms', 'PATCH', { forms: [{ id: 'x', active: false }] }],
+    ['system/structure/streams', 'POST', { name: 'Hack' }],
+    ['system/structure/classes', 'PUT', { cells: [{ levelId: 'x', stream: '', exists: true, capacity: 40 }] }],
+    ['system/grading', 'GET'],
     ['system/calendar', 'GET'],
     ['system/calendar', 'POST', { title: 'Party', kind: 'OTHER', startDate: '2026-05-01', endDate: '2026-05-01' }],
     ['system/audit-log', 'GET'],
@@ -296,44 +304,91 @@ describe('users', () => {
 // ─── School settings ─────────────────────────────────────────────────────────
 
 describe('school settings', () => {
-  const good = { name: 'Chinhoyi High School', schoolType: 'PRIVATE', location: 'Chinhoyi', address: 'PO Box 1', phone: '+263 242 123456', email: 'Office@Chinhoyi.test', motto: 'Strive', logoUrl: 'https://utfs.io/f/logo.png', defaultCurrency: 'ZIG', maxClassSize: 40 };
+  const good = {
+    name: 'Chinhoyi High School', motto: 'Strive', logoUrl: 'https://utfs.io/f/logo.png', schoolType: 'MISSION_CHURCH', responsibleAuthority: 'Anglican Diocese of Harare',
+    boarding: 'DAY_AND_BOARDING', studentGender: 'GIRLS', offersCambridge: true, zimsecCentreNumber: '140123', emisNumber: 'EMIS-2231', province: 'Mashonaland West',
+    district: 'Chinhoyi', physicalAddress: '12 Main Street, Chinhoyi', postalAddress: 'P O Box 1, Chinhoyi', phone: '0242 700 123', email: 'Office@Chinhoyi.test',
+    website: 'https://www.chinhoyi.co.zw', headName: 'Mrs T. Moyo', headSignatureUrl: 'https://utfs.io/f/sign.png',
+  };
+  const save = (body: object, as: typeof A.users.ADMIN | null = admin()) => call('system/settings/profile', 'PATCH', { as, body });
 
-  it('saves the profile with before/after in the audit log', async () => {
+  it('saves the whole profile, with the phone as +263…, and logs before and after', async () => {
     const n = await auditCount({ action: 'UPDATE_SCHOOL_SETTINGS' });
-    const r = await call('system/settings', 'PATCH', { as: admin(), body: good });
+    const r = await save(good);
     expect(r.status).toBe(200);
-    expect(r.json.data.school).toMatchObject({ name: 'Chinhoyi High School', schoolType: 'PRIVATE', defaultCurrency: 'ZIG', maxClassSize: 40, email: 'office@chinhoyi.test' });
+    expect(r.json.data.school).toMatchObject({
+      name: 'Chinhoyi High School', schoolType: 'MISSION_CHURCH', responsibleAuthority: 'Anglican Diocese of Harare', boarding: 'DAY_AND_BOARDING', studentGender: 'GIRLS',
+      offersCambridge: true, zimsecCentreNumber: '140123', emisNumber: 'EMIS-2231', province: 'Mashonaland West', district: 'Chinhoyi', phone: '+263242700123',
+      email: 'office@chinhoyi.test', website: 'https://www.chinhoyi.co.zw', headName: 'Mrs T. Moyo',
+    });
     const entry = await prisma.auditLog.findFirstOrThrow({ where: { action: 'UPDATE_SCHOOL_SETTINGS', schoolId: A.schoolId }, orderBy: { createdAt: 'desc' } });
-    expect(entry.before).toMatchObject({ name: 'School A', defaultCurrency: 'USD' });
-    expect(entry.after).toMatchObject({ name: 'Chinhoyi High School', defaultCurrency: 'ZIG' });
+    expect(entry.before).toMatchObject({ name: 'School A', boarding: 'DAY', offersCambridge: false });
+    expect(entry.after).toMatchObject({ name: 'Chinhoyi High School', boarding: 'DAY_AND_BOARDING', phone: '+263242700123' });
+    expect(entry.detail).toMatch(/^School profile: changed name,/);
     expect(await auditCount({ action: 'UPDATE_SCHOOL_SETTINGS' })).toBe(n + 1);
     expect((await call('system/settings', 'GET', { as: owner() })).json.data.school.name).toBe('Chinhoyi High School');
   });
 
-  it("never touches another school", async () => {
+  it('keeps the profile and the defaults apart in the log', async () => {
+    const r = await call('system/settings/defaults', 'PATCH', { as: admin(), body: { maxClassSize: 40 } });
+    expect(r.status).toBe(200);
+    const entry = await prisma.auditLog.findFirstOrThrow({ where: { action: 'UPDATE_SCHOOL_SETTINGS', schoolId: A.schoolId }, orderBy: { createdAt: 'desc' } });
+    expect(entry.detail).toMatch(/^Defaults: changed maxClassSize/);
+    expect(Object.keys(entry.after as object)).not.toContain('name');
+    expect((await call('system/settings', 'GET', { as: admin() })).json.data.school.name).toBe('Chinhoyi High School'); // the profile did not move
+  });
+
+  it('never touches another school', async () => {
     expect((await prisma.school.findUniqueOrThrow({ where: { id: B.schoolId } })).name).toBe('School B');
     expect((await call('system/settings', 'GET', { as: B.users.ADMIN })).json.data.school.name).toBe('School B');
   });
 
   it('rejects bad input without changing anything', async () => {
-    for (const bad of [{ name: '' }, { schoolType: 'ACADEMY' }, { defaultCurrency: 'GBP' }, { maxClassSize: 0 }, { maxClassSize: '40' }, { email: 'nope' }, { phone: 'abc' }, { logoUrl: 'https://evil.test/x.png' }]) {
-      const r = await call('system/settings', 'PATCH', { as: admin(), body: { ...good, ...bad } });
-      expect(r.status, JSON.stringify(bad)).toBe(422);
-    }
+    const bad: object[] = [
+      { name: '' }, { name: 'x'.repeat(121) }, { schoolType: 'ACADEMY' }, { boarding: 'WEEKLY' }, { studentGender: 'MIXED' }, { province: 'Narnia' },
+      { district: '' }, { physicalAddress: '' }, { physicalAddress: 'x'.repeat(251) }, { phone: 'abc' }, { phone: '+27 82 123 4567' }, { phone: '12345' },
+      { email: 'nope' }, { website: 'www.school.co.zw' }, { website: 'ftp://school.co.zw' }, { zimsecCentreNumber: '12' }, { emisNumber: '!!' },
+      { logoUrl: 'https://evil.test/x.png' }, { logoUrl: 'http://utfs.io/f/x.png' }, { headSignatureUrl: 'https://evil.test/s.png' }, { headName: 'x'.repeat(101) },
+      { motto: 'x'.repeat(151) }, { offersCambridge: 'yes' },
+    ];
+    for (const b of bad) expect((await save({ ...good, ...b })).status, JSON.stringify(b)).toBe(422);
     expect((await prisma.school.findUniqueOrThrow({ where: { id: A.schoolId } })).name).toBe('Chinhoyi High School');
+  });
+
+  it('needs the name, school type, boarding, gender, district and physical address', async () => {
+    for (const field of ['name', 'schoolType', 'boarding', 'studentGender', 'district', 'physicalAddress']) {
+      const rest: Record<string, unknown> = { ...good };
+      delete rest[field];
+      expect((await save(rest)).status, field).toBe(422);
+    }
+  });
+
+  it('accepts every school type, boarding option and gender', async () => {
+    for (const schoolType of ['GOVERNMENT', 'COUNCIL', 'MISSION_CHURCH', 'TRUST', 'PRIVATE']) expect((await save({ ...good, schoolType })).status, schoolType).toBe(200);
+    for (const boarding of ['DAY', 'BOARDING', 'DAY_AND_BOARDING']) expect((await save({ ...good, boarding })).status, boarding).toBe(200);
+    for (const studentGender of ['BOYS', 'GIRLS', 'CO_ED']) expect((await save({ ...good, studentGender })).status, studentGender).toBe(200);
   });
 
   it('is rolled back when the audit write fails', async () => {
     audit.failNext = true;
-    const r = await call('system/settings', 'PATCH', { as: admin(), body: { ...good, name: 'Should Not Stick' } });
+    const r = await save({ ...good, name: 'Should Not Stick' });
     expect(r.status).toBe(500);
     expect((await prisma.school.findUniqueOrThrow({ where: { id: A.schoolId } })).name).toBe('Chinhoyi High School');
   });
 
-  it('turns blanks into empty values', async () => {
-    const r = await call('system/settings', 'PATCH', { as: admin(), body: { ...good, motto: '', phone: '', logoUrl: '' } });
+  it('turns blank optional fields into empty values, and keeps the required ones', async () => {
+    const r = await save({ ...good, motto: '', phone: '', logoUrl: '', website: '', email: '', postalAddress: '', headName: '', headSignatureUrl: '', responsibleAuthority: '', emisNumber: '', zimsecCentreNumber: '', province: '' });
     expect(r.status).toBe(200);
-    expect(r.json.data.school).toMatchObject({ motto: null, phone: null, logoUrl: null });
+    expect(r.json.data.school).toMatchObject({
+      motto: null, phone: null, logoUrl: null, website: null, email: null, postalAddress: null, headName: null, headSignatureUrl: null,
+      responsibleAuthority: null, emisNumber: null, zimsecCentreNumber: null, province: null, district: 'Chinhoyi',
+    });
+  });
+
+  it('is refused to a signed-out caller and to someone without the permission', async () => {
+    expect((await save(good, null)).status).toBe(401);
+    expect((await save(good, A.users.HEAD)).status).toBe(403);
+    expect((await call('system/settings/defaults', 'PATCH', { as: A.users.HEAD, body: { maxClassSize: 40 } })).status).toBe(403);
   });
 });
 

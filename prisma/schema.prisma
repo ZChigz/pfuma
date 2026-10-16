@@ -266,12 +266,35 @@ enum AuditAction {
   UPDATE_SCHOOL_MODULES
   CREATE_CALENDAR_EVENT
   UPDATE_CALENDAR_EVENT
+  UPDATE_FORMS
+  UPDATE_STREAMS
+  ARCHIVE_CLASS
+  DELETE_CLASS
+  UPDATE_GRADING
+  UPDATE_FINANCE_SETTINGS
+  UPDATE_NUMBERING
   DELETE_CALENDAR_EVENT
 }
 
 enum SchoolType {
   GOVERNMENT
+  COUNCIL
+  MISSION_CHURCH
+  TRUST
   PRIVATE
+}
+
+enum SchoolBoarding {
+  DAY
+  BOARDING
+  DAY_AND_BOARDING
+}
+
+// Whom the school admits.
+enum SchoolGender {
+  BOYS
+  GIRLS
+  CO_ED
 }
 
 enum SubscriptionStatus {
@@ -310,37 +333,60 @@ enum CalendarAudience {
 // ─── Core ────────────────────────────────────────────────────────────────────
 
 model School {
-  id                   String      @id @default(cuid())
+  id                   String         @id @default(cuid())
   name                 String
   location             String?
   // Default capacity for newly created classes.
-  maxClassSize         Int         @default(45)
+  maxClassSize         Int            @default(45)
   // Lowest grade that counts as a pass ("C or better" = C), looked up in GradeBoundary.
-  passGrade            String      @default("C")
+  passGrade            String         @default("C")
   // O Level classes: rank by average percentage, or by number of passes then average.
-  oLevelRanking        RankingMode @default(AVERAGE)
+  oLevelRanking        RankingMode    @default(AVERAGE)
   // Library: checkout is blocked above this much unpaid fines (in the fine currency),
   // and each kind of member has its own loan limit.
-  libraryFineLimit     Decimal     @default(5) @db.Decimal(14, 2)
-  studentLoanLimit     Int         @default(2)
-  staffLoanLimit       Int         @default(5)
+  libraryFineLimit     Decimal        @default(5) @db.Decimal(14, 2)
+  studentLoanLimit     Int            @default(2)
+  staffLoanLimit       Int            @default(5)
   // Profile shown in the top bar and on documents.
-  schoolType           SchoolType  @default(GOVERNMENT)
+  schoolType           SchoolType     @default(GOVERNMENT)
   phone                String?
   email                String?
   address              String?
   motto                String?
   logoUrl              String?
-  defaultCurrency      Currency    @default(USD)
+  defaultCurrency      Currency       @default(USD)
   province             String?
   // ZIMSEC examination centre number.
   zimsecCentreNumber   String?
   // Receipt numbers look like <prefix>-<number>; a null prefix means not chosen yet.
   receiptPrefix        String?
-  receiptNextNumber    Int         @default(1)
+  receiptNextNumber    Int            @default(1)
+  // Settings, Finance basics. Formats such as RCP-{YEAR}-{000000}; see lib/numbering.ts.
+  currencyUsdEnabled   Boolean        @default(true)
+  currencyZigEnabled   Boolean        @default(true)
+  receiptFormat        String?
+  invoiceFormat        String?
+  invoiceNextNumber    Int            @default(1)
+  // Settings, Numbering. The code that starts admission numbers, and their format.
+  schoolCode           String         @default("STU")
+  admissionFormat      String         @default("{SCHOOLCODE}{YEAR}{0000}")
   // Keeps the dashboard setup checklist visible after every step is done.
-  setupChecklistPinned Boolean     @default(false)
-  createdAt            DateTime    @default(now())
+  setupChecklistPinned Boolean        @default(false)
+  // School profile (Settings, tab 1). The old "location" and "address" columns stay until the
+  // contract migration; district and physicalAddress replace them and were filled from them.
+  responsibleAuthority String?
+  boarding             SchoolBoarding @default(DAY)
+  studentGender        SchoolGender   @default(CO_ED)
+  // ZIMSEC is always on; Cambridge is optional.
+  offersCambridge      Boolean        @default(false)
+  emisNumber           String?
+  district             String?
+  physicalAddress      String?
+  postalAddress        String?
+  website              String?
+  headName             String?
+  headSignatureUrl     String?
+  createdAt            DateTime       @default(now())
   // Legacy column "currentTerm" still exists in the database until the
   // contract migration; the current term is now the OPEN AcademicTerm.
 
@@ -383,6 +429,7 @@ model School {
   notifications       Notification[]
   calendarEvents      CalendarEvent[]
   CalendarHolidayYear CalendarHolidayYear[]
+  streams             Stream[]
 }
 
 model User {
@@ -477,6 +524,8 @@ model Level {
   name     String // "Form 1" … "Form 6"
   order    Int // 1–6: sorting and promotion
   category LevelCategory
+  // Switched off when the school does not have this form (e.g. no A Level). Off forms offer no classes.
+  active   Boolean       @default(true)
 
   school          School          @relation(fields: [schoolId], references: [id])
   classes         SchoolClass[]
@@ -993,13 +1042,18 @@ model TermResult {
 // specific set wins: level + term, then level, then term, then the school-wide set
 // (both null). This lets O Level and A Level use different boundaries.
 model GradeBoundary {
-  id          String  @id @default(cuid())
+  id          String         @id @default(cuid())
   schoolId    String
   levelId     String?
   termId      String?
-  minPercent  Decimal @db.Decimal(14, 2)
-  maxPercent  Decimal @db.Decimal(14, 2)
+  minPercent  Decimal        @db.Decimal(14, 2)
+  maxPercent  Decimal        @db.Decimal(14, 2)
   letterGrade String
+  // The scale chosen in Settings, Grading: one for O Level and one for A Level. Such a set has no
+  // level or term. A set with category null is the older school-wide set, used when no scale is chosen.
+  category    LevelCategory?
+  points      Int?
+  remark      String?
 
   school School        @relation(fields: [schoolId], references: [id])
   level  Level?        @relation(fields: [levelId], references: [id])
@@ -1372,4 +1426,17 @@ model CalendarHolidayYear {
   school School @relation(fields: [schoolId], references: [id])
 
   @@unique([schoolId, year])
+}
+
+// The streams a school uses (North, South, East ...). Classes take their stream from this list.
+model Stream {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  createdAt DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
 }

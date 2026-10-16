@@ -68,9 +68,11 @@ async function _POST(req: NextRequest) {
       letterGrade: b.letterGrade,
       levelId:     b.levelId,
       termId:      b.termId,
+      category:    b.category,
     })),
     schoolClass.levelId,
     termId,
+    schoolClass.level.category,
   );
   const nextTerm = await db.academicTerm.findFirst({
     where: { schoolId: user.schoolId, startDate: { gt: termRow.startDate } },

@@ -8,6 +8,23 @@ import { POP_ALLOWED_TYPES, POP_MAX_BYTES, newProofKey } from '@/lib/proof-of-pa
 
 const f = createUploadthing();
 
+const SETTINGS_IMAGE_TYPES = ['image/png', 'image/jpeg'];
+const SETTINGS_IMAGE_MAX_BYTES = 1024 * 1024;
+
+async function settingsImageGate(files: readonly { type: string; size: number }[]) {
+  try {
+    const user = await requirePermission('system.settings.update');
+    for (const file of files) {
+      if (!SETTINGS_IMAGE_TYPES.includes(file.type)) throw new UploadThingError('Use a PNG or JPG image');
+      if (file.size > SETTINGS_IMAGE_MAX_BYTES) throw new UploadThingError('The image must be 1 MB or smaller');
+    }
+    return { userId: user.id };
+  } catch (e) {
+    if (e instanceof UploadThingError) throw e;
+    throw new UploadThingError('You cannot change the school settings');
+  }
+}
+
 export const fileRouter = {
   // Proof of payment: images and PDF only, at most 5 MB, stored privately.
   // UploadThing only offers power-of-two size limits (4MB, 8MB), so the 5 MB cap
@@ -63,16 +80,15 @@ export const fileRouter = {
     })
     .onUploadComplete(() => {}),
 
-  // School logo (Dashboard & System → School Settings): only people who may change settings.
-  schoolLogo: f({ image: { maxFileSize: '2MB', maxFileCount: 1 } })
-    .middleware(async () => {
-      try {
-        const user = await requirePermission('system.settings.update');
-        return { userId: user.id };
-      } catch {
-        throw new UploadThingError('You cannot change the school logo');
-      }
-    })
+  // School logo and head's signature (Settings → School profile): PNG or JPG, at most 1 MB,
+  // and only people who may change settings. The size and type are checked here as well as in
+  // the route config, because a client can lie about both.
+  schoolLogo: f({ 'image/png': { maxFileSize: '1MB', maxFileCount: 1 }, 'image/jpeg': { maxFileSize: '1MB', maxFileCount: 1 } })
+    .middleware(async ({ files }) => settingsImageGate(files))
+    .onUploadComplete(() => {}),
+
+  headSignature: f({ 'image/png': { maxFileSize: '1MB', maxFileCount: 1 }, 'image/jpeg': { maxFileSize: '1MB', maxFileCount: 1 } })
+    .middleware(async ({ files }) => settingsImageGate(files))
     .onUploadComplete(() => {}),
 } satisfies FileRouter;
 

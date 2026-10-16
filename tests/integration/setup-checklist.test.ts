@@ -14,6 +14,12 @@ let A: SeededSchool;
 let B: SeededSchool;
 let prisma: typeof import('@/lib/prisma').prisma;
 
+const PROFILE = { name: 'School A', schoolType: 'GOVERNMENT', boarding: 'DAY', studentGender: 'CO_ED', district: 'Chinhoyi', physicalAddress: '1 Main Street, Chinhoyi' };
+const FINANCE = { currencyUsdEnabled: true, currencyZigEnabled: false, defaultCurrency: 'USD', receiptFormat: 'RCP-{YEAR}-{000000}', receiptNextNumber: 1, invoiceFormat: 'INV-{YEAR}-{000000}', invoiceNextNumber: 1 };
+const saveProfile = (extra: object, as = A.users.ADMIN) => call('system/settings/profile', 'PATCH', { as, body: { ...PROFILE, ...extra } });
+const saveDefaults = (extra: object, as = A.users.ADMIN) => call('system/settings/defaults', 'PATCH', { as, body: extra });
+const saveFinance = (extra: object, as = A.users.ADMIN) => call('system/settings/finance', 'PATCH', { as, body: { ...FINANCE, ...extra } });
+
 beforeAll(async () => {
   delete process.env.UPSTASH_REDIS_REST_URL;
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -52,12 +58,12 @@ describe('setup checklist facts', () => {
     expect((await stepsFor(A)).terms).toBe(true);
     expect((await stepsFor(B)).terms).toBe(false);
 
-    const r = await call('system/settings', 'PATCH', {
-      as: A.users.ADMIN,
-      body: { name: 'School A', schoolType: 'GOVERNMENT', defaultCurrency: 'USD', maxClassSize: 45, province: 'Harare', zimsecCentreNumber: '140123', logoUrl: 'https://utfs.io/f/a.png', receiptPrefix: 'rct' },
-    });
+    const r = await saveProfile({ province: 'Harare', zimsecCentreNumber: '140123', logoUrl: 'https://utfs.io/f/a.png' });
     expect(r.status).toBe(200);
-    expect(r.json.data.school).toMatchObject({ province: 'Harare', zimsecCentreNumber: '140123', receiptPrefix: 'RCT', receiptNextNumber: 1, setupChecklistPinned: false });
+    expect(r.json.data.school).toMatchObject({ province: 'Harare', zimsecCentreNumber: '140123' });
+    const d = await saveFinance({});
+    expect(d.status).toBe(200);
+    expect(d.json.data.school).toMatchObject({ receiptFormat: 'RCP-{YEAR}-{000000}', receiptNextNumber: 1, currencyZigEnabled: false, setupChecklistPinned: false });
     const done = await stepsFor(A);
     expect(done.profile).toBe(true);
     expect(done.money).toBe(true);
@@ -82,7 +88,7 @@ describe('setup checklist facts', () => {
   });
 
   it('wants an exchange rate when the default currency is ZiG', async () => {
-    await call('system/settings', 'PATCH', { as: A.users.ADMIN, body: { name: 'School A', schoolType: 'GOVERNMENT', defaultCurrency: 'ZIG', maxClassSize: 45, receiptPrefix: 'RCT', receiptNextNumber: 1 } });
+    await saveFinance({ currencyZigEnabled: true, defaultCurrency: 'ZIG' });
     expect((await stepsFor(A)).money).toBe(false);
     await prisma.exchangeRate.create({ data: { schoolId: A.schoolId, usdToZig: 27, setBy: A.users.BURSAR.id } });
     expect((await stepsFor(A)).money).toBe(true);
@@ -90,17 +96,15 @@ describe('setup checklist facts', () => {
 });
 
 describe('new school settings fields', () => {
-  const body = { name: 'School A', schoolType: 'GOVERNMENT', defaultCurrency: 'USD', maxClassSize: 45 };
-
   it('rejects a bad province, centre number, prefix or receipt number', async () => {
-    for (const bad of [{ province: 'Narnia' }, { zimsecCentreNumber: '!!' }, { receiptPrefix: 'NOT OK' }, { receiptNextNumber: 0 }]) {
-      expect((await call('system/settings', 'PATCH', { as: A.users.ADMIN, body: { ...body, ...bad } })).status, JSON.stringify(bad)).toBe(422);
-    }
+    for (const bad of [{ province: 'Narnia' }, { zimsecCentreNumber: '!!' }]) expect((await saveProfile(bad)).status, JSON.stringify(bad)).toBe(422);
+    for (const bad of [{ receiptFormat: 'NO COUNTER' }, { receiptNextNumber: 0 }]) expect((await saveFinance(bad)).status, JSON.stringify(bad)).toBe(422);
+    for (const bad of [{ maxClassSize: 0 }, {}]) expect((await saveDefaults(bad)).status, JSON.stringify(bad)).toBe(422);
   });
 
   it('pins and unpins the checklist, audited, without touching other schools', async () => {
     const n = await prisma.auditLog.count({ where: { schoolId: A.schoolId, action: 'UPDATE_SCHOOL_SETTINGS' } });
-    const pin = await call('system/settings', 'PATCH', { as: A.users.ADMIN, body: { ...body, setupChecklistPinned: true } });
+    const pin = await saveDefaults({ setupChecklistPinned: true });
     expect(pin.json.data.school.setupChecklistPinned).toBe(true);
     const entry = await prisma.auditLog.findFirstOrThrow({ where: { schoolId: A.schoolId, action: 'UPDATE_SCHOOL_SETTINGS' }, orderBy: { createdAt: 'desc' } });
     expect(entry.before).toMatchObject({ setupChecklistPinned: false });
@@ -110,9 +114,9 @@ describe('new school settings fields', () => {
     expect((await prisma.school.findUniqueOrThrow({ where: { id: B.schoolId } })).setupChecklistPinned).toBe(false);
 
     // Leaving the field out keeps it as it was.
-    const keep = await call('system/settings', 'PATCH', { as: A.users.ADMIN, body });
+    const keep = await saveDefaults({ maxClassSize: 45 });
     expect(keep.json.data.school.setupChecklistPinned).toBe(true);
-    const off = await call('system/settings', 'PATCH', { as: A.users.ADMIN, body: { ...body, setupChecklistPinned: false } });
+    const off = await saveDefaults({ setupChecklistPinned: false });
     expect(off.json.data.school.setupChecklistPinned).toBe(false);
   });
 
@@ -121,7 +125,8 @@ describe('new school settings fields', () => {
     expect(can({ id: 'x', schoolId: 's', role: 'ADMIN' }, 'system.setup.view')).toBe(true);
     expect(can({ id: 'x', schoolId: 's', role: 'DIRECTOR' }, 'system.setup.view')).toBe(true);
     for (const role of ['HEAD', 'BURSAR', 'TEACHER', 'LIBRARIAN'] as const) expect(can({ id: 'x', schoolId: 's', role }, 'system.setup.view')).toBe(false);
-    expect((await call('system/settings', 'PATCH', { as: A.users.TEACHER, body: { ...body, setupChecklistPinned: true } })).status).toBe(403);
+    expect((await saveDefaults({ setupChecklistPinned: true }, A.users.TEACHER)).status).toBe(403);
+    expect((await saveProfile({}, A.users.TEACHER)).status).toBe(403);
   });
 
   it('the dashboard page shows the checklist while steps are open and hides it when all are done', async () => {
@@ -142,9 +147,11 @@ describe('new school settings fields', () => {
     expect(await hasChecklist()).toBe(true);   // A still has open steps
     // Finish everything for A.
     await prisma.calendarEvent.create({ data: { schoolId: A.schoolId, title: 'Term dates', startDate: new Date('2026-03-01'), endDate: new Date('2026-03-01'), createdById: A.users.ADMIN.id } });
-    await call('system/settings', 'PATCH', { as: A.users.ADMIN, body: { ...body, province: 'Harare', zimsecCentreNumber: '140123', logoUrl: 'https://utfs.io/f/a.png', receiptPrefix: 'RCT', setupChecklistPinned: false } });
+    await saveProfile({ province: 'Harare', zimsecCentreNumber: '140123', logoUrl: 'https://utfs.io/f/a.png' });
+    await saveFinance({});
+    await saveDefaults({ setupChecklistPinned: false });
     expect(await hasChecklist()).toBe(false);
-    await call('system/settings', 'PATCH', { as: A.users.ADMIN, body: { ...body, province: 'Harare', zimsecCentreNumber: '140123', logoUrl: 'https://utfs.io/f/a.png', receiptPrefix: 'RCT', setupChecklistPinned: true } });
+    await saveDefaults({ setupChecklistPinned: true });
     expect(await hasChecklist()).toBe(true);   // reopened from Settings
   });
 });

@@ -116,17 +116,28 @@ export interface BoundaryRow {
   letterGrade: string;
   levelId?: string | null;
   termId?: string | null;
+  /** Set on the scale chosen in Settings → Grading (one per level category); null on every other set. */
+  category?: 'O_LEVEL' | 'A_LEVEL' | null;
 }
 
 /**
  * The boundary set for a level and term: the most specific non-empty set wins —
- * level + term, then level, then term, then the school-wide set.
+ * level + term, then level, then term, then the scale chosen for the level's category
+ * (O Level or A Level, from Settings → Grading), then the older school-wide set.
  */
-export function boundariesFor<T extends BoundaryRow>(rows: T[], levelId: string | null, termId: string | null): T[] {
-  const pick = (l: string | null, t: string | null) => rows.filter((r) => (r.levelId ?? null) === l && (r.termId ?? null) === t);
-  const tries: [string | null, string | null][] = [[levelId, termId], [levelId, null], [null, termId], [null, null]];
-  for (const [l, t] of tries) {
-    const set = pick(l, t);
+export function boundariesFor<T extends BoundaryRow>(
+  rows: T[],
+  levelId: string | null,
+  termId: string | null,
+  category: 'O_LEVEL' | 'A_LEVEL' | null = null,
+): T[] {
+  const pick = (l: string | null, t: string | null, c: string | null) =>
+    rows.filter((r) => (r.levelId ?? null) === l && (r.termId ?? null) === t && (r.category ?? null) === c);
+  const tries: [string | null, string | null, string | null][] = [[levelId, termId, null], [levelId, null, null], [null, termId, null]];
+  if (category) tries.push([null, null, category]);
+  tries.push([null, null, null]);
+  for (const [l, t, c] of tries) {
+    const set = pick(l, t, c);
     if (set.length > 0) return set;
   }
   return [];

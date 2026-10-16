@@ -12,7 +12,8 @@ const ENDPOINT_ACCEPT: Record<Endpoint, string> = {
   assetImage:     'image/jpeg,image/png,image/webp',
   studentPhoto:   'image/jpeg,image/png,image/webp',
   bookCover:      'image/jpeg,image/png,image/webp',
-  schoolLogo:     'image/jpeg,image/png,image/webp',
+  schoolLogo:     'image/jpeg,image/png',
+  headSignature:  'image/jpeg,image/png',
 };
 
 type Status = 'idle' | 'uploading' | 'done' | 'error';

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { MODULE_KEYS } from '@/lib/access-core';
+import { normalizeZimbabwePhone } from '@/lib/phone';
+import { maxCounter, parseFormat } from '@/lib/numbering';
+import { validateBoundaries } from '@/lib/results';
 
 export const PROVINCES = [
   'Bulawayo', 'Harare', 'Manicaland', 'Mashonaland Central', 'Mashonaland East', 'Mashonaland West',
@@ -31,22 +34,36 @@ export const SystemUpdateUserSchema = z
 
 // ─── School settings ─────────────────────────────────────────────────────────
 
-export const SchoolSettingsSchema = z.object({
-  name: z.string().trim().min(2, 'Enter the school name').max(120, 'The name is too long'),
-  schoolType: z.enum(['GOVERNMENT', 'PRIVATE']),
-  location: optionalText(120),
-  address: optionalText(250),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^\+?[0-9 ()-]{7,20}$/, 'Enter a phone number such as +263 242 123456')
-    .or(z.literal(''))
-    .transform((v) => (v === '' ? null : v))
-    .nullable()
-    .optional(),
-  email: z.string().trim().toLowerCase().email('Enter a valid email address').max(254).or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional(),
-  motto: optionalText(150),
-  province: z.enum(PROVINCES).or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional(),
+export const SCHOOL_TYPES = ['GOVERNMENT', 'COUNCIL', 'MISSION_CHURCH', 'TRUST', 'PRIVATE'] as const;
+export const BOARDING_TYPES = ['DAY', 'BOARDING', 'DAY_AND_BOARDING'] as const;
+export const GENDER_TYPES = ['BOYS', 'GIRLS', 'CO_ED'] as const;
+
+/** An image the school uploaded through UploadThing (a logo or a signature): nothing else is accepted. */
+const uploadedImage = z
+  .string()
+  .trim()
+  .url('Upload the image again')
+  .max(500)
+  .refine((u) => /^https:\/\/(utfs\.io|[a-z0-9-]+\.ufs\.sh)\//.test(u), 'Upload the image again; only uploaded images can be used');
+
+const blankToNull = <T extends z.ZodTypeAny>(schema: T) =>
+  schema.or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional();
+
+/** Optional short text: trimmed, a blank becomes empty, and a maximum length. */
+const text = (label: string, max: number) =>
+  z.string().trim().max(max, `${label} can be at most ${max} characters`).or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional();
+
+// Tab 1: School profile
+export const SchoolProfileSchema = z.object({
+  name: z.string().trim().min(2, 'Enter the school name').max(120, 'The school name can be at most 120 characters'),
+  motto: text('The motto', 150),
+  logoUrl: blankToNull(uploadedImage),
+  schoolType: z.enum(SCHOOL_TYPES, { error: 'Choose the type of school' }),
+  responsibleAuthority: text('The responsible authority', 120),
+  boarding: z.enum(BOARDING_TYPES, { error: 'Choose day, boarding, or day and boarding' }),
+  studentGender: z.enum(GENDER_TYPES, { error: 'Choose boys, girls or co-educational' }),
+  // ZIMSEC is always on, so it is not a field; Cambridge is the only choice.
+  offersCambridge: z.boolean().default(false),
   zimsecCentreNumber: z
     .string()
     .trim()
@@ -56,30 +73,50 @@ export const SchoolSettingsSchema = z.object({
     .transform((v) => (v === '' ? null : v))
     .nullable()
     .optional(),
-  receiptPrefix: z
+  emisNumber: z
     .string()
     .trim()
-    .toUpperCase()
-    .regex(/^[A-Z0-9]{1,8}$/, 'Use 1 to 8 letters or digits, e.g. RCT')
+    .regex(/^[A-Za-z0-9/-]{2,20}$/, 'Use 2 to 20 letters, digits, / or -')
     .or(z.literal(''))
     .transform((v) => (v === '' ? null : v))
     .nullable()
     .optional(),
-  receiptNextNumber: z.number({ error: 'Receipt number must be a number' }).int('Whole number only').min(1, 'At least 1').max(99_999_999).optional(),
-  setupChecklistPinned: z.boolean().optional(),
-  logoUrl: z
+  province: z.enum(PROVINCES, { error: 'Choose a province' }).or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional(),
+  district: z.string().trim().min(2, 'Enter the district').max(80, 'The district can be at most 80 characters'),
+  physicalAddress: z.string().trim().min(5, 'Enter the physical address').max(250, 'The address can be at most 250 characters'),
+  postalAddress: text('The postal address', 250),
+  phone: z
     .string()
     .trim()
-    .url('Enter a web address')
-    .refine((u) => /^https:\/\/(utfs\.io|[a-z0-9-]+\.ufs\.sh)\//.test(u), 'Upload the logo again; only uploaded images can be used')
-    .max(500)
     .or(z.literal(''))
-    .transform((v) => (v === '' ? null : v))
+    .transform((v, ctx) => {
+      if (v === '') return null;
+      const n = normalizeZimbabwePhone(v);
+      if (!n) ctx.addIssue({ code: 'custom', message: 'Enter a Zimbabwe number such as 0242 700123 or +263 77 123 4567' });
+      return n;
+    })
     .nullable()
     .optional(),
-  defaultCurrency: z.enum(['USD', 'ZIG']),
-  maxClassSize: z.number({ error: 'Class size must be a number' }).int('Class size must be a whole number').min(1, 'At least 1').max(200, 'At most 200'),
+  email: blankToNull(z.string().trim().toLowerCase().email('Enter a valid email address').max(254)),
+  website: blankToNull(
+    z
+      .string()
+      .trim()
+      .max(200, 'The website address is too long')
+      .regex(/^https?:\/\/[^\s]+\.[^\s]+$/i, 'Start with http:// or https://, e.g. https://www.school.co.zw'),
+  ),
+  headName: text("The head's name", 100),
+  headSignatureUrl: blankToNull(uploadedImage),
 });
+
+// Small defaults that live on other tabs: the class capacity (Forms, streams and classes) and the
+// dashboard checklist switch (School profile). Either may be sent on its own.
+export const SchoolDefaultsSchema = z
+  .object({
+    maxClassSize: z.number({ error: 'Class size must be a number' }).int('Class size must be a whole number').min(1, 'At least 1').max(200, 'At most 200').optional(),
+    setupChecklistPinned: z.boolean().optional(),
+  })
+  .refine((d) => d.maxClassSize !== undefined || d.setupChecklistPinned !== undefined, { message: 'Nothing to save' });
 
 // ─── Calendar ────────────────────────────────────────────────────────────────
 
@@ -183,3 +220,114 @@ export const NotificationReadSchema = z.union([
 ]);
 
 export const ProfileSchema = z.object({ fullName });
+
+// ─── Academic years and terms (Settings tab 2) ───────────────────────────────
+
+const termDates = z.object({ startDate: isoDate, endDate: isoDate });
+
+export const CreateYearSchema = z
+  .object({
+    year: z.number({ error: 'Year must be a number' }).int('Year must be a whole number').min(2000, 'Year must be 2000 or later').max(2100, 'Year must be 2100 or earlier'),
+    terms: z.array(termDates).length(3, 'A year has three terms'),
+  })
+  .superRefine((d, ctx) => {
+    const y = String(d.year);
+    d.terms.forEach((t, i) => {
+      const n = i + 1;
+      if (t.endDate < t.startDate) ctx.addIssue({ code: 'custom', path: ['terms', i, 'endDate'], message: `Term ${n} must end on or after the day it starts` });
+      if (t.startDate < `${y}-01-01` || t.endDate > `${y}-12-31`) ctx.addIssue({ code: 'custom', path: ['terms', i, 'startDate'], message: `Term ${n} must fall inside ${y}` });
+      if (i > 0 && t.startDate <= d.terms[i - 1].endDate) ctx.addIssue({ code: 'custom', path: ['terms', i, 'startDate'], message: `Term ${n} must start after Term ${n - 1} ends` });
+    });
+  });
+
+export const UpdateTermDatesSchema = termDates.refine((t) => t.endDate >= t.startDate, { message: 'The term must end on or after the day it starts', path: ['endDate'] });
+
+// ─── Forms, streams and classes (tab 3) ──────────────────────────────────────
+
+export const FormsSchema = z.object({
+  forms: z.array(z.object({ id: z.string().min(1).max(60), active: z.boolean() })).min(1).max(6),
+});
+
+export const StreamNameSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Enter a stream name')
+    .max(30, 'A stream name can be at most 30 characters')
+    .regex(/^[A-Za-z0-9 ]+$/, 'Use letters, numbers and spaces only'),
+});
+
+export const ClassGridSchema = z.object({
+  cells: z
+    .array(
+      z.object({
+        levelId: z.string().min(1).max(60),
+        // The stream's name; "" is a form with a single class and no stream.
+        stream: z.string().trim().max(30),
+        exists: z.boolean(),
+        capacity: z.number({ error: 'Capacity must be a number' }).int('Capacity must be a whole number').min(1, 'Capacity must be at least 1').max(200, 'Capacity can be at most 200'),
+      }),
+    )
+    .min(1)
+    .max(240),
+});
+
+// ─── Grading (tab 4) ─────────────────────────────────────────────────────────
+
+export const GRADE_CATEGORIES = ['O_LEVEL', 'A_LEVEL'] as const;
+
+export const GradeScaleSchema = z.object({
+  rows: z
+    .array(
+      z.object({
+        letterGrade: z.string().trim().min(1, 'Enter a grade').max(3, 'A grade can be at most 3 characters'),
+        minPercent: z.number({ error: 'Lowest % must be a number' }),
+        maxPercent: z.number({ error: 'Highest % must be a number' }),
+        points: z.number({ error: 'Points must be a number' }).int('Points must be a whole number').min(0, 'Points cannot be negative').max(100).nullable().optional(),
+        remark: z.string().trim().max(60, 'A remark can be at most 60 characters').or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional(),
+      }),
+    )
+    .min(2, 'A scale needs at least two grades')
+    .max(15, 'A scale can have at most 15 grades'),
+}).superRefine((d, ctx) => {
+  const problem = validateBoundaries(d.rows);
+  if (problem) ctx.addIssue({ code: 'custom', path: ['rows'], message: problem });
+});
+
+// ─── Finance basics (tab 5) ──────────────────────────────────────────────────
+
+const numberFormat = (label: string) =>
+  z.string().trim().superRefine((v, ctx) => {
+    const r = parseFormat(v);
+    if (!r.ok) ctx.addIssue({ code: 'custom', message: `${label}: ${r.error}` });
+  });
+
+const nextNumber = z.number({ error: 'Enter a number' }).int('Whole number only').min(1, 'At least 1');
+
+export const FinanceSettingsSchema = z
+  .object({
+    currencyUsdEnabled: z.boolean(),
+    currencyZigEnabled: z.boolean(),
+    defaultCurrency: z.enum(['USD', 'ZIG']),
+    receiptFormat: numberFormat('Receipt format'),
+    receiptNextNumber: nextNumber,
+    invoiceFormat: numberFormat('Invoice format'),
+    invoiceNextNumber: nextNumber,
+  })
+  .superRefine((d, ctx) => {
+    if (!d.currencyUsdEnabled && !d.currencyZigEnabled) ctx.addIssue({ code: 'custom', path: ['currencyUsdEnabled'], message: 'Switch on at least one currency' });
+    if ((d.defaultCurrency === 'USD' && !d.currencyUsdEnabled) || (d.defaultCurrency === 'ZIG' && !d.currencyZigEnabled)) {
+      ctx.addIssue({ code: 'custom', path: ['defaultCurrency'], message: 'The currency shown first must be switched on' });
+    }
+    for (const [key, fmt, n] of [['receiptNextNumber', d.receiptFormat, d.receiptNextNumber], ['invoiceNextNumber', d.invoiceFormat, d.invoiceNextNumber]] as const) {
+      const max = maxCounter(fmt);
+      if (max > 0 && n > max) ctx.addIssue({ code: 'custom', path: [key], message: `This number is too big for the format (the most it can hold is ${max})` });
+    }
+  });
+
+// ─── Numbering (tab 6) ───────────────────────────────────────────────────────
+
+export const NumberingSchema = z.object({
+  schoolCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,8}$/, 'Use 1 to 8 letters or digits, e.g. CHS'),
+  admissionFormat: numberFormat('Admission number format'),
+});

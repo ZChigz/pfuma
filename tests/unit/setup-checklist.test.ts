@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { checklistVisible, evaluateSetup, summarize, type SetupFacts } from '@/lib/system/setup-checklist';
-import { SchoolSettingsSchema } from '@/lib/validations/system';
 
 const ready: SetupFacts = {
   profile: { name: 'Chinhoyi High', logoUrl: 'https://utfs.io/f/a.png', schoolType: 'GOVERNMENT', province: 'Mashonaland West', zimsecCentreNumber: '140123' },
-  termsInYear: 3, hasOpenTerm: true, activeClasses: 6, gradeBoundaries: 9, defaultCurrency: 'USD', exchangeRates: 0,
-  receiptPrefix: 'RCT', activeUsers: 4, students: 120, termEvents: 3,
+  termsInYear: 3, hasOpenTerm: true, activeClasses: 6, gradeBoundaries: 9, zigEnabled: false, exchangeRates: 0,
+  receiptFormat: 'RCP-{YEAR}-{000000}', activeUsers: 4, students: 120, termEvents: 3,
 };
 const step = (f: SetupFacts, key: string) => evaluateSetup(f).find((s) => s.key === key)!;
 
@@ -34,8 +33,8 @@ describe('setup checklist', () => {
   it('counts a brand-new school as 0 of 8', () => {
     const empty: SetupFacts = {
       profile: { name: 'New', logoUrl: null, schoolType: 'GOVERNMENT', province: null, zimsecCentreNumber: null },
-      termsInYear: 0, hasOpenTerm: false, activeClasses: 0, gradeBoundaries: 0, defaultCurrency: 'USD', exchangeRates: 0,
-      receiptPrefix: null, activeUsers: 1, students: 0, termEvents: null,
+      termsInYear: 0, hasOpenTerm: false, activeClasses: 0, gradeBoundaries: 0, zigEnabled: true, exchangeRates: 0,
+      receiptFormat: null, activeUsers: 1, students: 0, termEvents: null,
     };
     expect(summarize(evaluateSetup(empty))).toMatchObject({ done: 0, complete: false });
   });
@@ -60,28 +59,14 @@ describe('setup checklist', () => {
     expect(step({ ...ready, students: 0 }, 'students').done).toBe(false);
   });
 
-  it('needs a receipt prefix, and a rate when the school works in ZiG', () => {
-    expect(step({ ...ready, receiptPrefix: null }, 'money').done).toBe(false);
-    expect(step({ ...ready, defaultCurrency: 'ZIG' }, 'money')).toMatchObject({ done: false, hint: 'Missing: an exchange rate' });
-    expect(step({ ...ready, defaultCurrency: 'ZIG', exchangeRates: 1 }, 'money').done).toBe(true);
+  it('needs a receipt number format, and a rate when the school takes ZiG', () => {
+    expect(step({ ...ready, receiptFormat: null }, 'money').done).toBe(false);
+    expect(step({ ...ready, zigEnabled: true }, 'money')).toMatchObject({ done: false, hint: 'Missing: an exchange rate' });
+    expect(step({ ...ready, zigEnabled: true, exchangeRates: 1 }, 'money').done).toBe(true);
   });
 
   it('needs a calendar event inside the term, and handles having no term', () => {
     expect(step({ ...ready, termEvents: 0 }, 'calendar').done).toBe(false);
     expect(step({ ...ready, termEvents: null }, 'calendar')).toMatchObject({ done: false, hint: 'No term to put dates in' });
-  });
-});
-
-describe('new settings fields', () => {
-  const base = { name: 'Chinhoyi High', schoolType: 'GOVERNMENT', defaultCurrency: 'USD', maxClassSize: 45 };
-  it('accepts valid values and tidies them', () => {
-    const r = SchoolSettingsSchema.parse({ ...base, province: 'Harare', zimsecCentreNumber: ' 14a123 ', receiptPrefix: 'rct', receiptNextNumber: 50, setupChecklistPinned: true });
-    expect(r).toMatchObject({ province: 'Harare', zimsecCentreNumber: '14A123', receiptPrefix: 'RCT', receiptNextNumber: 50, setupChecklistPinned: true });
-    expect(SchoolSettingsSchema.parse({ ...base, province: '', zimsecCentreNumber: '', receiptPrefix: '' })).toMatchObject({ province: null, zimsecCentreNumber: null, receiptPrefix: null });
-  });
-  it('rejects bad values', () => {
-    for (const bad of [{ province: 'Narnia' }, { zimsecCentreNumber: '12' }, { zimsecCentreNumber: 'ab cd!' }, { receiptPrefix: 'TOO-LONG-PREFIX' }, { receiptPrefix: 'a b' }, { receiptNextNumber: 0 }, { receiptNextNumber: 1.5 }, { setupChecklistPinned: 'yes' }]) {
-      expect(SchoolSettingsSchema.safeParse({ ...base, ...bad }).success, JSON.stringify(bad)).toBe(false);
-    }
   });
 });

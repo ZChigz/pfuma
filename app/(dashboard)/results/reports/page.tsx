@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Permission } from '@/lib/permissions';
 import { ResultsFilters } from '@/components/results/ResultsFilters';
 import { listTerms } from '@/lib/academic/terms';
+import { boundariesFor, gradeFor } from '@/lib/results';
 import type { SessionUser } from '@/types';
 
 export default async function ReportsPage({
@@ -45,16 +46,19 @@ export default async function ReportsPage({
   let pendingMarkCount = 0;
 
   if (grade && term) {
-    const gradeBoundaries = await db.gradeBoundary.findMany({
-      where: { schoolId: user.schoolId },
-    });
+    const [boundaryRows, levelRow] = await Promise.all([
+      db.gradeBoundary.findMany({ where: { schoolId: user.schoolId } }),
+      db.level.findFirst({ where: { id: levelId, schoolId: user.schoolId }, select: { category: true } }),
+    ]);
+    // The set that applies to this level and term (most specific wins), not any band that happens to fit.
+    const gradeBoundaries = boundariesFor(
+      boundaryRows.map((b) => ({ minPercent: b.minPercent.toNumber(), maxPercent: b.maxPercent.toNumber(), letterGrade: b.letterGrade, levelId: b.levelId, termId: b.termId, category: b.category })),
+      levelId,
+      termId,
+      levelRow?.category ?? null,
+    );
 
-    const getLetterGrade = (pct: number): string => {
-      const b = gradeBoundaries.find(
-        (b) => pct >= b.minPercent.toNumber() && pct <= b.maxPercent.toNumber(),
-      );
-      return b?.letterGrade ?? '—';
-    };
+    const getLetterGrade = (pct: number): string => gradeFor(pct, gradeBoundaries)?.letterGrade ?? '—';
 
     // Students in that level FOR THAT TERM (from Enrollment), not their level today.
     const enrolled = await db.enrollment.findMany({

@@ -9,7 +9,7 @@ import { termLabel } from '@/lib/term-label';
 import { subscriptionView } from '@/lib/system/subscription';
 import { pickViewTerm } from '@/lib/system/view-term';
 import { termProgress } from '@/lib/system/dashboard';
-import { CalendarEventSchema, ModulesSchema, SchoolSettingsSchema, SystemCreateUserSchema } from '@/lib/validations/system';
+import { CalendarEventSchema, ModulesSchema, SystemCreateUserSchema } from '@/lib/validations/system';
 import { z } from 'zod';
 
 const user = (role: AccessUser['role'], extra: Partial<AccessUser> = {}): AccessUser => ({ id: 'u1', schoolId: 's1', role, ...extra });
@@ -177,20 +177,6 @@ describe('input rules (Zod)', () => {
     expect(SystemCreateUserSchema.safeParse({ fullName: 'T', email: 'x@y.zw', role: 'TEACHER' }).success).toBe(false);
     expect(SystemCreateUserSchema.safeParse({ fullName: 'Tendai', email: 'nope', role: 'TEACHER' }).success).toBe(false);
     expect(SystemCreateUserSchema.safeParse({ fullName: 'Tendai', email: 'a@b.zw', role: 'OWNER' }).success).toBe(false);
-  });
-
-  const settings = { name: 'Chinhoyi High', schoolType: 'GOVERNMENT', defaultCurrency: 'USD', maxClassSize: 45 };
-  it('accepts a minimal school profile and turns blanks into null', () => {
-    const r = SchoolSettingsSchema.parse({ ...settings, phone: '', email: '', logoUrl: '', motto: ' ' });
-    expect(r).toMatchObject({ phone: null, email: null, logoUrl: null, motto: null });
-  });
-  it('rejects bad school settings', () => {
-    for (const bad of [
-      { name: 'x' }, { schoolType: 'ACADEMY' }, { defaultCurrency: 'EUR' }, { maxClassSize: 0 }, { maxClassSize: 201 }, { maxClassSize: 40.5 },
-      { phone: 'call me' }, { email: 'nope' }, { logoUrl: 'http://utfs.io/f/x.png' }, { logoUrl: 'https://evil.example/x.png' },
-    ]) expect(SchoolSettingsSchema.safeParse({ ...settings, ...bad }).success, JSON.stringify(bad)).toBe(false);
-    expect(SchoolSettingsSchema.safeParse({ ...settings, logoUrl: 'https://utfs.io/f/abc.png' }).success).toBe(true);
-    expect(SchoolSettingsSchema.safeParse({ ...settings, logoUrl: 'https://abc123.ufs.sh/f/abc.png' }).success).toBe(true);
   });
 
   it('checks calendar events', () => {

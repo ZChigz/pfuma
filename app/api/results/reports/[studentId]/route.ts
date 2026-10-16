@@ -6,6 +6,7 @@ import { renderToStream } from '@react-pdf/renderer';
 import { ReportCardDocument, type ReportCardData } from '@/components/results/ReportCardDocument';
 import { createElement } from 'react';
 import { requireTerm } from '@/lib/academic/terms';
+import { fetchPdfImage } from '@/lib/system/pdf-image';
 import { enrollmentFor } from '@/lib/academic/roster';
 import { isoDate } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
@@ -29,7 +30,7 @@ async function _GET(
   const student = await db.student.findUnique({
     where: { id: params.studentId },
     include: {
-      school:  { select: { name: true } },
+      school:  { select: { name: true, motto: true, logoUrl: true, headName: true, headSignatureUrl: true } },
       marks: {
         where: { termId, schoolId: user.schoolId },
         include: { subject: { select: { name: true, maxMark: true } } },
@@ -57,8 +58,15 @@ async function _GET(
     }))?.startDate ??
     null;
 
+  // Images that fail to load are simply left off; they never stop the report card.
+  const [logo, headSignature] = await Promise.all([fetchPdfImage(student.school.logoUrl), fetchPdfImage(student.school.headSignatureUrl)]);
+
   const reportData: ReportCardData = {
     schoolName:    student.school.name,
+    motto:         student.school.motto,
+    logo,
+    headName:      student.school.headName,
+    headSignature,
     studentName:   student.fullName,
     admissionNumber: student.admissionNumber,
     level:         enrollment?.class.level.name,

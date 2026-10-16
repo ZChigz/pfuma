@@ -125,14 +125,15 @@ async function _POST(req: NextRequest) {
   }
 
   const percentage = kind === 'SCORE' ? (subject.maxMark > 0 ? (rawMark / subject.maxMark) * 100 : 0) : null;
-  const klass = await db.schoolClass.findFirst({ where: { id: classId, schoolId: user.schoolId }, select: { levelId: true } });
+  const klass = await db.schoolClass.findFirst({ where: { id: classId, schoolId: user.schoolId }, select: { levelId: true, level: { select: { category: true } } } });
   const boundaryRows = await db.gradeBoundary.findMany({ where: { schoolId: user.schoolId } });
   const band = percentage === null ? null : gradeFor(
     percentage,
     boundariesFor(
-      boundaryRows.map((b) => ({ minPercent: b.minPercent.toNumber(), maxPercent: b.maxPercent.toNumber(), letterGrade: b.letterGrade, levelId: b.levelId, termId: b.termId })),
+      boundaryRows.map((b) => ({ minPercent: b.minPercent.toNumber(), maxPercent: b.maxPercent.toNumber(), letterGrade: b.letterGrade, levelId: b.levelId, termId: b.termId, category: b.category })),
       klass?.levelId ?? null,
       term.id,
+      klass?.level.category ?? null,
     ),
   );
   const letterGrade = band?.letterGrade ?? null;

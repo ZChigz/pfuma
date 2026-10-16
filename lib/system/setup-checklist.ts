@@ -9,9 +9,10 @@ export interface SetupFacts {
   hasOpenTerm: boolean;
   activeClasses: number;
   gradeBoundaries: number;
-  defaultCurrency: 'USD' | 'ZIG';
+  /** ZiG is switched on, so payments in ZiG need a rate to convert them. */
+  zigEnabled: boolean;
   exchangeRates: number;
-  receiptPrefix: string | null;
+  receiptFormat: string | null;
   activeUsers: number;
   students: number;
   /** Events the school added itself (not the preloaded public holidays) inside the term being viewed; null when there is no term. */
@@ -39,9 +40,9 @@ export function evaluateSetup(f: SetupFacts): SetupStep[] {
     !filled(f.profile.zimsecCentreNumber) && 'ZIMSEC centre number',
   ].filter(Boolean) as string[];
 
-  // ZiG schools need a rate on record before they can take a ZiG payment.
-  const needsRate = f.defaultCurrency === 'ZIG' && f.exchangeRates === 0;
-  const money = [!filled(f.receiptPrefix) && 'receipt prefix', needsRate && 'an exchange rate'].filter(Boolean) as string[];
+  // A school taking ZiG needs a rate on record before it can take a ZiG payment.
+  const needsRate = f.zigEnabled && f.exchangeRates === 0;
+  const money = [!filled(f.receiptFormat) && 'receipt number format', needsRate && 'an exchange rate'].filter(Boolean) as string[];
 
   return [
     { key: 'profile', label: 'School profile filled in', done: missingProfile.length === 0, hint: `Missing: ${missingProfile.join(', ')}`, href: '/system/settings' },
@@ -78,7 +79,7 @@ export async function loadSetupFacts(
   const [school, years, openTerms, activeClasses, gradeBoundaries, exchangeRates, activeUsers, students, termEvents] = await Promise.all([
     db.school.findUniqueOrThrow({
       where: { id: schoolId },
-      select: { name: true, logoUrl: true, schoolType: true, province: true, zimsecCentreNumber: true, defaultCurrency: true, receiptPrefix: true },
+      select: { name: true, logoUrl: true, schoolType: true, province: true, zimsecCentreNumber: true, currencyZigEnabled: true, receiptFormat: true },
     }),
     db.academicYear.findMany({ where: { schoolId }, select: { _count: { select: { terms: true } } } }),
     db.academicTerm.count({ where: { schoolId, status: 'OPEN' } }),
@@ -97,9 +98,9 @@ export async function loadSetupFacts(
     hasOpenTerm: openTerms > 0,
     activeClasses,
     gradeBoundaries,
-    defaultCurrency: school.defaultCurrency,
+    zigEnabled: school.currencyZigEnabled,
     exchangeRates,
-    receiptPrefix: school.receiptPrefix,
+    receiptFormat: school.receiptFormat,
     activeUsers,
     students,
     termEvents,
