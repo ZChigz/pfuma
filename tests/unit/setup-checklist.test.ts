@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checklistVisible, evaluateSetup, summarize, type SetupFacts } from '@/lib/system/setup-checklist';
-import { SchoolSettingsSchema } from '@/lib/validations/system';
+import { SchoolDefaultsSchema } from '@/lib/validations/system';
 
 const ready: SetupFacts = {
   profile: { name: 'Chinhoyi High', logoUrl: 'https://utfs.io/f/a.png', schoolType: 'GOVERNMENT', province: 'Mashonaland West', zimsecCentreNumber: '140123' },
@@ -72,16 +72,15 @@ describe('setup checklist', () => {
   });
 });
 
-describe('new settings fields', () => {
-  const base = { name: 'Chinhoyi High', schoolType: 'GOVERNMENT', defaultCurrency: 'USD', maxClassSize: 45 };
+describe('defaults settings fields', () => {
+  const base = { defaultCurrency: 'USD', maxClassSize: 45 };
   it('accepts valid values and tidies them', () => {
-    const r = SchoolSettingsSchema.parse({ ...base, province: 'Harare', zimsecCentreNumber: ' 14a123 ', receiptPrefix: 'rct', receiptNextNumber: 50, setupChecklistPinned: true });
-    expect(r).toMatchObject({ province: 'Harare', zimsecCentreNumber: '14A123', receiptPrefix: 'RCT', receiptNextNumber: 50, setupChecklistPinned: true });
-    expect(SchoolSettingsSchema.parse({ ...base, province: '', zimsecCentreNumber: '', receiptPrefix: '' })).toMatchObject({ province: null, zimsecCentreNumber: null, receiptPrefix: null });
+    expect(SchoolDefaultsSchema.parse({ ...base, receiptPrefix: 'rct', receiptNextNumber: 50, setupChecklistPinned: true })).toMatchObject({ receiptPrefix: 'RCT', receiptNextNumber: 50, setupChecklistPinned: true });
+    expect(SchoolDefaultsSchema.parse({ ...base, receiptPrefix: '' }).receiptPrefix).toBeNull();
   });
   it('rejects bad values', () => {
-    for (const bad of [{ province: 'Narnia' }, { zimsecCentreNumber: '12' }, { zimsecCentreNumber: 'ab cd!' }, { receiptPrefix: 'TOO-LONG-PREFIX' }, { receiptPrefix: 'a b' }, { receiptNextNumber: 0 }, { receiptNextNumber: 1.5 }, { setupChecklistPinned: 'yes' }]) {
-      expect(SchoolSettingsSchema.safeParse({ ...base, ...bad }).success, JSON.stringify(bad)).toBe(false);
+    for (const bad of [{ defaultCurrency: 'EUR' }, { maxClassSize: 0 }, { maxClassSize: 201 }, { maxClassSize: 40.5 }, { receiptPrefix: 'TOO-LONG-PREFIX' }, { receiptPrefix: 'a b' }, { receiptNextNumber: 0 }, { receiptNextNumber: 1.5 }, { setupChecklistPinned: 'yes' }]) {
+      expect(SchoolDefaultsSchema.safeParse({ ...base, ...bad }).success, JSON.stringify(bad)).toBe(false);
     }
   });
 });

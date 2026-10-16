@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MODULE_KEYS } from '@/lib/access-core';
+import { normalizeZimbabwePhone } from '@/lib/phone';
 
 export const PROVINCES = [
   'Bulawayo', 'Harare', 'Manicaland', 'Mashonaland Central', 'Mashonaland East', 'Mashonaland West',
@@ -31,22 +32,36 @@ export const SystemUpdateUserSchema = z
 
 // ─── School settings ─────────────────────────────────────────────────────────
 
-export const SchoolSettingsSchema = z.object({
-  name: z.string().trim().min(2, 'Enter the school name').max(120, 'The name is too long'),
-  schoolType: z.enum(['GOVERNMENT', 'PRIVATE']),
-  location: optionalText(120),
-  address: optionalText(250),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^\+?[0-9 ()-]{7,20}$/, 'Enter a phone number such as +263 242 123456')
-    .or(z.literal(''))
-    .transform((v) => (v === '' ? null : v))
-    .nullable()
-    .optional(),
-  email: z.string().trim().toLowerCase().email('Enter a valid email address').max(254).or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional(),
-  motto: optionalText(150),
-  province: z.enum(PROVINCES).or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional(),
+export const SCHOOL_TYPES = ['GOVERNMENT', 'COUNCIL', 'MISSION_CHURCH', 'TRUST', 'PRIVATE'] as const;
+export const BOARDING_TYPES = ['DAY', 'BOARDING', 'DAY_AND_BOARDING'] as const;
+export const GENDER_TYPES = ['BOYS', 'GIRLS', 'CO_ED'] as const;
+
+/** An image the school uploaded through UploadThing (a logo or a signature): nothing else is accepted. */
+const uploadedImage = z
+  .string()
+  .trim()
+  .url('Upload the image again')
+  .max(500)
+  .refine((u) => /^https:\/\/(utfs\.io|[a-z0-9-]+\.ufs\.sh)\//.test(u), 'Upload the image again; only uploaded images can be used');
+
+const blankToNull = <T extends z.ZodTypeAny>(schema: T) =>
+  schema.or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional();
+
+/** Optional short text: trimmed, a blank becomes empty, and a maximum length. */
+const text = (label: string, max: number) =>
+  z.string().trim().max(max, `${label} can be at most ${max} characters`).or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional();
+
+// Tab 1: School profile
+export const SchoolProfileSchema = z.object({
+  name: z.string().trim().min(2, 'Enter the school name').max(120, 'The school name can be at most 120 characters'),
+  motto: text('The motto', 150),
+  logoUrl: blankToNull(uploadedImage),
+  schoolType: z.enum(SCHOOL_TYPES, { error: 'Choose the type of school' }),
+  responsibleAuthority: text('The responsible authority', 120),
+  boarding: z.enum(BOARDING_TYPES, { error: 'Choose day, boarding, or day and boarding' }),
+  studentGender: z.enum(GENDER_TYPES, { error: 'Choose boys, girls or co-educational' }),
+  // ZIMSEC is always on, so it is not a field; Cambridge is the only choice.
+  offersCambridge: z.boolean().default(false),
   zimsecCentreNumber: z
     .string()
     .trim()
@@ -56,6 +71,46 @@ export const SchoolSettingsSchema = z.object({
     .transform((v) => (v === '' ? null : v))
     .nullable()
     .optional(),
+  emisNumber: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9/-]{2,20}$/, 'Use 2 to 20 letters, digits, / or -')
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? null : v))
+    .nullable()
+    .optional(),
+  province: z.enum(PROVINCES, { error: 'Choose a province' }).or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional(),
+  district: z.string().trim().min(2, 'Enter the district').max(80, 'The district can be at most 80 characters'),
+  physicalAddress: z.string().trim().min(5, 'Enter the physical address').max(250, 'The address can be at most 250 characters'),
+  postalAddress: text('The postal address', 250),
+  phone: z
+    .string()
+    .trim()
+    .or(z.literal(''))
+    .transform((v, ctx) => {
+      if (v === '') return null;
+      const n = normalizeZimbabwePhone(v);
+      if (!n) ctx.addIssue({ code: 'custom', message: 'Enter a Zimbabwe number such as 0242 700123 or +263 77 123 4567' });
+      return n;
+    })
+    .nullable()
+    .optional(),
+  email: blankToNull(z.string().trim().toLowerCase().email('Enter a valid email address').max(254)),
+  website: blankToNull(
+    z
+      .string()
+      .trim()
+      .max(200, 'The website address is too long')
+      .regex(/^https?:\/\/[^\s]+\.[^\s]+$/i, 'Start with http:// or https://, e.g. https://www.school.co.zw'),
+  ),
+  headName: text("The head's name", 100),
+  headSignatureUrl: blankToNull(uploadedImage),
+});
+
+// Tab 2 (for now): defaults other modules read
+export const SchoolDefaultsSchema = z.object({
+  defaultCurrency: z.enum(['USD', 'ZIG']),
+  maxClassSize: z.number({ error: 'Class size must be a number' }).int('Class size must be a whole number').min(1, 'At least 1').max(200, 'At most 200'),
   receiptPrefix: z
     .string()
     .trim()
@@ -67,18 +122,6 @@ export const SchoolSettingsSchema = z.object({
     .optional(),
   receiptNextNumber: z.number({ error: 'Receipt number must be a number' }).int('Whole number only').min(1, 'At least 1').max(99_999_999).optional(),
   setupChecklistPinned: z.boolean().optional(),
-  logoUrl: z
-    .string()
-    .trim()
-    .url('Enter a web address')
-    .refine((u) => /^https:\/\/(utfs\.io|[a-z0-9-]+\.ufs\.sh)\//.test(u), 'Upload the logo again; only uploaded images can be used')
-    .max(500)
-    .or(z.literal(''))
-    .transform((v) => (v === '' ? null : v))
-    .nullable()
-    .optional(),
-  defaultCurrency: z.enum(['USD', 'ZIG']),
-  maxClassSize: z.number({ error: 'Class size must be a number' }).int('Class size must be a whole number').min(1, 'At least 1').max(200, 'At most 200'),
 });
 
 // ─── Calendar ────────────────────────────────────────────────────────────────

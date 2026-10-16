@@ -271,7 +271,23 @@ enum AuditAction {
 
 enum SchoolType {
   GOVERNMENT
+  COUNCIL
+  MISSION_CHURCH
+  TRUST
   PRIVATE
+}
+
+enum SchoolBoarding {
+  DAY
+  BOARDING
+  DAY_AND_BOARDING
+}
+
+// Whom the school admits.
+enum SchoolGender {
+  BOYS
+  GIRLS
+  CO_ED
 }
 
 enum SubscriptionStatus {
@@ -310,37 +326,51 @@ enum CalendarAudience {
 // ─── Core ────────────────────────────────────────────────────────────────────
 
 model School {
-  id                   String      @id @default(cuid())
+  id                   String         @id @default(cuid())
   name                 String
   location             String?
   // Default capacity for newly created classes.
-  maxClassSize         Int         @default(45)
+  maxClassSize         Int            @default(45)
   // Lowest grade that counts as a pass ("C or better" = C), looked up in GradeBoundary.
-  passGrade            String      @default("C")
+  passGrade            String         @default("C")
   // O Level classes: rank by average percentage, or by number of passes then average.
-  oLevelRanking        RankingMode @default(AVERAGE)
+  oLevelRanking        RankingMode    @default(AVERAGE)
   // Library: checkout is blocked above this much unpaid fines (in the fine currency),
   // and each kind of member has its own loan limit.
-  libraryFineLimit     Decimal     @default(5) @db.Decimal(14, 2)
-  studentLoanLimit     Int         @default(2)
-  staffLoanLimit       Int         @default(5)
+  libraryFineLimit     Decimal        @default(5) @db.Decimal(14, 2)
+  studentLoanLimit     Int            @default(2)
+  staffLoanLimit       Int            @default(5)
   // Profile shown in the top bar and on documents.
-  schoolType           SchoolType  @default(GOVERNMENT)
+  schoolType           SchoolType     @default(GOVERNMENT)
   phone                String?
   email                String?
   address              String?
   motto                String?
   logoUrl              String?
-  defaultCurrency      Currency    @default(USD)
+  defaultCurrency      Currency       @default(USD)
   province             String?
   // ZIMSEC examination centre number.
   zimsecCentreNumber   String?
   // Receipt numbers look like <prefix>-<number>; a null prefix means not chosen yet.
   receiptPrefix        String?
-  receiptNextNumber    Int         @default(1)
+  receiptNextNumber    Int            @default(1)
   // Keeps the dashboard setup checklist visible after every step is done.
-  setupChecklistPinned Boolean     @default(false)
-  createdAt            DateTime    @default(now())
+  setupChecklistPinned Boolean        @default(false)
+  // School profile (Settings, tab 1). The old "location" and "address" columns stay until the
+  // contract migration; district and physicalAddress replace them and were filled from them.
+  responsibleAuthority String?
+  boarding             SchoolBoarding @default(DAY)
+  studentGender        SchoolGender   @default(CO_ED)
+  // ZIMSEC is always on; Cambridge is optional.
+  offersCambridge      Boolean        @default(false)
+  emisNumber           String?
+  district             String?
+  physicalAddress      String?
+  postalAddress        String?
+  website              String?
+  headName             String?
+  headSignatureUrl     String?
+  createdAt            DateTime       @default(now())
   // Legacy column "currentTerm" still exists in the database until the
   // contract migration; the current term is now the OPEN AcademicTerm.
 
