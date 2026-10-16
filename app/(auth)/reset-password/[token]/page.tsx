@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { PASSWORD_MIN_LENGTH } from '@/lib/password-rules';
 
@@ -11,6 +11,7 @@ const inputClass =
 export default function ResetPasswordPage() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
+  const invite = useSearchParams().get('invite') === '1';
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
@@ -50,16 +51,16 @@ export default function ResetPasswordPage() {
   if (done) {
     return (
       <>
-        <h1 className="mb-1 text-3xl font-bold tracking-tight text-ink">Password changed</h1>
-        <p className="text-sm text-muted">You can now sign in with your new password. Taking you to the sign-in page…</p>
+        <h1 className="mb-1 text-3xl font-bold tracking-tight text-ink">{invite ? 'Password set' : 'Password changed'}</h1>
+        <p className="text-sm text-muted">You can now sign in with your {invite ? 'password' : 'new password'}. Taking you to the sign-in page…</p>
       </>
     );
   }
 
   return (
     <>
-      <h1 className="mb-1 text-3xl font-bold tracking-tight text-ink">Reset your password</h1>
-      <p className="mb-8 text-sm text-muted">Choose a new password of at least {PASSWORD_MIN_LENGTH} characters.</p>
+      <h1 className="mb-1 text-3xl font-bold tracking-tight text-ink">{invite ? 'Welcome to Pfuma' : 'Reset your password'}</h1>
+      <p className="mb-8 text-sm text-muted">{invite ? 'Choose a password to finish setting up your account.' : 'Choose a new password.'} It needs at least {PASSWORD_MIN_LENGTH} characters.</p>
       <form onSubmit={submit} noValidate aria-label="Reset password form" className="space-y-5">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="new" className="text-sm font-medium text-ink">New password</label>

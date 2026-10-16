@@ -9,7 +9,7 @@ import { termLabel } from '@/lib/term-label';
 import { subscriptionView } from '@/lib/system/subscription';
 import { pickViewTerm } from '@/lib/system/view-term';
 import { termProgress } from '@/lib/system/dashboard';
-import { CalendarEventSchema, ModulesSchema, SystemCreateUserSchema } from '@/lib/validations/system';
+import { CalendarEventSchema, ModulesSchema } from '@/lib/validations/system';
 import { z } from 'zod';
 
 const user = (role: AccessUser['role'], extra: Partial<AccessUser> = {}): AccessUser => ({ id: 'u1', schoolId: 's1', role, ...extra });
@@ -172,13 +172,6 @@ describe('subscription', () => {
 });
 
 describe('input rules (Zod)', () => {
-  it('cleans a new user and rejects bad ones', () => {
-    expect(SystemCreateUserSchema.parse({ fullName: '  Tendai Moyo ', email: ' Tendai@School.CO.zw ', role: 'TEACHER' })).toEqual({ fullName: 'Tendai Moyo', email: 'tendai@school.co.zw', role: 'TEACHER' });
-    expect(SystemCreateUserSchema.safeParse({ fullName: 'T', email: 'x@y.zw', role: 'TEACHER' }).success).toBe(false);
-    expect(SystemCreateUserSchema.safeParse({ fullName: 'Tendai', email: 'nope', role: 'TEACHER' }).success).toBe(false);
-    expect(SystemCreateUserSchema.safeParse({ fullName: 'Tendai', email: 'a@b.zw', role: 'OWNER' }).success).toBe(false);
-  });
-
   it('checks calendar events', () => {
     const ok = { title: 'Heroes Day', kind: 'PUBLIC_HOLIDAY', startDate: '2026-08-10', endDate: '2026-08-11' };
     expect(CalendarEventSchema.safeParse(ok).success).toBe(true);

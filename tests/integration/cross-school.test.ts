@@ -241,8 +241,11 @@ const ATTACKS: Attack[] = [
   // ── Dashboard & System ──
   { name: 'system users (list)', file: 'system/users', method: 'GET', as: 'ADMIN', url: () => '?pageSize=100', expect: 'ok' },
   { name: 'system users CSV', file: 'system/users', method: 'GET', as: 'ADMIN', url: () => '?format=csv', expect: 'ok' },
-  { name: 'system user create (own school)', file: 'system/users', method: 'POST', as: 'ADMIN', body: () => ({ fullName: 'System New', email: 'system.new@schoola.test', role: 'TEACHER' }), expect: 'ok' },
-  { name: "system edit B's user", file: 'system/users/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), body: () => ({ role: 'ADMIN' }), expect: 404 },
+  { name: 'system user create (own school)', file: 'system/users', method: 'POST', as: 'ADMIN', body: () => ({ fullName: 'System New', email: 'system.new@schoola.test', phone: '0771234567', roles: ['TEACHER'] }), expect: 'ok' },
+  { name: 'system users import (own school)', file: 'system/users/import', method: 'POST', as: 'ADMIN', body: () => ({ csv: ['name,email,phone,roles', 'Import One,import.one@schoola.test,0712345678,Teacher'].join('\n') }), expect: 'ok' },
+  { name: 'system users import template', file: 'system/users/import', method: 'GET', as: 'ADMIN', expect: 'ok' },
+  { name: "system new invite for B's user", file: 'system/users/[id]/invite', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },
+  { name: "system edit B's user", file: 'system/users/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), body: () => ({ roles: ['SCHOOL_ADMINISTRATOR'] }), expect: 404 },
   { name: "system deactivate B's user", file: 'system/users/[id]/deactivate', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.HEAD.id }), expect: 404 },
   { name: "system reactivate B's user", file: 'system/users/[id]/reactivate', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.HEAD.id }), expect: 404 },
   { name: "system reset B's user password", file: 'system/users/[id]/reset-password', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },

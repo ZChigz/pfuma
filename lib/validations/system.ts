@@ -3,6 +3,9 @@ import { MODULE_KEYS } from '@/lib/access-core';
 import { normalizeZimbabwePhone } from '@/lib/phone';
 import { maxCounter, parseFormat } from '@/lib/numbering';
 import { validateBoundaries } from '@/lib/results';
+import { capitalizeName } from '@/lib/names';
+import { STAFF_ROLE_KEYS } from '@/lib/staff-roles';
+import { normalizeZimMobile } from '@/lib/students/registration';
 
 export const PROVINCES = [
   'Bulawayo', 'Harare', 'Manicaland', 'Mashonaland Central', 'Mashonaland East', 'Mashonaland West',
@@ -18,19 +21,57 @@ const optionalText = (max: number) =>
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
+/** A staff member's name: 2 to 80 characters, tidied ("tendai MOYO" becomes "Tendai Moyo"). */
+const personName = z
+  .string()
+  .trim()
+  .min(2, 'Enter the full name (at least 2 characters)')
+  .max(80, 'The name can be at most 80 characters')
+  .transform(capitalizeName);
+
+/** A Zimbabwe mobile number in any usual spelling, stored as +263XXXXXXXXX. */
+const mobile = z
+  .string()
+  .trim()
+  .transform((v, ctx) => {
+    const n = normalizeZimMobile(v);
+    if (!n) ctx.addIssue({ code: 'custom', message: 'Enter a Zimbabwe mobile number such as 0771 234 567 or +263 77 123 4567' });
+    return n ?? '';
+  });
+
+const staffRoles = z
+  .array(z.enum(STAFF_ROLE_KEYS, { error: 'Choose from the list of roles' }))
+  .min(1, 'Choose at least one role')
+  .max(STAFF_ROLE_KEYS.length)
+  .transform((r) => Array.from(new Set(r)));
+
+export const USER_TITLES = ['Mr', 'Mrs', 'Ms', 'Dr'] as const;
+const title = z.enum(USER_TITLES).or(z.literal('')).transform((v) => (v === '' ? null : v)).nullable().optional();
+
+export const SIGN_IN_SETUPS = ['INVITE', 'TEMP_PASSWORD'] as const;
+
 export const SystemCreateUserSchema = z.object({
-  fullName,
+  fullName: personName,
   email,
-  role: z.enum(ROLES),
+  phone: mobile,
+  roles: staffRoles,
+  title,
+  signIn: z.enum(SIGN_IN_SETUPS).default('INVITE'),
 });
 
 export const SystemUpdateUserSchema = z
   .object({
-    fullName: fullName.optional(),
+    fullName: personName.optional(),
     email: email.optional(),
-    role: z.enum(ROLES).optional(),
+    phone: mobile.optional(),
+    roles: staffRoles.optional(),
+    title,
   })
-  .refine((d) => d.fullName !== undefined || d.email !== undefined || d.role !== undefined, { message: 'Nothing to update' });
+  .refine((d) => Object.values(d).some((v) => v !== undefined), { message: 'Nothing to update' });
+
+export const ImportUsersSchema = z.object({
+  csv: z.string().min(1, 'Choose a file with at least one row').max(300_000, 'The file is too big (at most 300 KB)'),
+});
 
 // ─── School settings ─────────────────────────────────────────────────────────
 

@@ -53,6 +53,8 @@ export const PERMISSIONS = {
   'system.users.update':        'Edit users and roles',
   'system.users.deactivate':    'Deactivate and reactivate users',
   'system.users.reset_password': 'Reset user passwords',
+  'system.users.invite':        'Send invites again',
+  'system.users.import':        'Import users from a file',
   'system.users.export':        'Export the user list',
   'system.roles.view':          'View roles and permissions',
   'system.audit.view':          'View the audit log',

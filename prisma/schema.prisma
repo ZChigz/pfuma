@@ -273,6 +273,9 @@ enum AuditAction {
   UPDATE_GRADING
   UPDATE_FINANCE_SETTINGS
   UPDATE_NUMBERING
+  INVITE_USER
+  ACCEPT_INVITE
+  IMPORT_USERS
   DELETE_CALENDAR_EVENT
 }
 
@@ -295,6 +298,29 @@ enum SchoolGender {
   BOYS
   GIRLS
   CO_ED
+}
+
+// What a person does at the school. A user holds one or more. The older single "role" on User is the
+// access level the existing pages use, worked out from these (lib/staff-roles.ts).
+enum StaffRole {
+  SCHOOL_ADMINISTRATOR
+  OWNER
+  HEAD_TEACHER
+  DEPUTY_HEAD
+  SENIOR_TEACHER
+  HEAD_OF_DEPARTMENT
+  CLASS_TEACHER
+  TEACHER
+  BURSAR
+  ACCOUNTS_CLERK
+  LIBRARIAN
+  REGISTRAR
+  OFFICE_SECRETARY
+}
+
+enum PasswordTokenKind {
+  RESET
+  INVITE
 }
 
 enum SubscriptionStatus {
@@ -433,20 +459,27 @@ model School {
 }
 
 model User {
-  id                 String    @id @default(cuid())
+  id                 String      @id @default(cuid())
   schoolId           String
   fullName           String
   email              String
   passwordHash       String
-  role               Role      @default(TEACHER)
-  active             Boolean   @default(true)
-  createdAt          DateTime  @default(now())
+  role               Role        @default(TEACHER)
+  active             Boolean     @default(true)
+  createdAt          DateTime    @default(now())
   // Bumped when the user is deactivated, changes role or school, resets their
   // password, or an ADMIN logs everyone out. A JWT carrying an older value is
   // rejected (lib/auth.ts).
-  tokenVersion       Int       @default(0)
+  tokenVersion       Int         @default(0)
   // True for accounts created or reset by an admin until the user picks their own password.
-  mustChangePassword Boolean   @default(false)
+  mustChangePassword Boolean     @default(false)
+  phone              String?
+  title              String?
+  // One or more; the database fills it in from "role" for older code that only sets role.
+  staffRoles         StaffRole[]
+  // Added by an administrator and has not set or changed the first password yet.
+  invitePending      Boolean     @default(false)
+  invitedAt          DateTime?
   passwordChangedAt  DateTime?
   // Set at every successful sign-in (lib/auth.ts); null = has not signed in since this was added.
   lastLoginAt        DateTime?
@@ -1302,14 +1335,15 @@ model ExchangeRate {
 // Sessions are JWTs, so the Auth.js Account / Session / VerificationToken tables are gone.
 // A staff password reset is a single-use link valid for 30 minutes; only the SHA-256 of the token is stored.
 model PasswordResetToken {
-  id          String    @id @default(cuid())
+  id          String            @id @default(cuid())
   schoolId    String
   userId      String
-  tokenHash   String    @unique
+  tokenHash   String            @unique
   expiresAt   DateTime
   usedAt      DateTime?
+  kind        PasswordTokenKind @default(RESET)
   createdById String
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime          @default(now())
 
   school    School @relation(fields: [schoolId], references: [id])
   user      User   @relation("ResetTokenUser", fields: [userId], references: [id])
