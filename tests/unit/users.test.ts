@@ -35,17 +35,17 @@ describe('roles', () => {
     expect(accessFor(['TEACHER', 'BURSAR'])).toBe('BURSAR');
     expect(accessFor(['LIBRARIAN', 'TEACHER'])).toBe('LIBRARIAN');
     expect(accessFor(['DEPUTY_HEAD', 'BURSAR', 'LIBRARIAN'])).toBe('HEAD');
-    expect(accessFor(['OWNER', 'HEAD_TEACHER'])).toBe('DIRECTOR');
-    expect(accessFor(['TEACHER', 'SCHOOL_ADMINISTRATOR', 'OWNER'])).toBe('ADMIN');
+    expect(accessFor(['OWNER', 'HEAD'])).toBe('DIRECTOR');
+    expect(accessFor(['TEACHER', 'ADMINISTRATOR', 'OWNER'])).toBe('ADMIN');
     expect(accessFor([])).toBe('TEACHER');
   });
   it('are read from the names people write in a spreadsheet', () => {
-    expect(parseStaffRole('Head Teacher')).toBe('HEAD_TEACHER');
-    expect(parseStaffRole(' head_teacher ')).toBe('HEAD_TEACHER');
-    expect(parseStaffRole('HEAD-OF-DEPARTMENT')).toBe('HEAD_OF_DEPARTMENT');
-    expect(parseStaffRole('school administrator')).toBe('SCHOOL_ADMINISTRATOR');
+    expect(parseStaffRole('Deputy Head')).toBe('DEPUTY_HEAD');
+    expect(parseStaffRole(' deputy_head ')).toBe('DEPUTY_HEAD');
+    expect(parseStaffRole('Head of Department')).toBe('HOD');
+    expect(parseStaffRole('administrator')).toBe('ADMINISTRATOR');
     expect(parseStaffRole('Teacher')).toBe('TEACHER');
-    expect(parseStaffRole('HOD')).toBeNull();
+    expect(parseStaffRole('HOD')).toBe('HOD');
     expect(parseStaffRole('')).toBeNull();
     expect(parseStaffRole('Principal')).toBeNull();
   });
@@ -113,9 +113,9 @@ describe('the list query', () => {
     const q = (qs: string) => userWhere({ q: '', sort: undefined, dir: 'asc', page: 1, pageSize: 25, filters: Object.fromEntries(new URLSearchParams(qs)) });
     expect(q('status=invited')).toMatchObject({ active: true, invitePending: true });
     expect(q('status=active')).toMatchObject({ active: true, invitePending: false });
-    expect(q('status=deactivated')).toEqual({ active: false });
-    expect(q('role=TEACHER')).toEqual({ staffRoles: { has: 'TEACHER' } });
-    expect(q('')).toEqual({});
+    expect(q('status=deactivated')).toEqual({ isSupport: false, active: false });
+    expect(q('role=TEACHER')).toEqual({ isSupport: false, userRoles: { some: { role: { key: 'TEACHER' } } } });
+    expect(q('')).toEqual({ isSupport: false });
     expect(where).toBeTypeOf('function');
   });
   it('searches the phone however it is written', () => {

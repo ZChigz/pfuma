@@ -86,7 +86,7 @@ export async function loadSetupFacts(
     db.schoolClass.count({ where: { schoolId, active: true } }),
     db.gradeBoundary.count({ where: { schoolId } }),
     db.exchangeRate.count({ where: { schoolId } }),
-    db.user.count({ where: { schoolId, active: true } }),
+    db.user.count({ where: { schoolId, active: true, isSupport: false } }),
     db.student.count({ where: { schoolId } }),
     term
       ? db.calendarEvent.count({ where: { schoolId, autoKey: null, startDate: { lte: term.endDate }, endDate: { gte: term.startDate } } })

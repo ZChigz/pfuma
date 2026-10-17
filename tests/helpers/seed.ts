@@ -138,3 +138,16 @@ export async function seedSchool(prisma: PrismaClient, name: string): Promise<Se
     borrowingId: borrowing.id, boundaryId: boundary.id, categoryName: cat.name,
   };
 }
+
+/** Gives one of a school's roles one more permission (a data change, like an administrator would do). */
+export async function grantPermission(prisma: PrismaClient, schoolId: string, roleKey: string, permissionKey: string) {
+  const role = await prisma.roleDefinition.findFirstOrThrow({ where: { schoolId, key: roleKey } });
+  await prisma.rolePermission.upsert({
+    where: { roleId_permissionKey: { roleId: role.id, permissionKey } },
+    update: {},
+    create: { schoolId, roleId: role.id, permissionKey },
+  });
+}
+
+export const revokePermission = (prisma: PrismaClient, schoolId: string, roleKey: string, permissionKey: string) =>
+  prisma.rolePermission.deleteMany({ where: { schoolId, permissionKey, role: { key: roleKey } } });

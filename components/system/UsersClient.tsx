@@ -58,9 +58,10 @@ interface Props {
   canExport: boolean;
   canInvite: boolean;
   canImport: boolean;
+  canViewActivity: boolean;
 }
 
-interface Invite { url: string; expiresAt: string }
+interface Invite { url: string; expiresAt: string; reset?: boolean }
 type Shown =
   | { kind: 'invite'; title: string; user: { fullName: string; email: string; phone: string | null }; invite: Invite }
   | { kind: 'password'; title: string; user: { fullName: string; email: string }; password: string }
@@ -150,7 +151,7 @@ export function UsersClient(props: Props) {
       const res = await fetch(`/api/system/users/${pending.user.id}/${pending.kind === 'reset' ? 'reset-password' : pending.kind}`, { method: 'POST' });
       const body = await res.json();
       if (!res.ok) { toast.error(body.message ?? 'That did not work'); return; }
-      if (pending.kind === 'reset') setShown({ kind: 'password', title: 'Password reset', user: pending.user, password: body.data.tempPassword });
+      if (pending.kind === 'reset') setShown({ kind: 'invite', title: 'Reset link ready', user: pending.user, invite: { ...body.data.reset, reset: true } });
       else toast.success(pending.kind === 'deactivate' ? 'User deactivated' : 'User reactivated');
       setPending(null);
       router.refresh();
@@ -212,6 +213,7 @@ export function UsersClient(props: Props) {
             </button>
           )}
           {props.canResetPassword && u.status !== 'deactivated' && <button type="button" className={action} onClick={() => setPending({ kind: 'reset', user: u })}>Reset password</button>}
+          {props.canViewActivity && <Link href={`/system/audit-log?user=${u.id}`} className={cn(action, 'inline-flex items-center')}>View activity</Link>}
         </div>
       ),
     },
@@ -228,7 +230,10 @@ export function UsersClient(props: Props) {
     </Link>
   );
 
-  const message = (name: string, url: string) => `Hello ${name}, you have been added to ${props.schoolName} on Pfuma. Choose your password here (the link works for 72 hours): ${url}`;
+  const message = (name: string, url: string, reset?: boolean) =>
+    reset
+      ? `Hello ${name}, choose a new password for your ${props.schoolName} account on Pfuma here (the link works once, for 30 minutes): ${url}`
+      : `Hello ${name}, you have been added to ${props.schoolName} on Pfuma. Choose your password here (the link works for 72 hours): ${url}`;
 
   return (
     <>
@@ -329,7 +334,7 @@ export function UsersClient(props: Props) {
       >
         {pending?.kind === 'deactivate' && <>{pending.user.fullName} will be signed out and cannot sign in until you reactivate the account.</>}
         {pending?.kind === 'reactivate' && <>{pending.user.fullName} will be able to sign in again.</>}
-        {pending?.kind === 'reset' && <>{pending.user.fullName} will be signed out of every device and given a new temporary password, which you will see once. They must change it when they sign in.</>}
+        {pending?.kind === 'reset' && <>You will get a link for {pending.user.fullName} to choose a new password. It works once and for 30 minutes, and you will see it only once.</>}
       </ConfirmDialog>
 
       {/* The invite link or temporary password: shown once, never stored */}
@@ -337,17 +342,17 @@ export function UsersClient(props: Props) {
         {shown?.kind === 'invite' && (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-muted">
-              Give {shown.user.fullName} this link. It works once and for 72 hours, and they choose their own password with it. It will not be shown again.
+              Give {shown.user.fullName} this link. It works once and for {shown.invite.reset ? '30 minutes' : '72 hours'}, and they choose their own password with it. It will not be shown again.
             </p>
             <input readOnly aria-label="Invite link" value={shown.invite.url} onFocus={(e) => e.currentTarget.select()} className="min-h-[44px] w-full rounded-xl border border-line bg-rowhover px-3 font-mono text-xs text-primary" />
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={() => copy(shown.invite.url)}>Copy link</Button>
               {shown.user.phone && (
-                <a href={buildWhatsAppLink(shown.user.phone, message(shown.user.fullName, shown.invite.url))} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center rounded-full border border-primary px-5 text-sm font-semibold text-primary hover:bg-tint">
+                <a href={buildWhatsAppLink(shown.user.phone, message(shown.user.fullName, shown.invite.url, shown.invite.reset))} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center rounded-full border border-primary px-5 text-sm font-semibold text-primary hover:bg-tint">
                   Send on WhatsApp
                 </a>
               )}
-              <a href={`mailto:${shown.user.email}?subject=${encodeURIComponent(`Your ${props.schoolName} account on Pfuma`)}&body=${encodeURIComponent(message(shown.user.fullName, shown.invite.url))}`} className="inline-flex min-h-[44px] items-center rounded-full border border-primary px-5 text-sm font-semibold text-primary hover:bg-tint">
+              <a href={`mailto:${shown.user.email}?subject=${encodeURIComponent(`Your ${props.schoolName} account on Pfuma`)}&body=${encodeURIComponent(message(shown.user.fullName, shown.invite.url, shown.invite.reset))}`} className="inline-flex min-h-[44px] items-center rounded-full border border-primary px-5 text-sm font-semibold text-primary hover:bg-tint">
                 Send by email
               </a>
             </div>

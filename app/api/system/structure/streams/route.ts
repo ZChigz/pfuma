@@ -5,7 +5,7 @@ import { addStream } from '@/lib/system/structure';
 import { StreamNameSchema } from '@/lib/validations/system';
 
 async function _POST(req: Request) {
-  const user = await requirePermission('system.structure.update');
+  const user = await requirePermission('system.settings.edit');
   const db = getScopedDb(user.schoolId, user.id);
   const parsed = await parseBody(req, StreamNameSchema);
   if ('error' in parsed) return parsed.error;

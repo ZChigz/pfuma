@@ -14,15 +14,14 @@ export const PROVINCES = [
 
 export const ROLES = ['ADMIN', 'DIRECTOR', 'HEAD', 'BURSAR', 'TEACHER', 'LIBRARIAN'] as const;
 
-const fullName = z.string().trim().min(2, 'Enter the full name').max(100, 'The name is too long');
-const email = z.string().trim().toLowerCase().email('Enter a valid email address').max(254, 'The email is too long');
+export const email = z.string().trim().toLowerCase().email('Enter a valid email address').max(254, 'The email is too long');
 const optionalText = (max: number) =>
   z.string().trim().max(max, `Use ${max} characters or fewer`).transform((v) => (v === '' ? null : v)).nullable().optional();
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
 /** A staff member's name: 2 to 80 characters, tidied ("tendai MOYO" becomes "Tendai Moyo"). */
-const personName = z
+export const personName = z
   .string()
   .trim()
   .min(2, 'Enter the full name (at least 2 characters)')
@@ -30,7 +29,7 @@ const personName = z
   .transform(capitalizeName);
 
 /** A Zimbabwe mobile number in any usual spelling, stored as +263XXXXXXXXX. */
-const mobile = z
+export const mobile = z
   .string()
   .trim()
   .transform((v, ctx) => {
@@ -260,7 +259,10 @@ export const NotificationReadSchema = z.union([
   z.object({ id: z.string().min(1).max(60) }),
 ]);
 
-export const ProfileSchema = z.object({ fullName });
+// My profile: a person's own name, phone and photo (their email and roles are changed by an administrator).
+export const ProfileSchema = z
+  .object({ fullName: personName.optional(), phone: mobile.optional(), photoUrl: blankToNull(uploadedImage) })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), { message: 'Nothing to update' });
 
 // ─── Academic years and terms (Settings tab 2) ───────────────────────────────
 

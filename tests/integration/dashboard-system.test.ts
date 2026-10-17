@@ -30,6 +30,12 @@ let prisma: typeof import('@/lib/prisma').prisma;
 
 const admin = () => A.users.ADMIN;
 const owner = () => A.users.DIRECTOR;
+const grant = async (schoolId: string, roleKey: string, permissionKey: string) => {
+  const role = await prisma.roleDefinition.findFirstOrThrow({ where: { schoolId, key: roleKey } });
+  await prisma.rolePermission.create({ data: { schoolId, roleId: role.id, permissionKey } });
+};
+const ungrant = (schoolId: string, roleKey: string, permissionKey: string) =>
+  prisma.rolePermission.deleteMany({ where: { schoolId, permissionKey, role: { key: roleKey } } });
 const OTHERS = ['HEAD', 'BURSAR', 'TEACHER', 'LIBRARIAN'] as const;
 
 const auditCount = (where: Record<string, unknown> = {}) => prisma.auditLog.count({ where: { schoolId: A.schoolId, ...where } });
@@ -76,11 +82,8 @@ describe('every System route goes through the permission check', () => {
     ['system/structure/streams', 'POST', { name: 'Hack' }],
     ['system/structure/classes', 'PUT', { cells: [{ levelId: 'x', stream: '', exists: true, capacity: 40 }] }],
     ['system/grading', 'GET'],
-    ['system/calendar', 'GET'],
     ['system/calendar', 'POST', { title: 'Party', kind: 'OTHER', startDate: '2026-05-01', endDate: '2026-05-01' }],
     ['system/audit-log', 'GET'],
-    ['system/subscription/modules', 'GET'],
-    ['system/subscription/modules', 'PATCH', { modules: { finance: false } }],
   ];
 
   const target = (id: string | undefined) => (id ? { id: A.users[id as keyof typeof A.users].id } : undefined);
@@ -100,6 +103,10 @@ describe('every System route goes through the permission check', () => {
     });
   }
 
+  it('lets every role see the calendar and the dashboard, because every role is granted those', async () => {
+    for (const role of OTHERS) expect((await call('system/calendar', 'GET', { as: A.users[role] })).status, role).toBe(200);
+  });
+
   it('answers 401 to someone who is not signed in', async () => {
     for (const [file, method, body, who] of routes) {
       const r = await call(file, method, { as: null, body, params: target(who) });
@@ -118,18 +125,18 @@ describe('every System route goes through the permission check', () => {
 
   it('turns a role into an allowed one by changing data only: a RolePermission row', async () => {
     expect((await call('system/users', 'GET', { as: A.users.HEAD })).status).toBe(403);
-    await prisma.rolePermission.create({ data: { schoolId: A.schoolId, role: 'HEAD', permission: 'system.users.view' } });
+    await grant(A.schoolId, 'HEAD', 'system.users.view');
     expect((await call('system/users', 'GET', { as: A.users.HEAD })).status).toBe(200);
     expect((await call('system/users', 'POST', { as: A.users.HEAD, body: { fullName: 'Still No', email: 'stillno@a.test', role: 'TEACHER' } })).status).toBe(403);
-    await prisma.rolePermission.deleteMany({ where: { schoolId: A.schoolId } });
+    await ungrant(A.schoolId, 'HEAD', 'system.users.view');
     expect((await call('system/users', 'GET', { as: A.users.HEAD })).status).toBe(403);
   });
 
   it('never lets a grant in one school reach a user of another', async () => {
-    await prisma.rolePermission.create({ data: { schoolId: B.schoolId, role: 'HEAD', permission: 'system.users.view' } });
+    await grant(B.schoolId, 'HEAD', 'system.users.view');
     expect((await call('system/users', 'GET', { as: A.users.HEAD })).status).toBe(403);
     expect((await call('system/users', 'GET', { as: B.users.HEAD })).status).toBe(200);
-    await prisma.rolePermission.deleteMany({ where: { schoolId: B.schoolId } });
+    await ungrant(B.schoolId, 'HEAD', 'system.users.view');
   });
 });
 
@@ -297,13 +304,12 @@ describe('calendar', () => {
 });
 
 // ─── Modules and subscription ────────────────────────────────────────────────
+// Which modules a school has is decided by Pfuma in the platform console (tests/integration/platform.test.ts);
+// here only what a school sees of it.
 
 describe('module switches', () => {
-  it('start with every module on', async () => {
-    const r = await call('system/subscription/modules', 'GET', { as: admin() });
-    expect(Object.values(r.json.data.modules).every(Boolean)).toBe(true);
-    expect(Object.keys(r.json.data.modules)).toHaveLength(8);
-  });
+  const setModule = (schoolId: string, module: string, enabled: boolean) =>
+    prisma.schoolModule.upsert({ where: { schoolId_module: { schoolId, module } }, update: { enabled }, create: { schoolId, module, enabled } });
 
   it('switching a module off makes can() refuse its keys — even for the administrator — and hides its group', async () => {
     const { requirePermission, getAccess } = await import('@/lib/access');
@@ -311,11 +317,8 @@ describe('module switches', () => {
     session.current = { ...admin() };
     await expect(requirePermission('finance.payments.view')).resolves.toMatchObject({ id: admin().id });
 
-    const n = await auditCount({ action: 'UPDATE_SCHOOL_MODULES' });
-    const r = await call('system/subscription/modules', 'PATCH', { as: admin(), body: { modules: { finance: false, hr: false } } });
-    expect(r.status).toBe(200);
-    expect(r.json.data.modules).toMatchObject({ finance: false, hr: false, system: true, students: true });
-    expect(await auditCount({ action: 'UPDATE_SCHOOL_MODULES' })).toBe(n + 1);
+    await setModule(A.schoolId, 'finance', false);
+    await setModule(A.schoolId, 'hr', false);
 
     session.current = { ...admin() };
     await expect(requirePermission('finance.payments.view')).rejects.toMatchObject({ status: 403 });
@@ -332,32 +335,19 @@ describe('module switches', () => {
     session.current = { ...B.users.ADMIN };
     await expect(requirePermission('finance.payments.view')).resolves.toBeTruthy();
 
-    // Back on.
-    const back = await call('system/subscription/modules', 'PATCH', { as: admin(), body: { modules: { finance: true, hr: true } } });
-    expect(back.status).toBe(200);
+    await setModule(A.schoolId, 'finance', true);
+    await setModule(A.schoolId, 'hr', true);
     session.current = { ...admin() };
     await expect(requirePermission('finance.payments.view')).resolves.toBeTruthy();
   });
 
-  it('refuses to switch System off, unknown modules, and does nothing for a repeat', async () => {
-    for (const modules of [{ system: false }, { payroll: false }]) {
-      expect((await call('system/subscription/modules', 'PATCH', { as: admin(), body: { modules } })).status).toBe(422);
-    }
-    expect((await call('system/subscription/modules', 'PATCH', { as: admin(), body: {} })).status).toBe(422);
-    const n = await auditCount({ action: 'UPDATE_SCHOOL_MODULES' });
-    expect((await call('system/subscription/modules', 'PATCH', { as: admin(), body: { modules: { finance: true } } })).status).toBe(200);
-    expect(await auditCount({ action: 'UPDATE_SCHOOL_MODULES' })).toBe(n);
-  });
-
   it('the database itself refuses a System switch-off', async () => {
     await expect(prisma.schoolModule.create({ data: { schoolId: A.schoolId, module: 'system', enabled: false } })).rejects.toThrow();
+    await prisma.$queryRaw`SELECT 1`.catch(() => null); // the failed statement ends the connection; use it up here
   });
 
-  it('is rolled back when the audit write fails', async () => {
-    audit.failNext = true;
-    expect((await call('system/subscription/modules', 'PATCH', { as: admin(), body: { modules: { communication: false } } })).status).toBe(500);
-    const r = await call('system/subscription/modules', 'GET', { as: admin() });
-    expect(r.json.data.modules.communication).toBe(true);
+  it('is not something the school can do: there is no module route', async () => {
+    await expect(call('system/subscription/modules', 'PATCH', { as: admin(), body: { modules: { finance: false } } })).rejects.toThrow();
   });
 });
 
@@ -529,7 +519,7 @@ describe('audit log', () => {
     expect(r.status).toBe(200);
     expect(r.response.headers.get('content-type')).toContain('text/csv');
     const lines = r.text.replace(/^﻿/, '').trim().split('\r\n');
-    expect(lines[0]).toBe('When,Who,Action,Record type,Record ID,Detail');
+    expect(lines[0]).toBe('Date and time,User,Action,Action code,Module,Record type,Record,Record ID,IP');
     expect(r.text).toContain("'=cmd|calc");
     const json = await call('system/audit-log', 'GET', { as: admin(), query: '?action=UPDATE_SCHOOL_SETTINGS' });
     expect(lines.length - 1).toBe(json.json.data.total);

@@ -1,17 +1,16 @@
 // User administration for the System module. Routes call these after the permission check; every
 // change writes its AuditLog row in the same transaction. Nobody types another person's password:
 // a new person gets an invite link (72 hours) to set their own, or a temporary password shown once.
+// Users are never deleted, because their name stays on audit records: they are deactivated.
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import type { Prisma, Role, StaffRole } from '@prisma/client';
+import type { Prisma, Role } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { generateTempPassword, hashPassword } from '@/lib/password';
-import { FULL_ACCESS_ROLES } from '@/lib/access-core';
 import { createResetToken, resetUrl } from '@/lib/password-reset';
-import { notifyAdmins } from '@/lib/system/notifications';
-import { accessFor, parseStaffRole, STAFF_ROLE_KEYS, STAFF_ROLE_LABEL } from '@/lib/staff-roles';
-import { normalizeZimMobile } from '@/lib/students/registration';
+import { adminIds, notifyUsers } from '@/lib/system/notifications';
+import { accessFor, parseStaffRole, REQUIRED_ROLES, STAFF_ROLE_KEYS, STAFF_ROLE_LABEL, type StaffRoleKey } from '@/lib/staff-roles';
 import { parseCsv } from '@/lib/students/csv';
 import type { Db, ScopedDb } from '@/lib/scoped-db';
 import type { TableQuery } from '@/lib/table-query';
@@ -27,15 +26,26 @@ export const USER_SORTABLE = ['fullName', 'email', 'lastLoginAt', 'createdAt'] a
 export const MAX_IMPORT_ROWS = 200;
 
 const USER_SELECT = {
-  id: true, fullName: true, email: true, phone: true, title: true, staffRoles: true, role: true,
+  id: true, fullName: true, email: true, phone: true, title: true, photoUrl: true, role: true,
   active: true, invitePending: true, lastLoginAt: true, createdAt: true,
+  userRoles: { select: { role: { select: { key: true } } } },
 } as const;
-export type UserRow = Prisma.UserGetPayload<{ select: typeof USER_SELECT }>;
+type DbUser = Prisma.UserGetPayload<{ select: typeof USER_SELECT }>;
+
+/** A user as the screens use them: the roles as a list of keys, in the order of the role list. */
+export type UserRow = Omit<DbUser, 'userRoles'> & { roles: StaffRoleKey[] };
+
+const order = (k: string) => STAFF_ROLE_KEYS.indexOf(k as StaffRoleKey);
+function shape(u: DbUser): UserRow {
+  const { userRoles, ...rest } = u;
+  const roles = Array.from(new Set(userRoles.map((r) => r.role.key as StaffRoleKey))).sort((a, b) => order(a) - order(b));
+  return { ...rest, roles };
+}
 
 export const statusOf = (u: { active: boolean; invitePending: boolean }): UserStatus => (!u.active ? 'deactivated' : u.invitePending ? 'invited' : 'active');
 
 export function userWhere(q: TableQuery): Prisma.UserWhereInput {
-  const where: Prisma.UserWhereInput = {};
+  const where: Prisma.UserWhereInput = { isSupport: false };
   if (q.q) {
     // A phone is stored as +263771234567, but people search for 0771234567 or 77123.
     const digits = q.q.replace(/\D/g, '');
@@ -47,7 +57,7 @@ export function userWhere(q: TableQuery): Prisma.UserWhereInput {
       ...(national.length >= 3 ? [{ phone: { contains: national } }] : []),
     ];
   }
-  if (q.filters.role) where.staffRoles = { has: q.filters.role as StaffRole };
+  if (q.filters.role) where.userRoles = { some: { role: { key: q.filters.role } } };
   const status = q.filters.status as UserStatus | undefined;
   if (status === 'deactivated') where.active = false;
   if (status === 'invited') Object.assign(where, { active: true, invitePending: true });
@@ -68,24 +78,60 @@ export async function listUsers(db: ScopedDb, q: TableQuery, opts: { all?: boole
     db.user.count({ where }),
     db.user.findMany({ where, orderBy, select: USER_SELECT, ...(opts.all ? { take: 10_000 } : { skip: (q.page - 1) * q.pageSize, take: q.pageSize }) }),
   ]);
-  return { total, rows };
+  return { total, rows: rows.map(shape) };
 }
 
 /** Counts across the whole school, not the filtered list. */
 export async function userCounts(db: ScopedDb) {
   const [active, invited, deactivated] = await Promise.all([
-    db.user.count({ where: { active: true, invitePending: false } }),
-    db.user.count({ where: { active: true, invitePending: true } }),
-    db.user.count({ where: { active: false } }),
+    db.user.count({ where: { isSupport: false, active: true, invitePending: false } }),
+    db.user.count({ where: { isSupport: false, active: true, invitePending: true } }),
+    db.user.count({ where: { isSupport: false, active: false } }),
   ]);
   return { active, invited, deactivated };
 }
 
-async function otherActiveAdmins(tx: Db, exceptId: string) {
-  return tx.user.count({ where: { active: true, id: { not: exceptId }, role: { in: FULL_ACCESS_ROLES as unknown as Role[] } } });
+// ─── Roles: what must always remain ──────────────────────────────────────────
+
+const rolesDetail = (roles: readonly string[]) => roles.map((r) => STAFF_ROLE_LABEL[r] ?? r).join(', ');
+
+/** Active people who hold a role, leaving one person out. */
+async function holders(tx: Db, schoolId: string, key: string, exceptId: string) {
+  return tx.user.count({ where: { schoolId, active: true, isSupport: false, id: { not: exceptId }, userRoles: { some: { role: { key } } } } });
 }
 
-const isFull = (role: string) => (FULL_ACCESS_ROLES as readonly string[]).includes(role);
+/**
+ * The school must always have an active Owner and an active Administrator. Called with what the
+ * person will be after the change. A school that has none yet (an older one) is not blocked from
+ * unrelated changes: only taking away the last one is refused.
+ */
+async function assertRequiredRolesRemain(tx: Db, schoolId: string, target: { id: string; active: boolean; roles: readonly string[] }, after: { active: boolean; roles: readonly string[] }) {
+  for (const key of REQUIRED_ROLES) {
+    const had = target.active && target.roles.includes(key);
+    const keeps = after.active && after.roles.includes(key);
+    if (had && !keeps && (await holders(tx, schoolId, key, target.id)) === 0) {
+      throw new ServiceError(`The school must always have at least one active ${STAFF_ROLE_LABEL[key]}`, 409);
+    }
+  }
+}
+
+/** Replaces the person's roles (whole school). */
+async function setRoles(tx: Db, schoolId: string, userId: string, keys: readonly string[], cache?: Map<string, string>) {
+  const wanted = Array.from(new Set(keys));
+  const missing = wanted.filter((k) => !cache?.has(k));
+  if (missing.length) {
+    const defs = await tx.roleDefinition.findMany({ where: { schoolId, key: { in: missing } }, select: { id: true, key: true } });
+    for (const d of defs) cache?.set(d.key, d.id);
+    if (defs.length !== missing.length) throw new ServiceError('One of the roles was not found for this school', 500);
+    if (!cache) {
+      await tx.userRole.deleteMany({ where: { userId } });
+      await tx.userRole.createMany({ data: defs.map((d) => ({ schoolId, userId, roleId: d.id })) });
+      return;
+    }
+  }
+  await tx.userRole.deleteMany({ where: { userId } });
+  await tx.userRole.createMany({ data: wanted.map((k) => ({ schoolId, userId, roleId: cache!.get(k)! })) });
+}
 
 // What the person is told about getting the link to the new user. Sending by e-mail and SMS needs
 // a provider; until one is connected the administrator passes the link on (copy, WhatsApp, e-mail).
@@ -94,41 +140,44 @@ export const INVITE_DELIVERY = { email: 'not_connected', sms: 'not_connected' } 
 /** A password that nobody knows, so an invited account cannot be signed into until the link is used. */
 const unusablePassword = () => `!invited!${randomBytes(24).toString('hex')}`;
 
-const rolesDetail = (roles: readonly string[]) => roles.map((r) => STAFF_ROLE_LABEL[r] ?? r).join(', ');
-
 // ─── Create ──────────────────────────────────────────────────────────────────
 
 export interface NewUser {
   fullName: string;
   email: string;
   phone: string;
-  roles: StaffRole[];
+  roles: StaffRoleKey[];
   title?: string | null;
   signIn: 'INVITE' | 'TEMP_PASSWORD';
 }
 
-async function createOne(tx: Db, actor: Actor, input: NewUser, passwordHash: string, now: Date) {
+async function createOne(tx: Db, actor: Actor, input: NewUser, passwordHash: string, now: Date, roleIds?: Map<string, string>) {
   const created = await tx.user.create({
     data: {
       schoolId: actor.schoolId, fullName: input.fullName, email: input.email, phone: input.phone, title: input.title ?? null,
-      staffRoles: input.roles, role: accessFor(input.roles), passwordHash,
-      mustChangePassword: input.signIn === 'TEMP_PASSWORD', invitePending: true, invitedAt: now,
+      role: accessFor(input.roles), passwordHash, mustChangePassword: input.signIn === 'TEMP_PASSWORD', invitePending: true, invitedAt: now,
     },
-    select: USER_SELECT,
+    select: { id: true },
   });
+  await setRoles(tx, actor.schoolId, created.id, input.roles, roleIds);
+  const user = shape(await tx.user.findUniqueOrThrow({ where: { id: created.id }, select: USER_SELECT }));
   await logAudit(
     {
-      schoolId: actor.schoolId, actorId: actor.id, action: 'CREATE_USER', entityType: 'User', entityId: created.id,
-      detail: `${created.fullName} (${rolesDetail(input.roles)})`,
-      after: { fullName: created.fullName, email: created.email, phone: created.phone, roles: input.roles, signIn: input.signIn },
+      schoolId: actor.schoolId, actorId: actor.id, action: 'CREATE_USER', entityType: 'User', entityId: user.id,
+      detail: `${user.fullName} (${rolesDetail(input.roles)})`,
+      after: { fullName: user.fullName, email: user.email, phone: user.phone, roles: input.roles, signIn: input.signIn },
     },
     tx,
   );
-  return created;
+  return user;
 }
 
 async function emailTaken(db: Db, email: string, exceptId?: string) {
   return db.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' }, ...(exceptId ? { id: { not: exceptId } } : {}) }, select: { id: true } });
+}
+
+async function tellAdmins(tx: Db, actor: Actor, title: string, body: string) {
+  await notifyUsers(tx, actor.schoolId, await adminIds(tx, actor.schoolId, actor.id), { type: 'USERS', title, body, link: '/system/users' });
 }
 
 export async function createUser(db: ScopedDb, actor: Actor, input: NewUser) {
@@ -146,7 +195,7 @@ export async function createUser(db: ScopedDb, actor: Actor, input: NewUser) {
       invite = { url: resetUrl(t.token, true), expiresAt: t.expiresAt };
       await logAudit({ schoolId: actor.schoolId, actorId: actor.id, action: 'INVITE_USER', entityType: 'User', entityId: user.id, detail: `Invite for ${user.fullName}, valid 72 hours` }, tx);
     }
-    await notifyAdmins(tx, actor.schoolId, actor.id, { title: 'User added', body: `${user.fullName} was added as ${rolesDetail(input.roles)}.`, href: '/system/users' });
+    await tellAdmins(tx, actor, 'User added', `${user.fullName} was added as ${rolesDetail(input.roles)}.`);
     return { user, tempPassword, invite, delivery: INVITE_DELIVERY };
   });
 }
@@ -157,26 +206,26 @@ export async function updateUser(
   db: ScopedDb,
   actor: Actor,
   id: string,
-  input: { fullName?: string; email?: string; phone?: string; title?: string | null; roles?: StaffRole[] },
+  input: { fullName?: string; email?: string; phone?: string; title?: string | null; roles?: StaffRoleKey[] },
 ) {
-  const target = await db.user.findUnique({ where: { id }, select: USER_SELECT });
-  if (!target) throw new ServiceError('User not found', 404);
+  const found = await db.user.findFirst({ where: { id, isSupport: false }, select: USER_SELECT });
+  if (!found) throw new ServiceError('User not found', 404);
+  const target = shape(found);
 
-  const sameRoles = input.roles !== undefined && [...input.roles].sort().join() === [...target.staffRoles].sort().join();
+  const sameRoles = input.roles !== undefined && [...input.roles].sort().join() === [...target.roles].sort().join();
   const changingRoles = input.roles !== undefined && !sameRoles;
-  if (target.id === actor.id && changingRoles) throw new ServiceError('You cannot change your own roles', 409);
-
+  // Nobody can take their own administrator role away (they could lock themselves, and the school, out).
+  if (target.id === actor.id && changingRoles && target.roles.includes('ADMINISTRATOR') && !input.roles!.includes('ADMINISTRATOR')) {
+    throw new ServiceError('You cannot remove your own Administrator role', 409);
+  }
   if (input.email !== undefined && input.email.toLowerCase() !== target.email.toLowerCase() && (await emailTaken(db, input.email, id))) {
     throw new ServiceError('A user with this email already exists', 409);
   }
 
-  const newAccess = changingRoles ? accessFor(input.roles!) : target.role;
-
   return db.$tx(async (tx) => {
-    if (changingRoles && isFull(target.role) && target.active && !isFull(newAccess) && (await otherActiveAdmins(tx, id)) === 0) {
-      throw new ServiceError('The school needs at least one active administrator', 409);
-    }
-    const updated = await tx.user.update({
+    if (changingRoles) await assertRequiredRolesRemain(tx, actor.schoolId, target, { active: target.active, roles: input.roles! });
+
+    await tx.user.update({
       where: { id },
       data: {
         ...(input.fullName !== undefined ? { fullName: input.fullName } : {}),
@@ -184,21 +233,37 @@ export async function updateUser(
         ...(input.phone !== undefined ? { phone: input.phone } : {}),
         ...(input.title !== undefined ? { title: input.title } : {}),
         // A change of roles can change what the person may open, so open sessions are ended.
-        ...(changingRoles ? { staffRoles: input.roles, role: newAccess, tokenVersion: { increment: 1 } } : {}),
+        ...(changingRoles ? { role: accessFor(input.roles!), tokenVersion: { increment: 1 } } : {}),
       },
-      select: USER_SELECT,
     });
-    await logAudit(
-      {
-        schoolId: actor.schoolId, actorId: actor.id, action: 'UPDATE_USER', entityType: 'User', entityId: id,
-        detail: changingRoles ? `Roles: ${rolesDetail(target.staffRoles)} → ${rolesDetail(updated.staffRoles)}` : 'Details changed',
-        before: { fullName: target.fullName, email: target.email, phone: target.phone, title: target.title, roles: target.staffRoles },
-        after: { fullName: updated.fullName, email: updated.email, phone: updated.phone, title: updated.title, roles: updated.staffRoles },
-      },
-      tx,
-    );
+    if (changingRoles) await setRoles(tx, actor.schoolId, id, input.roles!);
+
+    const updated = shape(await tx.user.findUniqueOrThrow({ where: { id }, select: USER_SELECT }));
+    const detailsChanged = (['fullName', 'email', 'phone', 'title'] as const).some((k) => target[k] !== updated[k]);
+    if (detailsChanged || !changingRoles) {
+      await logAudit(
+        {
+          schoolId: actor.schoolId, actorId: actor.id, action: 'UPDATE_USER', entityType: 'User', entityId: id,
+          detail: `${updated.fullName}: details changed`,
+          before: { fullName: target.fullName, email: target.email, phone: target.phone, title: target.title },
+          after: { fullName: updated.fullName, email: updated.email, phone: updated.phone, title: updated.title },
+        },
+        tx,
+      );
+    }
     if (changingRoles) {
-      await notifyAdmins(tx, actor.schoolId, actor.id, { title: 'Roles changed', body: `${updated.fullName} is now ${rolesDetail(updated.staffRoles)}.`, href: '/system/users' });
+      await logAudit(
+        {
+          schoolId: actor.schoolId, actorId: actor.id, action: 'ROLES_CHANGED', entityType: 'User', entityId: id,
+          detail: `${updated.fullName}: ${rolesDetail(target.roles)} → ${rolesDetail(updated.roles)}`,
+          before: { roles: target.roles }, after: { roles: updated.roles },
+        },
+        tx,
+      );
+    }
+    if (changingRoles) {
+      await notifyUsers(tx, actor.schoolId, [id], { type: 'ROLES_CHANGED', title: 'Your roles changed', body: `You are now ${rolesDetail(updated.roles)}.`, link: '/system/profile' });
+      await tellAdmins(tx, actor, 'Roles changed', `${updated.fullName} is now ${rolesDetail(updated.roles)}.`);
     }
     return updated;
   });
@@ -208,8 +273,9 @@ export async function updateUser(
 
 /** A new 72-hour link for someone who has not set a password yet. The earlier link stops working. */
 export async function resendInvite(db: ScopedDb, actor: Actor, id: string) {
-  const target = await db.user.findUnique({ where: { id }, select: USER_SELECT });
-  if (!target) throw new ServiceError('User not found', 404);
+  const found = await db.user.findFirst({ where: { id, isSupport: false }, select: USER_SELECT });
+  if (!found) throw new ServiceError('User not found', 404);
+  const target = shape(found);
   if (!target.active) throw new ServiceError('This account is deactivated. Reactivate it first.', 409);
   if (!target.invitePending) throw new ServiceError(`${target.fullName} has already set up their account`, 409);
 
@@ -222,36 +288,44 @@ export async function resendInvite(db: ScopedDb, actor: Actor, id: string) {
 }
 
 export async function setUserActive(db: ScopedDb, actor: Actor, id: string, active: boolean) {
-  const target = await db.user.findUnique({ where: { id }, select: USER_SELECT });
-  if (!target) throw new ServiceError('User not found', 404);
+  const found = await db.user.findFirst({ where: { id, isSupport: false }, select: USER_SELECT });
+  if (!found) throw new ServiceError('User not found', 404);
+  const target = shape(found);
   if (target.id === actor.id) throw new ServiceError('You cannot deactivate your own account', 409);
   if (target.active === active) throw new ServiceError(active ? 'This user is already active' : 'This user is already deactivated', 409);
 
   return db.$tx(async (tx) => {
-    if (!active && isFull(target.role) && (await otherActiveAdmins(tx, id)) === 0) {
-      throw new ServiceError('The school needs at least one active administrator', 409);
-    }
-    const updated = await tx.user.update({
+    if (!active) await assertRequiredRolesRemain(tx, actor.schoolId, target, { active: false, roles: target.roles });
+    await tx.user.update({
       where: { id },
-      // Deactivating ends any open session at its next check.
+      // Deactivating ends the person's sessions at once: every open session carries the old tokenVersion.
       data: { active, ...(active ? {} : { tokenVersion: { increment: 1 } }) },
-      select: USER_SELECT,
     });
+    const updated = shape(await tx.user.findUniqueOrThrow({ where: { id }, select: USER_SELECT }));
     await logAudit(
       {
         schoolId: actor.schoolId, actorId: actor.id, action: active ? 'REACTIVATE_USER' : 'DEACTIVATE_USER',
-        entityType: 'User', entityId: id, detail: `${updated.fullName} (${rolesDetail(updated.staffRoles)})`,
+        entityType: 'User', entityId: id, detail: `${updated.fullName} (${rolesDetail(updated.roles)})`,
         before: { active: target.active }, after: { active },
       },
       tx,
     );
-    await notifyAdmins(tx, actor.schoolId, actor.id, { title: active ? 'User reactivated' : 'User deactivated', body: updated.fullName, href: '/system/users' });
+    await tellAdmins(tx, actor, active ? 'User reactivated' : 'User deactivated', updated.fullName);
     return updated;
   });
 }
 
+/** A reset link (30 minutes, one use) for an active person. It is handed over, like an invite. */
+export async function createResetLink(db: ScopedDb, actor: Actor, id: string) {
+  const target = await db.user.findFirst({ where: { id, isSupport: false }, select: { id: true, active: true, fullName: true } });
+  if (!target) throw new ServiceError('User not found', 404);
+  if (!target.active) throw new ServiceError('This account is deactivated. Reactivate it first.', 409);
+  const { token, expiresAt } = await db.$tx((tx) => createResetToken(tx, actor.schoolId, actor.id, id));
+  return { url: resetUrl(token), expiresAt, user: target };
+}
+
 export async function resetUserPassword(db: ScopedDb, actor: Actor, id: string) {
-  const target = await db.user.findUnique({ where: { id }, select: USER_SELECT });
+  const target = await db.user.findFirst({ where: { id, isSupport: false }, select: { id: true, active: true, fullName: true } });
   if (!target) throw new ServiceError('User not found', 404);
   if (!target.active) throw new ServiceError('This account is deactivated. Reactivate it first.', 409);
 
@@ -303,7 +377,7 @@ export async function importUsers(db: ScopedDb, actor: Actor, csv: string) {
     const reject = (reason: string) => rejected.push({ row, ...raw, reason });
 
     const roleNames = raw.roles.split(/[;|,]/).map((r) => r.trim()).filter(Boolean);
-    const roles: StaffRole[] = [];
+    const roles: StaffRoleKey[] = [];
     for (const name of roleNames) {
       const key = parseStaffRole(name);
       if (!key) return reject(`Unknown role "${name}"`);
@@ -325,8 +399,9 @@ export async function importUsers(db: ScopedDb, actor: Actor, csv: string) {
   const result = await db.$tx(async (tx) => {
     const invites: { fullName: string; email: string; phone: string; url: string }[] = [];
     let expiresAt = now;
+    const roleIds = new Map<string, string>();
     for (const v of valid) {
-      const user = await createOne(tx, actor, v.input, unusablePassword(), now);
+      const user = await createOne(tx, actor, v.input, unusablePassword(), now, roleIds);
       const t = await createResetToken(tx, actor.schoolId, actor.id, user.id, now, { kind: 'INVITE' });
       expiresAt = t.expiresAt;
       invites.push({ fullName: user.fullName, email: user.email, phone: user.phone ?? '', url: resetUrl(t.token, true) });
@@ -338,10 +413,10 @@ export async function importUsers(db: ScopedDb, actor: Actor, csv: string) {
       },
       tx,
     );
-    await notifyAdmins(tx, actor.schoolId, actor.id, { title: 'Users imported', body: `${valid.length} added from a file.`, href: '/system/users' });
+    await tellAdmins(tx, actor, 'Users imported', `${valid.length} added from a file.`);
     return { invites, expiresAt };
-  });
+  }, { timeout: 120_000, maxWait: 10_000 });
   return { created: valid.length, rejected, invites: result.invites, expiresAt: result.expiresAt as Date | null };
 }
 
-export { normalizeZimMobile };
+export type { Role };

@@ -5,7 +5,7 @@ import { resendInvite } from '@/lib/system/users';
 
 // A new link for someone who has not set a password yet; the earlier link stops working.
 async function _POST(_req: Request, ctx: { params: { id: string } }) {
-  const user = await requirePermission('system.users.invite');
+  const user = await requirePermission('system.users.create');
   const db = getScopedDb(user.schoolId, user.id);
   return apiSuccess(await resendInvite(db, user, ctx.params.id));
 }

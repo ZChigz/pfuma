@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  can, disabledModulesFrom, FULL_ACCESS_ROLES, MODULES, moduleOf, PERMISSIONS, type AccessUser,
+  can, disabledModulesFrom, MODULES, moduleOf, PERMISSIONS, type AccessUser,
 } from '@/lib/access-core';
 import { buildNav, NAV_GROUPS } from '@/lib/nav';
 import { toCsv } from '@/lib/csv';
@@ -13,37 +13,49 @@ import { CalendarEventSchema, ModulesSchema } from '@/lib/validations/system';
 import { z } from 'zod';
 
 const user = (role: AccessUser['role'], extra: Partial<AccessUser> = {}): AccessUser => ({ id: 'u1', schoolId: 's1', role, ...extra });
+const ALL = ['*'];
+const BASIC = ['system.dashboard.view', 'system.calendar.view'];
 const SYSTEM_KEYS = Object.keys(PERMISSIONS).filter((k) => moduleOf(k) === 'system');
 
 describe('can()', () => {
-  it('lets administrators and owners do everything', () => {
-    for (const role of FULL_ACCESS_ROLES) for (const k of Object.keys(PERMISSIONS)) expect(can(user(role), k), `${role} ${k}`).toBe(true);
-    expect(FULL_ACCESS_ROLES).toEqual(['ADMIN', 'DIRECTOR']);
+  it('lets the wildcard grant (Owner, Administrator) do everything', () => {
+    for (const k of Object.keys(PERMISSIONS)) expect(can(user('ADMIN', { grants: ALL }), k), k).toBe(true);
   });
 
-  it('refuses everyone else on every System permission', () => {
+  it('gives nobody anything without a grant, whatever the old access level says', () => {
+    for (const role of ['ADMIN', 'DIRECTOR'] as const) expect(can(user(role), 'system.users.view')).toBe(false);
+  });
+
+  it('blocks changes but not looking when the school is suspended or a support person is in', () => {
+    const ro = user('ADMIN', { grants: ALL, readOnly: true });
+    for (const k of ['system.users.view', 'system.audit.export', 'system.calendar.view']) expect(can(ro, k), k).toBe(true);
+    for (const k of ['system.users.create', 'system.users.edit', 'system.calendar.delete', 'system.settings.edit', 'system.users.deactivate']) expect(can(ro, k), k).toBe(false);
+    expect(can(ro, 'account.password.change')).toBe(true);
+  });
+
+  it('lets every other role see the dashboard and the calendar, and nothing else in System', () => {
     for (const role of ['HEAD', 'BURSAR', 'TEACHER', 'LIBRARIAN'] as const) {
-      for (const k of SYSTEM_KEYS) expect(can(user(role), k), `${role} ${k}`).toBe(false);
+      for (const k of SYSTEM_KEYS) expect(can(user(role, { grants: BASIC }), k), `${role} ${k}`).toBe(BASIC.includes(k));
     }
   });
 
   it('refuses a signed-out caller and a permission key that does not exist', () => {
     expect(can(null, 'system.users.view')).toBe(false);
     expect(can(undefined, 'system.users.view')).toBe(false);
-    expect(can(user('ADMIN'), 'system.users.vieww')).toBe(false);
-    expect(can(user('ADMIN'), '')).toBe(false);
+    expect(can(user('ADMIN', { grants: ALL }), 'system.users.vieww')).toBe(false);
+    expect(can(user('ADMIN', { grants: ALL }), '')).toBe(false);
   });
 
   it('refuses a module that is switched off, even for the administrator', () => {
-    const admin = user('ADMIN', { disabledModules: ['finance'] });
+    const admin = user('ADMIN', { grants: ALL, disabledModules: ['finance'] });
     expect(can(admin, 'finance.payments.view')).toBe(false);
     expect(can(admin, 'students.list.view')).toBe(true);
     expect(can(admin, 'system.users.view')).toBe(true);
   });
 
   it('never switches the System module off', () => {
-    const admin = user('ADMIN', { disabledModules: ['system'] });
-    expect(can(admin, 'system.subscription.manage')).toBe(true);
+    const admin = user('ADMIN', { grants: ALL, disabledModules: ['system'] });
+    expect(can(admin, 'system.subscription.view')).toBe(true);
     expect(disabledModulesFrom([{ module: 'system', enabled: false }, { module: 'hr', enabled: false }, { module: 'finance', enabled: true }])).toEqual(['hr']);
   });
 
@@ -55,8 +67,8 @@ describe('can()', () => {
   });
 
   it('takes a scope into account: another school is never allowed', () => {
-    expect(can(user('ADMIN'), 'system.users.view', { schoolId: 's1' })).toBe(true);
-    expect(can(user('ADMIN'), 'system.users.view', { schoolId: 's2' })).toBe(false);
+    expect(can(user('ADMIN', { grants: ALL }), 'system.users.view', { schoolId: 's1' })).toBe(true);
+    expect(can(user('ADMIN', { grants: ALL }), 'system.users.view', { schoolId: 's2' })).toBe(false);
   });
 
   it('is data-driven for other roles: a granted key works, an ungranted one does not, a switched-off module still wins', () => {
@@ -81,14 +93,14 @@ describe('sidebar', () => {
   });
 
   it('makes only Dashboard & System live; every other item is "coming soon"', () => {
-    const nav = buildNav(user('ADMIN'));
+    const nav = buildNav(user('ADMIN', { grants: ALL }));
     expect(nav.map((g) => g.module)).toEqual(MODULES.map((m) => m.key));
     for (const g of nav) for (const i of g.items) expect(i.comingSoon, `${g.label} / ${i.label}`).toBe(g.module !== 'system');
     for (const i of nav[0].items) expect(i.href).toMatch(/^\/system\//);
   });
 
   it('hides a whole group when its module is switched off', () => {
-    const nav = buildNav(user('ADMIN', { disabledModules: ['finance', 'hr'] }));
+    const nav = buildNav(user('ADMIN', { grants: ALL, disabledModules: ['finance', 'hr'] }));
     expect(nav.map((g) => g.module)).not.toContain('finance');
     expect(nav.map((g) => g.module)).not.toContain('hr');
     expect(nav.length).toBe(6);
@@ -156,18 +168,22 @@ describe('term helpers', () => {
 });
 
 describe('subscription', () => {
-  const base = { plan: 'STANDARD', status: 'ACTIVE' as const, startsAt: new Date('2026-01-01'), studentLimit: null };
-  const now = new Date('2026-06-01');
-  it('has no end date and never expires', () => {
-    expect(subscriptionView({ ...base, endsAt: null }, now)).toMatchObject({ status: 'ACTIVE', daysLeft: null, expiringSoon: false });
+  const now = new Date('2026-06-01T10:00:00Z');
+  const school = (status: 'TRIAL' | 'ACTIVE' | 'OVERDUE' | 'SUSPENDED', renewal: string | null) => ({ status, renewalDate: renewal ? new Date(`${renewal}T00:00:00Z`) : null, studentLimit: 500 });
+
+  it('has no banner far from the renewal date, or without one', () => {
+    expect(subscriptionView(school('ACTIVE', null), now)).toMatchObject({ status: 'ACTIVE', daysToRenewal: null, banner: null });
+    expect(subscriptionView(school('ACTIVE', '2026-06-16'), now)).toMatchObject({ daysToRenewal: 15, banner: null });
   });
-  it('warns in the last 30 days', () => {
-    expect(subscriptionView({ ...base, endsAt: new Date('2026-06-20') }, now)).toMatchObject({ status: 'ACTIVE', expiringSoon: true, daysLeft: 19 });
-    expect(subscriptionView({ ...base, endsAt: new Date('2026-12-20') }, now).expiringSoon).toBe(false);
+  it('warns from 14 days before the renewal date', () => {
+    expect(subscriptionView(school('ACTIVE', '2026-06-15'), now)).toMatchObject({ daysToRenewal: 14, banner: { kind: 'renewal', days: 14 } });
+    expect(subscriptionView(school('TRIAL', '2026-06-01'), now).banner).toMatchObject({ kind: 'renewal', days: 0, text: 'Your subscription renews today.' });
+    expect(subscriptionView(school('ACTIVE', '2026-06-02'), now).banner?.text).toBe('Your subscription renews in 1 day.');
   });
-  it('reads a lapsed plan as expired, but leaves a cancelled one cancelled', () => {
-    expect(subscriptionView({ ...base, endsAt: new Date('2026-05-01') }, now).status).toBe('EXPIRED');
-    expect(subscriptionView({ ...base, status: 'CANCELLED', endsAt: new Date('2026-05-01') }, now).status).toBe('CANCELLED');
+  it('reads a school past its renewal date as overdue, and keeps overdue and suspended as stored', () => {
+    expect(subscriptionView(school('ACTIVE', '2026-05-31'), now)).toMatchObject({ status: 'OVERDUE', banner: { kind: 'overdue' } });
+    expect(subscriptionView(school('OVERDUE', null), now)).toMatchObject({ status: 'OVERDUE', banner: { kind: 'overdue' } });
+    expect(subscriptionView(school('SUSPENDED', '2026-05-01'), now)).toMatchObject({ status: 'SUSPENDED', banner: { kind: 'suspended' } });
   });
 });
 

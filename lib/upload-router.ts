@@ -13,7 +13,7 @@ const SETTINGS_IMAGE_MAX_BYTES = 1024 * 1024;
 
 async function settingsImageGate(files: readonly { type: string; size: number }[]) {
   try {
-    const user = await requirePermission('system.settings.update');
+    const user = await requirePermission('system.settings.edit');
     for (const file of files) {
       if (!SETTINGS_IMAGE_TYPES.includes(file.type)) throw new UploadThingError('Use a PNG or JPG image');
       if (file.size > SETTINGS_IMAGE_MAX_BYTES) throw new UploadThingError('The image must be 1 MB or smaller');
@@ -85,6 +85,19 @@ export const fileRouter = {
   // the route config, because a client can lie about both.
   schoolLogo: f({ 'image/png': { maxFileSize: '1MB', maxFileCount: 1 }, 'image/jpeg': { maxFileSize: '1MB', maxFileCount: 1 } })
     .middleware(async ({ files }) => settingsImageGate(files))
+    .onUploadComplete(() => {}),
+
+  // A person's own photo (My profile): PNG or JPG, at most 1 MB, any signed-in person.
+  profilePhoto: f({ 'image/png': { maxFileSize: '1MB', maxFileCount: 1 }, 'image/jpeg': { maxFileSize: '1MB', maxFileCount: 1 } })
+    .middleware(async ({ files }) => {
+      const session = await auth();
+      if (!session?.user) throw new UploadThingError('Unauthorized');
+      for (const file of files) {
+        if (!SETTINGS_IMAGE_TYPES.includes(file.type)) throw new UploadThingError('Use a PNG or JPG image');
+        if (file.size > SETTINGS_IMAGE_MAX_BYTES) throw new UploadThingError('The image must be 1 MB or smaller');
+      }
+      return { userId: session.user.id };
+    })
     .onUploadComplete(() => {}),
 
   headSignature: f({ 'image/png': { maxFileSize: '1MB', maxFileCount: 1 }, 'image/jpeg': { maxFileSize: '1MB', maxFileCount: 1 } })

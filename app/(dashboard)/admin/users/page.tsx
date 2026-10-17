@@ -26,7 +26,7 @@ export default async function AdminUsersPage() {
   try { await canManageUsers(user.role); } catch { redirect('/accounting'); }
 
   const users = await db.user.findMany({
-    where: { schoolId: user.schoolId },
+    where: { schoolId: user.schoolId, isSupport: false },
     select: { id: true, fullName: true, email: true, role: true, active: true },
     orderBy: { fullName: 'asc' },
   });

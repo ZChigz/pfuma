@@ -162,7 +162,7 @@ describe('the cards on the dashboard', () => {
     const { ClassesCard } = await import('@/components/system/cards/ClassesCard');
     const { TermCard } = await import('@/components/system/cards/TermCard');
     const term = await termOf(A.termId);
-    const admin = { id: A.users.ADMIN.id, schoolId: A.schoolId, role: 'ADMIN' as const };
+    const admin = { id: A.users.ADMIN.id, schoolId: A.schoolId, role: 'ADMIN' as const, grants: ['*'] };
 
     expect(await StudentsCard({ user: { ...admin, disabledModules: ['students'] }, term })).toBeNull();
     expect(await StaffCard({ user: { ...admin, disabledModules: ['hr'] } })).toBeNull();
@@ -180,7 +180,7 @@ describe('the cards on the dashboard', () => {
     const { StudentsCard } = await import('@/components/system/cards/StudentsCard');
     const { ClassesCard } = await import('@/components/system/cards/ClassesCard');
     const { TermCard } = await import('@/components/system/cards/TermCard');
-    const admin = { id: A.users.ADMIN.id, schoolId: A.schoolId, role: 'ADMIN' as const };
+    const admin = { id: A.users.ADMIN.id, schoolId: A.schoolId, role: 'ADMIN' as const, grants: ['*'] };
     expect(await StudentsCard({ user: admin, term: null })).not.toBeNull();
     expect(await ClassesCard({ user: admin, term: null })).not.toBeNull();
     expect(TermCard({ user: admin, term: null })).not.toBeNull();

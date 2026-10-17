@@ -51,7 +51,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: SP 
         classes={classes}
         pdfTermId={term?.id ?? null}
         canCreate={can('system.calendar.create')}
-        canUpdate={can('system.calendar.update')}
+        canUpdate={can('system.calendar.edit')}
         canDelete={can('system.calendar.delete')}
         canExport={can('system.calendar.export')}
       />

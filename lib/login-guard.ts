@@ -1,6 +1,6 @@
 // Brute-force protection for sign-in: 5 failed attempts per email + IP within
-// 15 minutes lock that pair for 15 minutes. Repeated failures are written to the
-// AuditLog (when the email belongs to a known user).
+// 15 minutes lock that pair for 15 minutes. Every failure is written to the
+// AuditLog (when the email belongs to a known user), with the address it came from.
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getCounterStore, LIMITS } from '@/lib/rate-limit';
@@ -8,8 +8,8 @@ import { getCounterStore, LIMITS } from '@/lib/rate-limit';
 const failKey = (email: string, ip: string) => `pfuma:login:fail:${email.toLowerCase()}|${ip}`;
 const lockKey = (email: string, ip: string) => `pfuma:login:lock:${email.toLowerCase()}|${ip}`;
 
-/** Failures from this count on are recorded in the AuditLog. */
-export const AUDIT_FROM_FAILURE = 3;
+/** Failures from this count on are recorded in the AuditLog: all of them. */
+export const AUDIT_FROM_FAILURE = 1;
 
 /** Seconds the caller must still wait, or 0 when sign-in may proceed. */
 export async function loginLockedFor(email: string, ip: string): Promise<number> {
@@ -40,9 +40,10 @@ export async function recordLoginFailure(email: string, ip: string, users: Known
             action: locked ? 'LOGIN_LOCKED' : 'LOGIN_FAILED',
             entityType: 'User',
             entityId: u.id,
+            ip,
             detail: locked
               ? `Locked for ${LIMITS.loginLock / 60} minutes after ${count} failed sign-ins from ${ip}`
-              : `${count} failed sign-ins from ${ip}`,
+              : count === 1 ? `Wrong password from ${ip}` : `${count} failed sign-ins from ${ip}`,
           },
         });
       } catch (e) {

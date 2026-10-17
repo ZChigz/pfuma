@@ -87,7 +87,7 @@ export default async function AdminDashboard() {
   const openTermId = openTerm?.id ?? '';
 
   const [totalUsers, totalStudents, totalSubjects, unplacedStudents, classes, recentUsers] = await Promise.all([
-    db.user.count({ where: { schoolId } }),
+    db.user.count({ where: { schoolId, isSupport: false } }),
     db.student.count({ where: { schoolId, status: 'ACTIVE' } }),
     db.subject.count({ where: { schoolId } }),
     // Active students with no class in the open term.
@@ -104,7 +104,7 @@ export default async function AdminDashboard() {
       },
     }),
     db.user.findMany({
-      where: { schoolId },
+      where: { schoolId, isSupport: false },
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: { id: true, fullName: true, email: true, role: true, active: true },

@@ -2,7 +2,7 @@
 // The Users page: several roles, invites and temporary passwords, the list, and import from a file.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startTestDb, type TestDb } from '../helpers/test-db';
-import { seedSchool, type SeededSchool } from '../helpers/seed';
+import { grantPermission, revokePermission, seedSchool, type SeededSchool } from '../helpers/seed';
 import { call } from '../helpers/route';
 import { session } from '../helpers/session';
 
@@ -10,6 +10,9 @@ vi.mock('@/lib/auth', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/auth')>()),
   auth: (await import('../helpers/session')).mockAuth,
 }));
+
+// Hashing passwords (bcrypt cost 12) makes several of these take a few seconds; give them room when the machine is busy.
+vi.setConfig({ testTimeout: 30_000 });
 
 let t: TestDb;
 let A: SeededSchool;
@@ -21,6 +24,7 @@ const post = (body: object, as: object | null = admin()) => call('system/users',
 const person = (over: object = {}) => ({ fullName: 'Rudo Chari', email: 'rudo@a.test', phone: '0771234567', roles: ['TEACHER'], ...over });
 const tokenOf = (url: string) => /reset-password\/([A-Za-z0-9_-]+)/.exec(url)![1];
 const csv = (...lines: string[]) => lines.join('\n');
+const rolesOf = async (userId: string) => (await prisma.userRole.findMany({ where: { userId }, select: { role: { select: { key: true } } } })).map((x) => x.role.key).sort();
 const auditCount = (where: object = {}) => prisma.auditLog.count({ where: { schoolId: A.schoolId, ...where } });
 
 beforeAll(async () => {
@@ -47,7 +51,8 @@ describe('adding a person with an invite', () => {
     const { user, invite, tempPassword } = r.json.data;
     expect(tempPassword).toBeNull();
     expect(user).toMatchObject({ fullName: 'Tendai Moyo', email: 'tendai.moyo@a.test', phone: '+263771234567', title: 'Mrs', status: 'invited' });
-    expect([...user.staffRoles].sort()).toEqual(['BURSAR', 'CLASS_TEACHER', 'TEACHER']);
+    expect([...user.roles].sort()).toEqual(['BURSAR', 'CLASS_TEACHER', 'TEACHER']);
+    expect(await rolesOf(user.id)).toEqual(['BURSAR', 'CLASS_TEACHER', 'TEACHER']);
     expect(invite.url).toMatch(/^https:\/\/pfuma\.test\/reset-password\/[A-Za-z0-9_-]{40,}\?invite=1$/);
     expect(JSON.stringify(r.json)).not.toMatch(/passwordHash/);
     created = { id: user.id, url: invite.url };
@@ -154,8 +159,26 @@ describe('adding a person with a temporary password', () => {
     expect((await call('system/users', 'GET', { as: admin(), query: '?q=temp@a.test' })).json.data.users[0].status).toBe('active');
   });
 
-  it('can be made again for any active person with the reset button', async () => {
+  it('sends a reset link by default: 30 minutes, one use, and the old password keeps working until it is used', async () => {
     const r = await call('system/users/[id]/reset-password', 'POST', { as: admin(), params: { id: A.users.TEACHER.id } });
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(r.json.data.method).toBe('LINK');
+    expect(r.json.data.tempPassword).toBeUndefined();
+    const url: string = r.json.data.reset.url;
+    expect(url).toMatch(/\/reset-password\/[A-Za-z0-9_-]{40,}$/);
+    const minutes = (new Date(r.json.data.reset.expiresAt).getTime() - Date.now()) / 60_000;
+    expect(minutes).toBeGreaterThan(29);
+    expect(minutes).toBeLessThanOrEqual(30);
+    const stored = await prisma.passwordResetToken.findFirstOrThrow({ where: { userId: A.users.TEACHER.id, usedAt: null }, orderBy: { createdAt: 'desc' } });
+    expect(stored.kind).toBe('RESET');
+    expect(stored.tokenHash).not.toContain(tokenOf(url));
+    expect(await auditCount({ action: 'CREATE_PASSWORD_RESET', entityId: A.users.TEACHER.id })).toBeGreaterThan(0);
+    const bad = await call('system/users/[id]/reset-password', 'POST', { as: admin(), params: { id: B.users.TEACHER.id } });
+    expect(bad.status).toBe(404);
+  });
+
+  it('can still make a temporary password for any active person', async () => {
+    const r = await call('system/users/[id]/reset-password', 'POST', { as: admin(), params: { id: A.users.TEACHER.id }, body: { method: 'TEMP_PASSWORD' } });
     expect(r.status).toBe(200);
     expect(r.json.data.tempPassword.length).toBeGreaterThanOrEqual(10);
     expect((await prisma.user.findUniqueOrThrow({ where: { id: A.users.TEACHER.id } })).mustChangePassword).toBe(true);
@@ -178,11 +201,11 @@ describe('what is checked when adding a person', () => {
   });
 
   it('accepts every role and every way of writing a mobile number', async () => {
-    const roles = ['SCHOOL_ADMINISTRATOR', 'OWNER', 'HEAD_TEACHER', 'DEPUTY_HEAD', 'SENIOR_TEACHER', 'HEAD_OF_DEPARTMENT', 'CLASS_TEACHER', 'TEACHER', 'BURSAR', 'ACCOUNTS_CLERK', 'LIBRARIAN', 'REGISTRAR', 'OFFICE_SECRETARY'];
+    const roles = ['OWNER', 'HEAD', 'DEPUTY_HEAD', 'ADMINISTRATOR', 'BURSAR', 'ACCOUNTS_CLERK', 'HR_OFFICER', 'HOD', 'TEACHER', 'CLASS_TEACHER', 'EXAMS_OFFICER', 'LIBRARIAN', 'BOARDING_MASTER'];
     expect(roles).toHaveLength(13);
     const r = await post(person({ email: 'all@a.test', roles }));
     expect(r.status).toBe(201);
-    expect(r.json.data.user.staffRoles).toHaveLength(13);
+    expect(r.json.data.user.roles).toHaveLength(13);
     const phones = ['0771234567', '+263771234567', '263771234567', '0263 77 123 4567'.replace('0263', '+263'), '077-123-4567', '0731234567', '0781234567', '0711234567'];
     for (let i = 0; i < phones.length; i++) {
       const phone = phones[i];
@@ -210,14 +233,16 @@ describe('changing a person', () => {
     const made = await post(person({ email: 'edit@a.test', roles: ['TEACHER'] }));
     const id = made.json.data.user.id;
     const v = (await prisma.user.findUniqueOrThrow({ where: { id } })).tokenVersion;
-    const r = await call('system/users/[id]', 'PATCH', { as: admin(), params: { id }, body: { fullName: 'rudo MOYO-chari', phone: '0712345678', title: 'Dr', roles: ['HEAD_TEACHER', 'TEACHER'] } });
-    expect(r.status).toBe(200);
+    const r = await call('system/users/[id]', 'PATCH', { as: admin(), params: { id }, body: { fullName: 'rudo MOYO-chari', phone: '0712345678', title: 'Dr', roles: ['HEAD', 'TEACHER'] } });
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
     const row = await prisma.user.findUniqueOrThrow({ where: { id } });
     expect(row).toMatchObject({ fullName: 'Rudo Moyo-Chari', phone: '+263712345678', title: 'Dr', role: 'HEAD' });
-    expect([...row.staffRoles].sort()).toEqual(['HEAD_TEACHER', 'TEACHER']);
+    expect(await rolesOf(id)).toEqual(['HEAD', 'TEACHER']);
     expect(row.tokenVersion).toBe(v + 1);
-    const entry = await prisma.auditLog.findFirstOrThrow({ where: { action: 'UPDATE_USER', entityId: id }, orderBy: { createdAt: 'desc' } });
-    expect(entry.detail).toBe('Roles: Teacher → Head Teacher, Teacher');
+    const entry = await prisma.auditLog.findFirstOrThrow({ where: { action: 'ROLES_CHANGED', entityId: id }, orderBy: { createdAt: 'desc' } });
+    expect(entry.detail).toBe('Rudo Moyo-Chari: Teacher → Head, Teacher');
+    expect(entry.module).toBe('system');
+    expect(await prisma.notification.count({ where: { userId: id, type: 'ROLES_CHANGED' } })).toBe(1);
     expect(entry.before).toMatchObject({ roles: ['TEACHER'] });
     // title cleared with a blank, and details-only changes do not touch sessions
     const r2 = await call('system/users/[id]', 'PATCH', { as: admin(), params: { id }, body: { title: '' } });
@@ -235,21 +260,36 @@ describe('changing a person', () => {
     expect((await patch({ fullName: 'Taken Over' }, B.users.TEACHER.id)).status).toBe(404);
   });
 
-  it('keeps at least one active administrator or owner when roles change', async () => {
-    // Earlier tests made other administrators; only the administrator and the owner should be left.
-    await prisma.user.updateMany({ where: { schoolId: A.schoolId, role: { in: ['ADMIN', 'DIRECTOR'] }, id: { notIn: [admin().id, A.users.DIRECTOR.id] } }, data: { role: 'TEACHER', staffRoles: ['TEACHER'] } });
-    await prisma.rolePermission.createMany({ data: ['system.users.update'].map((permission) => ({ schoolId: A.schoolId, role: 'HEAD' as const, permission })) });
+  it('keeps at least one active Owner and one active Administrator when roles change', async () => {
+    // Earlier tests made others; only the seeded Administrator and Owner should hold these two roles.
+    await prisma.userRole.deleteMany({ where: { schoolId: A.schoolId, role: { key: { in: ['OWNER', 'ADMINISTRATOR'] } }, userId: { notIn: [admin().id, A.users.DIRECTOR.id] } } });
+    await grantPermission(prisma, A.schoolId, 'HEAD', 'system.users.edit');
+    await grantPermission(prisma, A.schoolId, 'HEAD', 'system.users.deactivate');
     try {
       const patch = (id: string, roles: string[]) => call('system/users/[id]', 'PATCH', { as: A.users.HEAD, params: { id }, body: { roles } });
-      expect((await patch(admin().id, ['TEACHER'])).status).toBe(200);        // the owner is still there
-      const last = await patch(A.users.DIRECTOR.id, ['TEACHER']);
-      expect(last.status).toBe(409);
-      expect(last.json.message).toMatch(/at least one active administrator/);
-      expect((await patch(A.users.DIRECTOR.id, ['OWNER', 'TEACHER'])).status).toBe(200); // adding a role is fine
+      const lastAdmin = await patch(admin().id, ['TEACHER']);
+      expect(lastAdmin.status).toBe(409);
+      expect(lastAdmin.json.message).toMatch(/at least one active Administrator/);
+      const lastOwner = await patch(A.users.DIRECTOR.id, ['TEACHER']);
+      expect(lastOwner.status).toBe(409);
+      expect(lastOwner.json.message).toMatch(/at least one active Owner/);
+      expect((await call('system/users/[id]/deactivate', 'POST', { as: A.users.HEAD, params: { id: A.users.DIRECTOR.id } })).status).toBe(409);
+      expect(await rolesOf(admin().id)).toContain('ADMINISTRATOR');
+      expect((await patch(A.users.DIRECTOR.id, ['OWNER', 'ADMINISTRATOR'])).status).toBe(200); // adding a role is fine
+      expect((await patch(admin().id, ['TEACHER'])).status).toBe(200);                        // now another Administrator exists
     } finally {
-      await prisma.user.update({ where: { id: admin().id }, data: { staffRoles: ['SCHOOL_ADMINISTRATOR'], role: 'ADMIN' } });
-      await prisma.rolePermission.deleteMany({ where: { schoolId: A.schoolId } });
+      await prisma.userRole.deleteMany({ where: { userId: admin().id } });
+      await prisma.userRole.create({ data: { schoolId: A.schoolId, userId: admin().id, roleId: (await prisma.roleDefinition.findFirstOrThrow({ where: { schoolId: A.schoolId, key: 'ADMINISTRATOR' } })).id } });
+      await prisma.userRole.deleteMany({ where: { userId: A.users.DIRECTOR.id, role: { key: 'ADMINISTRATOR' } } });
+      await revokePermission(prisma, A.schoolId, 'HEAD', 'system.users.edit');
+      await revokePermission(prisma, A.schoolId, 'HEAD', 'system.users.deactivate');
     }
+  });
+
+  it('never lets an Administrator deactivate themselves', async () => {
+    const r = await call('system/users/[id]/deactivate', 'POST', { as: admin(), params: { id: admin().id } });
+    expect(r.status).toBe(409);
+    expect(r.json.message).toMatch(/your own account/);
   });
 });
 
@@ -260,7 +300,7 @@ describe('the list', () => {
     await prisma.user.update({ where: { id: A.users.HEAD.id }, data: { lastLoginAt: new Date('2026-09-01T08:00:00Z') } });
     const d = await list('?pageSize=100');
     const head = d.users.find((u: { id: string }) => u.id === A.users.HEAD.id);
-    expect(head).toMatchObject({ fullName: A.users.HEAD.fullName, email: A.users.HEAD.email, staffRoles: ['HEAD_TEACHER'], status: 'active', lastLoginAt: '2026-09-01T08:00:00.000Z' });
+    expect(head).toMatchObject({ fullName: A.users.HEAD.fullName, email: A.users.HEAD.email, roles: ['HEAD'], status: 'active', lastLoginAt: '2026-09-01T08:00:00.000Z' });
     expect(head.createdAt).toBeTruthy();
     const all = await prisma.user.findMany({ where: { schoolId: A.schoolId } });
     expect(d.counts).toEqual({
@@ -289,8 +329,8 @@ describe('the list', () => {
   it('filters by role (anyone who holds it) and by status', async () => {
     const teachers = await list('?role=TEACHER&pageSize=100');
     expect(teachers.users.length).toBeGreaterThan(1);
-    expect(teachers.users.every((u: { staffRoles: string[] }) => u.staffRoles.includes('TEACHER'))).toBe(true);
-    expect(teachers.users.some((u: { staffRoles: string[] }) => u.staffRoles.length > 1)).toBe(true); // multi-role people appear
+    expect(teachers.users.every((u: { roles: string[] }) => u.roles.includes('TEACHER'))).toBe(true);
+    expect(teachers.users.some((u: { roles: string[] }) => u.roles.length > 1)).toBe(true); // multi-role people appear
     for (const status of ['invited', 'active', 'deactivated']) {
       const d = await list(`?status=${status}&pageSize=100`);
       expect(d.total, status).toBeGreaterThan(0);
@@ -315,7 +355,7 @@ describe('the list', () => {
   });
 
   it('exports the same list as CSV, safe for spreadsheets, without secrets', async () => {
-    await post(person({ email: 'csv@a.test', fullName: '=cmd Evil', roles: ['LIBRARIAN', 'REGISTRAR'] }));
+    await post(person({ email: 'csv@a.test', fullName: '=cmd Evil', roles: ['LIBRARIAN', 'EXAMS_OFFICER'] }));
     const r = await call('system/users', 'GET', { as: admin(), query: '?format=csv&q=csv@a.test' });
     expect(r.status).toBe(200);
     expect(r.response.headers.get('content-type')).toContain('text/csv');
@@ -323,7 +363,7 @@ describe('the list', () => {
     expect(lines[0]).toBe('Name,Email,Phone,Roles,Status,Last login,Joined');
     expect(lines).toHaveLength(2);
     expect(lines[1]).toContain("'=cmd Evil");
-    expect(lines[1]).toContain('Librarian; Registrar');
+    expect(lines[1]).toContain('Exams Officer; Librarian');
     expect(lines[1]).toContain('Invited');
     expect(lines[1]).toContain('+263771234567');
     expect(r.text).not.toMatch(/password|invited!/i);
@@ -369,7 +409,7 @@ describe('import from a file', () => {
 
     const t = await prisma.user.findFirstOrThrow({ where: { email: 'tinashe@a.test' } });
     expect(t).toMatchObject({ fullName: 'Tinashe Ncube', phone: '+263771110001', invitePending: true, role: 'TEACHER' });
-    expect([...t.staffRoles].sort()).toEqual(['CLASS_TEACHER', 'TEACHER']);
+    expect(await rolesOf(t.id)).toEqual(['CLASS_TEACHER', 'TEACHER']);
     expect((await prisma.user.findFirstOrThrow({ where: { email: 'sarah@a.test' } })).fullName).toBe('Moyo, Sarah');
     expect(await prisma.user.count({ where: { email: { in: ['nophone@a.test', 'unknown@a.test', 'short@a.test'] } } })).toBe(0);
     expect(await auditCount({ action: 'IMPORT_USERS' })).toBe(1);
@@ -389,10 +429,10 @@ describe('import from a file', () => {
   });
 
   it('understands other headings, a byte-order mark, quoted roles, and other ways of writing role names', async () => {
-    const r = await imp(`﻿Full Name,E-mail,Mobile,Role\r\nAmai Dube,amai@a.test,0781234000,"head teacher; DEPUTY_HEAD"\r\n`);
+    const r = await imp(`﻿Full Name,E-mail,Mobile,Role\r\nAmai Dube,amai@a.test,0781234000,"head; DEPUTY_HEAD"\r\n`);
     expect(r.json.data.created).toBe(1);
     const u = await prisma.user.findFirstOrThrow({ where: { email: 'amai@a.test' } });
-    expect([...u.staffRoles].sort()).toEqual(['DEPUTY_HEAD', 'HEAD_TEACHER']);
+    expect(await rolesOf(u.id)).toEqual(['DEPUTY_HEAD', 'HEAD']);
     expect(u.role).toBe('HEAD');
   });
 
@@ -432,16 +472,16 @@ describe('import from a file', () => {
 });
 
 describe('older code that only knows one role', () => {
-  it('still works: the staff roles follow the role', async () => {
+  it('still works: the user gets the role that matches the access level', async () => {
     const u = await prisma.user.create({ data: { schoolId: A.schoolId, fullName: 'Legacy', email: 'legacy@a.test', passwordHash: 'x', role: 'BURSAR' } });
-    expect(u.staffRoles).toEqual(['BURSAR']);
-    const moved = await prisma.user.update({ where: { id: u.id }, data: { role: 'LIBRARIAN' } });
-    expect(moved.staffRoles).toEqual(['LIBRARIAN']);
-    const both = await prisma.user.update({ where: { id: u.id }, data: { role: 'HEAD', staffRoles: ['DEPUTY_HEAD', 'REGISTRAR'] } });
-    expect([...both.staffRoles].sort()).toEqual(['DEPUTY_HEAD', 'REGISTRAR']);
+    expect(await rolesOf(u.id)).toEqual(['BURSAR']);
+    await prisma.user.update({ where: { id: u.id }, data: { role: 'LIBRARIAN' } });
+    expect(await rolesOf(u.id)).toEqual(['LIBRARIAN']);
+    await prisma.user.update({ where: { id: u.id }, data: { role: 'HEAD' } });
+    expect(await rolesOf(u.id)).toEqual(['HEAD']);
     const viaOld = await call('admin/users', 'POST', { as: admin(), body: { fullName: 'Old Route', email: 'oldroute@a.test', role: 'HEAD' } });
     expect(viaOld.status).toBe(201);
-    expect((await prisma.user.findFirstOrThrow({ where: { email: 'oldroute@a.test' } })).staffRoles).toEqual(['HEAD_TEACHER']);
+    expect(await rolesOf((await prisma.user.findFirstOrThrow({ where: { email: 'oldroute@a.test' } })).id)).toEqual(['HEAD']);
   });
 
   it('the database refuses a bad phone or title', async () => {

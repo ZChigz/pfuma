@@ -276,6 +276,10 @@ enum AuditAction {
   INVITE_USER
   ACCEPT_INVITE
   IMPORT_USERS
+  LOGIN_SUCCESS
+  SUPPORT_ACCESS_STARTED
+  SUPPORT_ACCESS_ENDED
+  ROLES_CHANGED
   DELETE_CALENDAR_EVENT
 }
 
@@ -321,6 +325,28 @@ enum StaffRole {
 enum PasswordTokenKind {
   RESET
   INVITE
+}
+
+// Where a role applies. Only SCHOOL is used for now; the others are for roles that cover one
+// department, class or hostel (Head of Department, Class Teacher, Boarding Master).
+enum RoleScopeType {
+  SCHOOL
+  DEPARTMENT
+  CLASS
+  HOSTEL
+}
+
+enum SchoolStatus {
+  TRIAL
+  ACTIVE
+  OVERDUE
+  SUSPENDED
+}
+
+enum InvoiceStatus {
+  OPEN
+  PAID
+  VOID
 }
 
 enum SubscriptionStatus {
@@ -412,6 +438,12 @@ model School {
   website              String?
   headName             String?
   headSignatureUrl     String?
+  // Subscription (managed from the Pfuma console, shown on Settings, Subscription).
+  status               SchoolStatus   @default(ACTIVE)
+  planId               String?
+  renewalDate          DateTime?      @db.Date
+  studentLimit         Int?
+  suspendedReason      String?
   createdAt            DateTime       @default(now())
   // Legacy column "currentTerm" still exists in the database until the
   // contract migration; the current term is now the OPEN AcademicTerm.
@@ -451,11 +483,15 @@ model School {
   incomes             Income[]
   subscription        Subscription?
   modules             SchoolModule[]
-  rolePermissions     RolePermission[]
   notifications       Notification[]
   calendarEvents      CalendarEvent[]
   CalendarHolidayYear CalendarHolidayYear[]
   streams             Stream[]
+  roleDefinitions     RoleDefinition[]
+  userRoles           UserRole[]
+  invoices            SubscriptionInvoice[]
+  plan                Plan?                 @relation(fields: [planId], references: [id])
+  RolePermission      RolePermission[]
 }
 
 model User {
@@ -480,6 +516,9 @@ model User {
   // Added by an administrator and has not set or changed the first password yet.
   invitePending      Boolean     @default(false)
   invitedAt          DateTime?
+  photoUrl           String?
+  // The hidden account a Pfuma support person is signed in as, read-only. Never listed or counted.
+  isSupport          Boolean     @default(false)
   passwordChangedAt  DateTime?
   // Set at every successful sign-in (lib/auth.ts); null = has not signed in since this was added.
   lastLoginAt        DateTime?
@@ -514,6 +553,7 @@ model User {
   transfersTo           AssetTransfer[]      @relation("TransferTo")
   transfersRecorded     AssetTransfer[]      @relation("TransfersRecorded")
   incomeRecorded        Income[]
+  userRoles             UserRole[]
   notifications         Notification[]
   calendarEventsCreated CalendarEvent[]
 
@@ -904,6 +944,10 @@ model AuditLog {
   // written by the database trigger "audit_row_change" (secrets removed).
   before     Json?
   after      Json?
+  // The part of Pfuma the entry belongs to (system, students, finance ...), filled by the database.
+  module     String?
+  ip         String?
+  userAgent  String?
   createdAt  DateTime    @default(now())
 
   school School @relation(fields: [schoolId], references: [id])
@@ -911,6 +955,7 @@ model AuditLog {
 
   @@index([schoolId])
   @@index([schoolId, entityType, entityId])
+  @@index([schoolId, createdAt])
 }
 
 // One row per view of a student's parent-portal page.
@@ -1344,6 +1389,7 @@ model PasswordResetToken {
   kind        PasswordTokenKind @default(RESET)
   createdById String
   createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @default(now()) @updatedAt
 
   school    School @relation(fields: [schoolId], references: [id])
   user      User   @relation("ResetTokenUser", fields: [userId], references: [id])
@@ -1373,11 +1419,15 @@ model Subscription {
 
 // Module switches. No row = the module is on. "system" cannot be switched off.
 model SchoolModule {
-  id        String   @id @default(cuid())
-  schoolId  String
-  module    String
-  enabled   Boolean  @default(true)
-  updatedAt DateTime @updatedAt
+  id                       String    @id @default(cuid())
+  schoolId                 String
+  module                   String
+  enabled                  Boolean   @default(true)
+  enabledAt                DateTime?
+  // The Pfuma staff member who switched it (a PlatformAdmin id).
+  enabledByPlatformAdminId String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   school School @relation(fields: [schoolId], references: [id])
 
@@ -1385,19 +1435,73 @@ model SchoolModule {
   @@index([schoolId])
 }
 
-// Permission keys granted to a role, per school (lib/access.ts). Empty for now:
-// access levels are added later by inserting rows, not by changing pages.
-model RolePermission {
-  id         String   @id @default(cuid())
-  schoolId   String
-  role       Role
-  permission String
-  createdAt  DateTime @default(now())
+// The roles of a school (OWNER, TEACHER ...). The 13 system roles are created for every school and
+// cannot be deleted. Display name and description are what people see.
+model RoleDefinition {
+  id          String   @id @default(cuid())
+  schoolId    String
+  key         String
+  name        String
+  description String
+  isSystem    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  school School @relation(fields: [schoolId], references: [id])
+  school      School           @relation(fields: [schoolId], references: [id])
+  permissions RolePermission[]
+  users       UserRole[]
 
-  @@unique([schoolId, role, permission])
+  @@unique([schoolId, key])
   @@index([schoolId])
+}
+
+// Every permission key there is, module.page.action ("*" means everything). Other modules add
+// their keys when they are built. Not per school: it is the catalogue.
+model Permission {
+  key         String   @id
+  module      String
+  description String
+  createdAt   DateTime @default(now())
+
+  grants RolePermission[]
+}
+
+model RolePermission {
+  id            String   @id @default(cuid())
+  schoolId      String
+  roleId        String
+  permissionKey String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  school     School         @relation(fields: [schoolId], references: [id])
+  role       RoleDefinition @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission     @relation(fields: [permissionKey], references: [key])
+
+  @@unique([roleId, permissionKey])
+  @@index([schoolId])
+}
+
+// A person holds one or more roles. scopeType / scopeId are for roles that apply to one department,
+// class or hostel; they are stored now and used when those screens are built (scopeId is empty for the
+// whole school).
+model UserRole {
+  id        String        @id @default(cuid())
+  schoolId  String
+  userId    String
+  roleId    String
+  scopeType RoleScopeType @default(SCHOOL)
+  scopeId   String        @default("")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  school School         @relation(fields: [schoolId], references: [id])
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   RoleDefinition @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId, scopeType, scopeId])
+  @@index([schoolId])
+  @@index([roleId])
 }
 
 model Notification {
@@ -1406,13 +1510,19 @@ model Notification {
   userId    String
   title     String
   body      String?
-  href      String?
+  link      String?
+  // What kind of notice it is (WELCOME, ROLES_CHANGED, TERM_OPENS_TOMORROW ...), for filtering and icons.
+  type      String    @default("GENERAL")
+  // Makes a notice that is sent by a schedule safe to send twice: one per person per key.
+  dedupeKey String?
   readAt    DateTime?
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
 
   school School @relation(fields: [schoolId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
 
+  @@unique([userId, dedupeKey])
   @@index([schoolId])
   @@index([userId, readAt])
 }
@@ -1472,5 +1582,78 @@ model Stream {
   school School @relation(fields: [schoolId], references: [id])
 
   @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+// ─── Pfuma platform (staff who run the product, not a school) ────────────────
+
+model Plan {
+  id                  String   @id @default(cuid())
+  key                 String   @unique
+  name                String
+  description         String   @default("")
+  // Module keys the plan includes.
+  modules             String[]
+  defaultStudentLimit Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  schools School[]
+}
+
+// Pfuma staff. They have their own sign-in at /platform and no school; school data is never edited by them.
+model PlatformAdmin {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  fullName     String
+  passwordHash String
+  active       Boolean   @default(true)
+  tokenVersion Int       @default(0)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  auditLogs PlatformAuditLog[]
+}
+
+// Everything done in the console. Append only.
+model PlatformAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  schoolId   String?
+  entityType String
+  entityId   String
+  detail     String?
+  before     Json?
+  after      Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  admin PlatformAdmin @relation(fields: [adminId], references: [id])
+
+  @@index([createdAt])
+  @@index([schoolId])
+}
+
+// What Pfuma bills a school. Created and marked paid in the console; the school sees its own.
+model SubscriptionInvoice {
+  id               String        @id @default(cuid())
+  schoolId         String
+  number           String        @unique
+  issuedOn         DateTime      @db.Date
+  dueOn            DateTime?     @db.Date
+  amount           Decimal       @db.Decimal(14, 2)
+  currency         Currency      @default(USD)
+  description      String
+  status           InvoiceStatus @default(OPEN)
+  paidOn           DateTime?     @db.Date
+  createdByAdminId String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+
   @@index([schoolId])
 }

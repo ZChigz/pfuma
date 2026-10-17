@@ -31,36 +31,25 @@ export const ALWAYS_ON_MODULES: readonly string[] = ['system'];
 // every signed-in user holds them (their own profile, password, notifications).
 
 export const PERMISSIONS = {
-  'system.dashboard.view':      'View the dashboard',
-  'system.setup.view':          'See the setup checklist',
-  'system.calendar.view':      'View the school calendar',
+  // System module: the same keys are rows in the Permission table (migration 20261030000000).
+  'system.dashboard.view':      'See the dashboard',
+  'system.calendar.view':       'See the school calendar',
   'system.calendar.create':     'Add calendar events',
-  'system.calendar.update':     'Edit calendar events',
+  'system.calendar.edit':       'Change calendar events',
   'system.calendar.delete':     'Delete calendar events',
   'system.calendar.export':     'Export the calendar to PDF',
-  'system.settings.view':       'View school settings',
-  'system.settings.update':     'Change school settings',
-  'system.academic.create':     'Add academic years',
-  'system.academic.update':     'Change term dates',
-  'system.academic.open':       'Open a term',
-  'system.academic.close':      'Close a term',
-  'system.structure.update':    'Change forms, streams and classes',
-  'system.grading.update':      'Change the grading scales',
-  'system.finance.update':      'Change currencies and number formats',
-  'system.numbering.update':    'Change the admission number format',
-  'system.users.view':          'View users',
-  'system.users.create':        'Add users',
-  'system.users.update':        'Edit users and roles',
+  'system.settings.view':       'See the school settings',
+  'system.settings.edit':       'Change the school settings',
+  'system.users.view':          'See the users',
+  'system.users.create':        'Add, invite and import users',
+  'system.users.edit':          'Change users, their roles and their passwords',
   'system.users.deactivate':    'Deactivate and reactivate users',
-  'system.users.reset_password': 'Reset user passwords',
-  'system.users.invite':        'Send invites again',
-  'system.users.import':        'Import users from a file',
   'system.users.export':        'Export the user list',
-  'system.roles.view':          'View roles and permissions',
-  'system.audit.view':          'View the audit log',
+  'system.roles.view':          'See roles and permissions',
+  'system.roles.edit':          'Change what a role may do',
+  'system.audit.view':          'See the audit log',
   'system.audit.export':        'Export the audit log',
-  'system.subscription.view':   'View the subscription',
-  'system.subscription.manage': 'Switch modules on and off',
+  'system.subscription.view':   'See the subscription and invoices',
 
   'students.list.view':         'View students',
   'students.import':            'Import students',
@@ -117,27 +106,31 @@ const isSelfService = (permission: string) => moduleOf(permission) === 'account'
 
 // ─── can() ───────────────────────────────────────────────────────────────────
 
-/**
- * Roles that hold every permission for now: the School Administrator (ADMIN) and
- * the school owner (DIRECTOR). Everyone else holds only what RolePermission rows
- * grant them, which is nothing yet.
- */
-export const FULL_ACCESS_ROLES: readonly UserRole[] = ['ADMIN', 'DIRECTOR'];
+/** The grant that means every permission (given to Owner and Administrator). */
+export const WILDCARD = '*';
 
 export interface AccessUser {
   id: string;
   schoolId: string;
+  /** The older single access level; the pages written before roles were data still use it. */
   role: UserRole;
   /** Modules switched off for the user's school. */
   disabledModules?: readonly string[];
-  /** Permission keys granted to the user's role (RolePermission rows). */
+  /** Permission keys granted by the person's roles (RolePermission rows), or "*" for everything. */
   grants?: readonly string[];
+  /** The school is suspended, or this is a support session: looking is allowed, changing is not. */
+  readOnly?: boolean;
+  /** A support session: looking is allowed, but nothing may be exported (people's details stay on screen). */
+  noExport?: boolean;
 }
 
 /** Narrows a check, e.g. to one school. A scope naming another school is never allowed. */
 export interface AccessScope {
   schoolId?: string;
 }
+
+/** The actions that only look. Everything else changes something. */
+const LOOKING = new Set(['view', 'export']);
 
 export function can(user: AccessUser | null | undefined, permission: string, scope?: AccessScope): boolean {
   if (!user) return false;
@@ -149,8 +142,12 @@ export function can(user: AccessUser | null | undefined, permission: string, sco
   const mod = moduleOf(permission);
   if (!ALWAYS_ON_MODULES.includes(mod) && user.disabledModules?.includes(mod)) return false;
 
-  if (FULL_ACCESS_ROLES.includes(user.role)) return true;
-  return user.grants?.includes(permission) ?? false;
+  const action = permission.split('.').pop() ?? '';
+  if (user.readOnly && !LOOKING.has(action)) return false;
+  if (user.noExport && action === 'export') return false;
+
+  const grants = user.grants ?? [];
+  return grants.includes(WILDCARD) || grants.includes(permission);
 }
 
 /** Turns the rows that say which modules are on into the list of switched-off ones. */

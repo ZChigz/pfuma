@@ -5,7 +5,7 @@ import { updateSchoolDefaults } from '@/lib/system/settings';
 import { SchoolDefaultsSchema } from '@/lib/validations/system';
 
 async function _PATCH(req: Request) {
-  const user = await requirePermission('system.settings.update');
+  const user = await requirePermission('system.settings.edit');
   const db = getScopedDb(user.schoolId, user.id);
   const parsed = await parseBody(req, SchoolDefaultsSchema);
   if ('error' in parsed) return parsed.error;

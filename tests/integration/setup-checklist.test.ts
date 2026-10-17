@@ -122,9 +122,8 @@ describe('new school settings fields', () => {
 
   it('is only for people who may see settings and set up the school', async () => {
     const { can } = await import('@/lib/access-core');
-    expect(can({ id: 'x', schoolId: 's', role: 'ADMIN' }, 'system.setup.view')).toBe(true);
-    expect(can({ id: 'x', schoolId: 's', role: 'DIRECTOR' }, 'system.setup.view')).toBe(true);
-    for (const role of ['HEAD', 'BURSAR', 'TEACHER', 'LIBRARIAN'] as const) expect(can({ id: 'x', schoolId: 's', role }, 'system.setup.view')).toBe(false);
+    expect(can({ id: 'x', schoolId: 's', role: 'ADMIN', grants: ['*'] }, 'system.settings.edit')).toBe(true);
+    for (const role of ['HEAD', 'BURSAR', 'TEACHER', 'LIBRARIAN'] as const) expect(can({ id: 'x', schoolId: 's', role, grants: ['system.dashboard.view', 'system.calendar.view'] }, 'system.settings.edit')).toBe(false);
     expect((await saveDefaults({ setupChecklistPinned: true }, A.users.TEACHER)).status).toBe(403);
     expect((await saveProfile({}, A.users.TEACHER)).status).toBe(403);
   });

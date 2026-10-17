@@ -29,7 +29,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Record
       />
       <UsersClient
         rows={rows.map((r) => ({
-          id: r.id, fullName: r.fullName, email: r.email, phone: r.phone, title: r.title, roles: r.staffRoles, status: statusOf(r),
+          id: r.id, fullName: r.fullName, email: r.email, phone: r.phone, title: r.title, roles: r.roles, status: statusOf(r),
           lastLoginAt: r.lastLoginAt?.toISOString() ?? null, createdAt: r.createdAt.toISOString(),
         }))}
         total={total}
@@ -39,12 +39,13 @@ export default async function UsersPage({ searchParams }: { searchParams: Record
         currentUserId={user.id}
         schoolName={school?.name ?? 'your school'}
         canCreate={can('system.users.create')}
-        canUpdate={can('system.users.update')}
+        canUpdate={can('system.users.edit')}
         canDeactivate={can('system.users.deactivate')}
-        canResetPassword={can('system.users.reset_password')}
+        canResetPassword={can('system.users.edit')}
         canExport={can('system.users.export')}
-        canInvite={can('system.users.invite')}
-        canImport={can('system.users.import')}
+        canInvite={can('system.users.create')}
+        canImport={can('system.users.create')}
+        canViewActivity={can('system.audit.view')}
       />
     </div>
   );

@@ -2,6 +2,7 @@
 // the term dates that come from Academic Terms. Every other module should read dates
 // through listCalendar so there is one place they live.
 import type { CalendarAudience, CalendarEventKind, CalendarRepeat, Prisma } from '@prisma/client';
+import { SchoolSuspendedError } from '@/lib/errors';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import type { ScopedDb } from '@/lib/scoped-db';
@@ -88,6 +89,8 @@ export async function ensureHolidays(db: ScopedDb, actor: Actor, years: number[]
         );
       });
     } catch (e) {
+      // A suspended school can look but nothing is saved: the holidays are loaded once it is active again.
+      if (e instanceof SchoolSuspendedError) return;
       // Another request loaded the same year first.
       if ((e as { code?: string }).code !== 'P2002') throw e;
     }

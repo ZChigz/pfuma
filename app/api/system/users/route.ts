@@ -22,7 +22,7 @@ async function _GET(req: Request) {
       'users.csv',
       toCsv(
         ['Name', 'Email', 'Phone', 'Roles', 'Status', 'Last login', 'Joined'],
-        rows.map((r) => [r.fullName, r.email, r.phone, r.staffRoles.map((k) => STAFF_ROLE_LABEL[k]).join('; '), STATUS_LABEL[statusOf(r)], r.lastLoginAt, r.createdAt]),
+        rows.map((r) => [r.fullName, r.email, r.phone, r.roles.map((k) => STAFF_ROLE_LABEL[k]).join('; '), STATUS_LABEL[statusOf(r)], r.lastLoginAt, r.createdAt]),
       ),
     );
   }

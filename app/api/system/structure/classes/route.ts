@@ -6,7 +6,7 @@ import { ClassGridSchema } from '@/lib/validations/system';
 
 // Saves the forms-by-streams grid in one go: either every change is made or none is.
 async function _PUT(req: Request) {
-  const user = await requirePermission('system.structure.update');
+  const user = await requirePermission('system.settings.edit');
   const db = getScopedDb(user.schoolId, user.id);
   const parsed = await parseBody(req, ClassGridSchema);
   if ('error' in parsed) return parsed.error;

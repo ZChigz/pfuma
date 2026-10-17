@@ -4,7 +4,10 @@ import { getScopedDb } from '@/lib/scoped-db';
 import { parseTableQuery } from '@/lib/table-query';
 import { csvResponse, toCsv } from '@/lib/csv';
 import { AUDIT_FILTER_KEYS, AUDIT_SORTABLE, listAuditLog } from '@/lib/system/audit-log';
+import { actionLabel, entityLabel, moduleLabel } from '@/lib/system/audit-labels';
 
+// Read-only on purpose: there is no POST, PATCH or DELETE for the audit log, and the database refuses
+// changes to it as well.
 async function _GET(req: Request) {
   const params = new URL(req.url).searchParams;
   const wantsCsv = params.get('format') === 'csv';
@@ -17,8 +20,8 @@ async function _GET(req: Request) {
     return csvResponse(
       'audit-log.csv',
       toCsv(
-        ['When', 'Who', 'Action', 'Record type', 'Record ID', 'Detail'],
-        rows.map((r) => [r.createdAt, r.actor.fullName, r.action, r.entityType, r.entityId, r.detail]),
+        ['Date and time', 'User', 'Action', 'Action code', 'Module', 'Record type', 'Record', 'Record ID', 'IP'],
+        rows.map((r) => [r.createdAt, r.actor.fullName, actionLabel(r.action), r.action, moduleLabel(r.module), entityLabel(r.entityType), r.detail, r.entityId, r.ip]),
       ),
     );
   }

@@ -41,7 +41,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: { t
 
   let panel;
   if (tab === 'profile') {
-    panel = <ProfileTab school={school} canUpdate={can('system.settings.update')} />;
+    panel = <ProfileTab school={school} canUpdate={can('system.settings.edit')} />;
   } else if (tab === 'years') {
     const years = await db.academicYear.findMany({
       where: { schoolId: user.schoolId },
@@ -53,27 +53,27 @@ export default async function SettingsPage({ searchParams }: { searchParams: { t
       year: y.year,
       terms: y.terms.map((t) => ({ id: t.id, name: t.name, termNumber: t.termNumber, startDate: day(t.startDate), endDate: day(t.endDate), status: t.status })),
     }));
-    panel = <AcademicTab years={rows} canCreate={can('system.academic.create')} canUpdate={can('system.academic.update')} canOpen={can('system.academic.open')} canClose={can('system.academic.close')} />;
+    panel = <AcademicTab years={rows} canCreate={can('system.settings.edit')} canUpdate={can('system.settings.edit')} canOpen={can('system.settings.edit')} canClose={can('system.settings.edit')} />;
   } else if (tab === 'structure') {
-    panel = <StructureTab data={await getStructure(db, user.schoolId)} canUpdate={can('system.structure.update')} />;
+    panel = <StructureTab data={await getStructure(db, user.schoolId)} canUpdate={can('system.settings.edit')} />;
   } else if (tab === 'grading') {
-    panel = <GradingTab scales={await getScales(db, user.schoolId)} canUpdate={can('system.grading.update')} />;
+    panel = <GradingTab scales={await getScales(db, user.schoolId)} canUpdate={can('system.settings.edit')} />;
   } else if (tab === 'finance') {
-    panel = <FinanceTab school={school} year={year} canUpdate={can('system.finance.update')} />;
+    panel = <FinanceTab school={school} year={year} canUpdate={can('system.settings.edit')} />;
   } else {
     const [sequences, modules, subscription] = await Promise.all([
       nextSequences(db as never, user.schoolId, [year]),
       getModuleStates(db),
-      can('system.subscription.view') ? db.subscription.findFirst() : Promise.resolve(null),
+      can('system.subscription.view') ? db.school.findUnique({ where: { id: user.schoolId }, select: { status: true, renewalDate: true, plan: { select: { name: true } } } }) : Promise.resolve(null),
     ]);
     panel = (
       <NumberingTab
         school={{ schoolCode: school.schoolCode, admissionFormat: school.admissionFormat }}
         year={year}
         nextSaved={sequences.get(year) ?? 1}
-        plan={subscription ? { name: subscription.plan, status: subscription.status, endsAt: subscription.endsAt ? day(subscription.endsAt) : null } : null}
+        plan={subscription ? { name: subscription.plan?.name ?? 'No plan', status: subscription.status, endsAt: subscription.renewalDate ? day(subscription.renewalDate) : null } : null}
         modules={MODULES.map((m) => ({ key: m.key, label: m.label, on: modules[m.key] }))}
-        canUpdate={can('system.numbering.update')}
+        canUpdate={can('system.settings.edit')}
       />
     );
   }

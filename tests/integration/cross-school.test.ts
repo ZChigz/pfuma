@@ -14,7 +14,7 @@ import { NextRequest } from 'next/server';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Role } from '@prisma/client';
 import { startTestDb, type TestDb } from '../helpers/test-db';
-import { seedSchool, type SeededSchool } from '../helpers/seed';
+import { grantPermission, seedSchool, type SeededSchool } from '../helpers/seed';
 import { defaultRegistrationValues, currentYearInHarare } from '@/lib/students/registration';
 
 const session = vi.hoisted(() => ({ current: null as null | Record<string, unknown> }));
@@ -30,6 +30,7 @@ let before: string;
 let bIds: string[] = [];
 let bEventId = '';
 let bNotificationId = '';
+let bInvoiceId = '';
 let bStreamId = '';
 let bStrings: string[] = [];
 
@@ -38,7 +39,7 @@ const TABLES = [
   'Charge', 'Payment', 'Expense', 'ExpenseRequest', 'AuditLog', 'Subject', 'SubjectAssignment', 'Mark', 'TermResult',
   'GradeBoundary', 'AssetCategory', 'Asset', 'AssetMaintenance', 'AssetDisposal', 'Book', 'BookCopy', 'LibraryMember',
   'Borrowing', 'ExchangeRate', 'PortalAccessLog', 'PasswordResetToken', 'AssetTransfer', 'Income', 'MarkChange',
-  'Subscription', 'SchoolModule', 'RolePermission', 'Notification', 'CalendarEvent', 'Stream',
+  'Subscription', 'SchoolModule', 'RolePermission', 'Notification', 'CalendarEvent', 'Stream', 'RoleDefinition', 'UserRole', 'SubscriptionInvoice',
 ];
 
 /** Every row of school B (and its child rows), as stable JSON. */
@@ -73,8 +74,9 @@ beforeAll(async () => {
   bStreamId = (await prisma.stream.create({ data: { schoolId: B.schoolId, name: 'BStream' } })).id;
   bNotificationId = (await prisma.notification.create({ data: { schoolId: B.schoolId, userId: B.users.HEAD.id, title: 'B note' } })).id;
   await prisma.subscription.create({ data: { schoolId: B.schoolId } });
+  bInvoiceId = (await prisma.subscriptionInvoice.create({ data: { schoolId: B.schoolId, number: 'INV-B-0001', issuedOn: new Date('2026-09-01'), amount: 120, description: 'Standard plan', createdByAdminId: 'platform' } })).id;
   await prisma.schoolModule.create({ data: { schoolId: B.schoolId, module: 'hr', enabled: false } });
-  await prisma.rolePermission.create({ data: { schoolId: B.schoolId, role: 'HEAD', permission: 'system.users.view' } });
+  await grantPermission(prisma, B.schoolId, 'HEAD', 'system.users.view');
   const snap = await snapshotB();
   before = snap.json;
   bIds = snap.ids;
@@ -245,7 +247,7 @@ const ATTACKS: Attack[] = [
   { name: 'system users import (own school)', file: 'system/users/import', method: 'POST', as: 'ADMIN', body: () => ({ csv: ['name,email,phone,roles', 'Import One,import.one@schoola.test,0712345678,Teacher'].join('\n') }), expect: 'ok' },
   { name: 'system users import template', file: 'system/users/import', method: 'GET', as: 'ADMIN', expect: 'ok' },
   { name: "system new invite for B's user", file: 'system/users/[id]/invite', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },
-  { name: "system edit B's user", file: 'system/users/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), body: () => ({ roles: ['SCHOOL_ADMINISTRATOR'] }), expect: 404 },
+  { name: "system edit B's user", file: 'system/users/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), body: () => ({ roles: ['ADMINISTRATOR'] }), expect: 404 },
   { name: "system deactivate B's user", file: 'system/users/[id]/deactivate', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.HEAD.id }), expect: 404 },
   { name: "system reactivate B's user", file: 'system/users/[id]/reactivate', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.HEAD.id }), expect: 404 },
   { name: "system reset B's user password", file: 'system/users/[id]/reset-password', method: 'POST', as: 'ADMIN', params: () => ({ id: b().users.TEACHER.id }), expect: 404 },
@@ -272,13 +274,14 @@ const ATTACKS: Attack[] = [
   { name: "system edit B's event", file: 'system/calendar/[id]', method: 'PATCH', as: 'ADMIN', params: () => ({ id: bEventId }), body: () => ({ title: 'hacked', kind: 'EXAM', startDate: '2026-09-01', endDate: '2026-09-02' }), expect: 404 },
   { name: "system delete B's event", file: 'system/calendar/[id]', method: 'DELETE', as: 'ADMIN', params: () => ({ id: bEventId }), expect: 404 },
   { name: 'system calendar PDF of an own term', file: 'system/calendar/pdf', method: 'GET', as: 'ADMIN', url: () => `?termId=${a().termId}`, expect: 'ok' },
+  { name: 'system invoice PDF (own school has none)', file: 'system/subscription/invoices/[id]/pdf', method: 'GET', as: 'ADMIN', params: () => ({ id: 'no-such-invoice' }), expect: 404 },
+  { name: "system invoice PDF of B's invoice", file: 'system/subscription/invoices/[id]/pdf', method: 'GET', as: 'ADMIN', params: () => ({ id: bInvoiceId }), expect: 404 },
+  { name: 'system profile change (own, body cannot name another user)', file: 'system/profile', method: 'PATCH', as: 'ADMIN', body: () => ({ fullName: 'Changed Own', id: b().users.ADMIN.id, userId: b().users.ADMIN.id }), expect: 'ok' },
   { name: "system calendar PDF of B's term", file: 'system/calendar/pdf', method: 'GET', as: 'ADMIN', url: () => `?termId=${b().termId}`, expect: 404 },
   { name: 'system calendar event for B forms', file: 'system/calendar', method: 'POST', as: 'ADMIN', body: () => ({ title: 'x', kind: 'EXAM', startDate: '2026-09-01', endDate: '2026-09-01', audience: 'FORMS', audienceLevelIds: [b().levelId] }), expect: 404 },
   { name: 'system audit log (list)', file: 'system/audit-log', method: 'GET', as: 'ADMIN', url: () => '?pageSize=100', expect: 'ok' },
   { name: 'system audit log filtered by a B person', file: 'system/audit-log', method: 'GET', as: 'ADMIN', url: () => `?actor=${b().users.ADMIN.id}&entity=User`, expect: 'ok' },
   { name: 'system audit log CSV', file: 'system/audit-log', method: 'GET', as: 'ADMIN', url: () => '?format=csv', expect: 'ok' },
-  { name: 'system modules read', file: 'system/subscription/modules', method: 'GET', as: 'ADMIN', expect: 'ok' },
-  { name: 'system modules change (own school)', file: 'system/subscription/modules', method: 'PATCH', as: 'ADMIN', body: () => ({ modules: { communication: false } }), expect: 'ok' },
   { name: 'system notifications (list)', file: 'system/notifications', method: 'GET', as: 'HEAD', expect: 'ok' },
   { name: "system mark B's notification read", file: 'system/notifications', method: 'POST', as: 'HEAD', body: () => ({ id: bNotificationId }), expect: 404 },
   { name: 'system switch to a B term', file: 'system/view-term', method: 'POST', as: 'ADMIN', body: () => ({ termId: b().termId }), expect: 404 },
@@ -292,6 +295,18 @@ const EXEMPT: Record<string, string> = {
   'upload': 'UploadThing handler; school id comes from the session, files are keyed pop:<schoolId>:…',
   'account/change-password': "changes the signed-in user's own password; no id is accepted",
   'password-reset': 'public; the single-use reset link is the credential (tests/integration/rates-resets-assets.test.ts)',
+  'cron/notifications': 'scheduler only (secret in the Authorization header); writes per school with each school own scoped client (tests/integration/roles-audit-notifications.test.ts)',
+  'platform/login': 'Pfuma staff sign-in, no school involved (tests/integration/platform.test.ts)',
+  'platform/logout': 'clears the console cookie, no school involved',
+  'platform/schools': 'Pfuma console: staff only, never a school user; every route answers 401 without the console cookie (tests/integration/platform.test.ts)',
+  'platform/schools/[id]': 'Pfuma console, staff only (tests/integration/platform.test.ts)',
+  'platform/schools/[id]/modules': 'Pfuma console, staff only (tests/integration/platform.test.ts)',
+  'platform/schools/[id]/suspend': 'Pfuma console, staff only (tests/integration/platform.test.ts)',
+  'platform/schools/[id]/reactivate': 'Pfuma console, staff only (tests/integration/platform.test.ts)',
+  'platform/schools/[id]/invoices': 'Pfuma console, staff only (tests/integration/platform.test.ts)',
+  'platform/schools/[id]/support': 'Pfuma console, staff only (tests/integration/platform.test.ts)',
+  'platform/invoices/[id]/pay': 'Pfuma console, staff only (tests/integration/platform.test.ts)',
+  'system/support/end': 'only a support session may call it, and it takes no id: it acts on the caller own school (tests/integration/platform.test.ts)',
   'portal/verify-pin': 'public; looks the student up by the hash of a secret link token (tests/integration/portal.test.ts)',
 };
 

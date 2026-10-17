@@ -27,8 +27,8 @@ export async function loadStudentSummary(db: ScopedDb, schoolId: string, term: S
 export async function loadStaffSummary(db: ScopedDb, schoolId: string, now = new Date()) {
   const since = new Date(now.getTime() - LOGIN_WINDOW_DAYS * DAY);
   const [active, recent] = await Promise.all([
-    db.user.count({ where: { schoolId, active: true } }),
-    db.user.count({ where: { schoolId, active: true, lastLoginAt: { gte: since } } }),
+    db.user.count({ where: { schoolId, active: true, isSupport: false } }),
+    db.user.count({ where: { schoolId, active: true, isSupport: false, lastLoginAt: { gte: since } } }),
   ]);
   return { active, loggedInThisWeek: recent };
 }

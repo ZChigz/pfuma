@@ -110,7 +110,7 @@ describe('chart drawing', () => {
 });
 
 describe('quick actions', () => {
-  const admin = { id: 'u', schoolId: 's', role: 'ADMIN' as const };
+  const admin = { id: 'u', schoolId: 's', role: 'ADMIN' as const, grants: ['*'] };
   it('offers the four actions to an administrator', () => {
     const html = renderToStaticMarkup(<QuickActions user={admin} />);
     for (const label of ['Add user', 'Import students', 'Add event', 'Open settings']) expect(html).toContain(label);
@@ -118,7 +118,7 @@ describe('quick actions', () => {
     expect(html).toContain('/system/calendar?new=1');
   });
   it('hides actions the person may not do, and everything when none', () => {
-    expect(renderToStaticMarkup(<QuickActions user={{ ...admin, role: 'TEACHER' }} />)).toBe('');
+    expect(renderToStaticMarkup(<QuickActions user={{ ...admin, role: 'TEACHER', grants: [] }} />)).toBe('');
     const some = renderToStaticMarkup(<QuickActions user={{ ...admin, role: 'HEAD', grants: ['system.settings.view'] }} />);
     expect(some).toContain('Open settings');
     expect(some).not.toContain('Add user');

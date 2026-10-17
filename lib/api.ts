@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ZodError, type ZodSchema } from 'zod';
+import { SchoolSuspendedError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 
 export function apiSuccess<T>(data: T, status = 200): NextResponse {
@@ -58,6 +59,7 @@ export function withApi(label: string, handler: NextHandler): NextHandler {
     } catch (err) {
       if (err instanceof ServiceError) return apiError(err.message, err.status);
       if (err instanceof Response) return err;
+      if (err instanceof SchoolSuspendedError) return apiError(err.message, 403);
       // The database refused a reference into another school (trigger
       // check_same_school). Treat it like any record the caller cannot see.
       if (err instanceof Error && err.message.includes('Cross-school reference')) {

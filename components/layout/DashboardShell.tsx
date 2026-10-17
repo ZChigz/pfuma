@@ -2,6 +2,9 @@ import { getAccess } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { buildNav } from '@/lib/nav';
 import { getViewTerm } from '@/lib/system/view-term';
+import { subscriptionView } from '@/lib/system/subscription';
+import { SubscriptionBanner } from './SubscriptionBanner';
+import { SupportBanner } from './SupportBanner';
 import { Sidebar } from './Sidebar';
 import { TopBar, type JumpItem } from './TopBar';
 import { ROLE_LABELS, ROLE_NAV } from './nav-config';
@@ -15,11 +18,12 @@ export async function DashboardShell({ children }: { children: ReactNode }) {
 
   const canSeeNotifications = can('account.notifications.view');
   const [school, view, unread] = await Promise.all([
-    db.school.findUnique({ where: { id: user.schoolId }, select: { name: true, logoUrl: true } }),
+    db.school.findUnique({ where: { id: user.schoolId }, select: { name: true, logoUrl: true, status: true, renewalDate: true, studentLimit: true } }),
     getViewTerm(user.schoolId, db),
     canSeeNotifications ? db.notification.count({ where: { userId: user.id, readAt: null } }) : Promise.resolve(0),
   ]);
 
+  const banner = school ? subscriptionView(school).banner : null;
   const groups = buildNav(user);
   const workspace = ROLE_NAV[user.role] ?? null;
   const jumpItems: JumpItem[] = [
@@ -46,7 +50,11 @@ export async function DashboardShell({ children }: { children: ReactNode }) {
             canViewProfile={can('account.profile.view')}
             canChangePassword={can('account.password.change')}
           />
-          <main className="min-h-0 flex-1 md:overflow-y-auto md:pr-1">{children}</main>
+          <main className="min-h-0 flex-1 md:overflow-y-auto md:pr-1">
+            {user.support && <SupportBanner schoolName={school?.name ?? ''} />}
+            <SubscriptionBanner banner={banner} canView={can('system.subscription.view')} />
+            {children}
+          </main>
         </div>
       </div>
     </div>

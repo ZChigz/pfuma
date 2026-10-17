@@ -16,6 +16,9 @@ declare module 'next-auth' {
       role: UserRole;
       fullName: string;
       mustChangePassword: boolean;
+      /** A Pfuma support person looking in read-only (set by the platform console, never by sign-in). */
+      support?: boolean;
+      supportAdminId?: string;
     };
   }
 
@@ -38,6 +41,8 @@ declare module '@auth/core/jwt' {
     tokenVersion: number;
     mustChangePassword: boolean;
     checkedAt: number;
+    support?: boolean;
+    supportAdminId?: string;
   }
 }
 
@@ -64,6 +69,8 @@ export const authConfig = {
       session.user.role = token.role;
       session.user.fullName = token.fullName;
       session.user.mustChangePassword = token.mustChangePassword === true;
+      session.user.support = token.support === true;
+      session.user.supportAdminId = typeof token.supportAdminId === 'string' ? token.supportAdminId : undefined;
       return session;
     },
   },

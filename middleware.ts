@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import { NextResponse } from 'next/server';
 import { authConfig } from '@/lib/auth.config';
 import { clientIp, getLimiters } from '@/lib/rate-limit';
+import { supportBlocked } from '@/lib/support-guard';
 import type { NextRequest } from 'next/server';
 import type { UserRole } from '@/types';
 
@@ -92,7 +93,7 @@ function tooManyRequests(retryAfter: number): Response {
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
-export default auth(async (req: NextRequest & { auth: { user?: { id?: string; role: UserRole; mustChangePassword?: boolean } } | null }) => {
+export default auth(async (req: NextRequest & { auth: { user?: { id?: string; role: UserRole; mustChangePassword?: boolean; support?: boolean } } | null }) => {
   const { nextUrl } = req;
   const { pathname } = nextUrl;
   const ip = clientIp(req.headers);
@@ -120,6 +121,11 @@ export default auth(async (req: NextRequest & { auth: { user?: { id?: string; ro
   const role = req.auth?.user?.role;
   const isLoggedIn = !!role;
 
+  // A Pfuma support person looks in read-only: no change request gets through.
+  if (isLoggedIn && req.auth?.user?.support && supportBlocked(req.method, pathname)) {
+    return NextResponse.json({ success: false, message: 'Pfuma support can look but not change anything' }, { status: 403 });
+  }
+
   const isPublic =
     pathname.startsWith('/login') ||
     pathname.startsWith('/portal') ||
@@ -128,7 +134,12 @@ export default auth(async (req: NextRequest & { auth: { user?: { id?: string; ro
     pathname.startsWith('/api/password-reset') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/upload') ||
-    pathname.startsWith('/api/health');
+    pathname.startsWith('/api/health') ||
+    // The Pfuma console has its own sign-in (lib/platform/session.ts); it checks the cookie itself.
+    pathname === '/platform' ||
+    pathname.startsWith('/platform/') ||
+    pathname.startsWith('/api/platform/') ||
+    pathname.startsWith('/api/cron/');
 
   if (!isLoggedIn && !isPublic) {
     // API callers get a status code, not an HTML redirect.
