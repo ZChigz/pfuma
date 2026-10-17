@@ -10,7 +10,7 @@ interface Item {
   id: string;
   title: string;
   body: string | null;
-  href: string | null;
+  link: string | null;
   readAt: string | null;
   createdAt: string;
 }
@@ -26,7 +26,7 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/system/notifications', { cache: 'no-store' });
+      const res = await fetch('/api/system/notifications?limit=10', { cache: 'no-store' });
       if (!res.ok) throw new Error();
       const { data } = await res.json();
       setItems(data.items);
@@ -81,7 +81,7 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
             <p className="text-sm font-semibold text-ink">Notifications</p>
             {unread > 0 && (
               <button type="button" onClick={() => markRead({ all: true })} className="min-h-[44px] px-2 text-xs font-medium text-primary hover:underline">
-                Mark all read
+                Mark all as read
               </button>
             )}
           </div>
@@ -99,8 +99,8 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
               );
               return (
                 <li key={n.id} className={cn('border-b border-line last:border-0', !n.readAt && 'bg-tint/60')}>
-                  {n.href ? (
-                    <Link href={n.href} onClick={() => { setOpen(false); if (!n.readAt) void markRead({ id: n.id }); }} className="block px-4 py-3 hover:bg-rowhover">{inner}</Link>
+                  {n.link ? (
+                    <Link href={n.link} onClick={() => { setOpen(false); if (!n.readAt) void markRead({ id: n.id }); }} className="block px-4 py-3 hover:bg-rowhover">{inner}</Link>
                   ) : (
                     <button type="button" onClick={() => !n.readAt && markRead({ id: n.id })} className="block w-full px-4 py-3 text-left hover:bg-rowhover">{inner}</button>
                   )}
@@ -108,6 +108,7 @@ export function NotificationBell({ initialUnread }: { initialUnread: number }) {
               );
             })}
           </ul>
+          <Link href="/system/notifications" onClick={() => setOpen(false)} className="flex min-h-[44px] items-center justify-center border-t border-line text-xs font-medium text-primary hover:underline">View all notifications</Link>
         </div>
       )}
     </div>

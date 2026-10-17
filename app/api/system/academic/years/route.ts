@@ -18,7 +18,7 @@ async function _GET() {
 // A year and its three terms, with the dates the school chose. Terms may not overlap, and the
 // year may not overlap another year.
 async function _POST(req: Request) {
-  const user = await requirePermission('system.academic.create');
+  const user = await requirePermission('system.settings.edit');
   const parsed = await parseBody(req, CreateYearSchema);
   if ('error' in parsed) return parsed.error;
   const year = await createAcademicYear(user.schoolId, user.id, { year: parsed.data.year, terms: parsed.data.terms });

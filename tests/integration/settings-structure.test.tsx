@@ -3,7 +3,7 @@
 // grading scales, finance basics, numbering (and the admission numbers that use it).
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startTestDb, type TestDb } from '../helpers/test-db';
-import { seedSchool, type SeededSchool } from '../helpers/seed';
+import { grantPermission, revokePermission, seedSchool, type SeededSchool } from '../helpers/seed';
 import { call } from '../helpers/route';
 import { session } from '../helpers/session';
 import { defaultRegistrationValues, currentYearInHarare } from '@/lib/students/registration';
@@ -525,10 +525,10 @@ describe('the settings page', () => {
   it('shows access denied without the permission, and passes the right flags to read-only people', async () => {
     const denied = (await render(A.users.TEACHER, 'years')) as { type: { name: string } };
     expect(denied.type.name).toBe('AccessDenied');
-    await prisma.rolePermission.create({ data: { schoolId: A.schoolId, role: 'BURSAR', permission: 'system.settings.view' } });
+    await grantPermission(prisma, A.schoolId, 'BURSAR', 'system.settings.view');
     const readOnly = (await render(A.users.BURSAR, 'years')) as { props: { children: { props: { children?: { props?: Record<string, unknown> } } }[] } };
     const tabProps = readOnly.props.children[2].props.children?.props ?? {};
     expect([tabProps.canCreate, tabProps.canUpdate, tabProps.canOpen, tabProps.canClose]).toEqual([false, false, false, false]);
-    await prisma.rolePermission.deleteMany({ where: { schoolId: A.schoolId } });
+    await revokePermission(prisma, A.schoolId, 'BURSAR', 'system.settings.view');
   });
 });

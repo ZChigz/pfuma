@@ -3,7 +3,7 @@ import { apiSuccess, withApi } from '@/lib/api';
 import { closeTerm } from '@/lib/academic/terms';
 
 async function _POST(_req: Request, ctx: { params: { id: string } }) {
-  const user = await requirePermission('system.academic.close');
+  const user = await requirePermission('system.settings.edit');
   return apiSuccess({ term: await closeTerm(user.schoolId, user.id, ctx.params.id) });
 }
 

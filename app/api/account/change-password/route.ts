@@ -50,6 +50,7 @@ async function _POST(req: Request) {
       data: {
         passwordHash,
         mustChangePassword: false,
+        invitePending: false,
         passwordChangedAt: new Date(),
         tokenVersion: { increment: 1 },
       },

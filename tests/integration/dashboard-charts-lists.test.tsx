@@ -16,7 +16,7 @@ let prisma: typeof import('@/lib/prisma').prisma;
 const day = 864e5;
 const dbOf = async (s: SeededSchool) => (await import('@/lib/scoped-db')).getScopedDb(s.schoolId, s.users.ADMIN.id);
 const termOf = (id: string) => prisma.academicTerm.findUniqueOrThrow({ where: { id } });
-const userOf = (s: SeededSchool) => ({ id: s.users.ADMIN.id, schoolId: s.schoolId, role: 'ADMIN' as const });
+const userOf = (s: SeededSchool) => ({ id: s.users.ADMIN.id, schoolId: s.schoolId, role: 'ADMIN' as const, grants: ['*'] });
 const html = async (el: unknown) => renderToStaticMarkup((await el) as never);
 
 async function addStudent(s: SeededSchool, n: number, gender: 'M' | 'F' | null, classId: string, termId: string) {
@@ -85,7 +85,7 @@ describe('enrolment and class-size charts', () => {
     const term = await termOf(A.termId);
     expect(await EnrolmentChart({ user: { ...userOf(A), disabledModules: ['students'] }, term })).toBeNull();
     expect(await ClassSizeChart({ user: { ...userOf(A), disabledModules: ['academics'] }, term })).toBeNull();
-    expect(await EnrolmentChart({ user: { ...userOf(A), role: 'TEACHER' }, term })).toBeNull();
+    expect(await EnrolmentChart({ user: { ...userOf(A), role: 'TEACHER', grants: [] }, term })).toBeNull();
   });
 
   it('show an empty state with a link to the setup step, never an empty chart', async () => {
@@ -197,7 +197,7 @@ describe('recent activity', () => {
   it('shows an empty state for a school with no activity', async () => {
     const { RecentActivity } = await import('@/components/system/lists/Lists');
     const fresh = await prisma.school.create({ data: { name: 'Fresh' } });
-    const out = await html(RecentActivity({ user: { id: 'x', schoolId: fresh.id, role: 'ADMIN' } }));
+    const out = await html(RecentActivity({ user: { id: 'x', schoolId: fresh.id, role: 'ADMIN', grants: ['*'] } }));
     expect(out).toContain('Nothing has been done yet');
   });
 });

@@ -13,19 +13,35 @@ import type { UserRole } from '@/types';
 
 export * from '@/lib/access-core';
 
-/** The signed-in user plus what the check needs: switched-off modules and role grants. */
+/** The signed-in user plus what the check needs: switched-off modules and what their roles grant. */
 export interface AccessContext extends AccessUser {
   email: string;
   fullName: string;
+  /** Keys of the roles the person holds (OWNER, TEACHER ...). */
+  roles: string[];
+  /** A Pfuma support person looking at this school, read-only. */
+  support: boolean;
+  /** The school's subscription status, for the banner. */
+  schoolStatus: 'TRIAL' | 'ACTIVE' | 'OVERDUE' | 'SUSPENDED';
 }
 
-async function loadContext(session: { user: { id: string; schoolId: string; role: UserRole; email: string; fullName: string } }): Promise<AccessContext> {
+type SessionLike = {
+  user: { id: string; schoolId: string; role: UserRole; email: string; fullName: string; support?: boolean };
+};
+
+async function loadContext(session: SessionLike): Promise<AccessContext> {
   const u = session.user;
   const db = getScopedDb(u.schoolId, u.id);
-  const [modules, grants] = await Promise.all([
+  const [modules, held, school] = await Promise.all([
     db.schoolModule.findMany({ where: { enabled: false }, select: { module: true, enabled: true } }),
-    db.rolePermission.findMany({ where: { role: u.role }, select: { permission: true } }),
+    db.userRole.findMany({
+      where: { userId: u.id },
+      select: { role: { select: { key: true, permissions: { select: { permissionKey: true } } } } },
+    }),
+    db.school.findUnique({ where: { id: u.schoolId }, select: { status: true } }),
   ]);
+  const schoolStatus = school?.status ?? 'ACTIVE';
+  const support = u.support === true;
   return {
     id: u.id,
     schoolId: u.schoolId,
@@ -33,7 +49,13 @@ async function loadContext(session: { user: { id: string; schoolId: string; role
     email: u.email,
     fullName: u.fullName,
     disabledModules: disabledModulesFrom(modules),
-    grants: grants.map((g) => g.permission),
+    roles: Array.from(new Set(held.map((h) => h.role.key))),
+    grants: Array.from(new Set(held.flatMap((h) => h.role.permissions.map((p) => p.permissionKey)))),
+    // A suspended school, and a support person, can look but not change.
+    readOnly: schoolStatus === 'SUSPENDED' || support,
+    noExport: support,
+    support,
+    schoolStatus,
   };
 }
 
@@ -58,4 +80,11 @@ export async function getAccess(): Promise<{
   if (!session?.user?.id) redirect('/login');
   const user = await loadContext(session as never);
   return { user, can: (permission, scope) => can(user, permission, scope) };
+}
+
+/** The signed-in user for self-service routes (profile, password, notifications): any signed-in person. */
+export async function requireSignedIn(): Promise<AccessContext> {
+  const session = await auth();
+  if (!session?.user?.id) throw apiUnauthorized();
+  return loadContext(session as never);
 }

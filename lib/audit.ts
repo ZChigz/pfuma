@@ -10,6 +10,9 @@ export interface AuditParams {
   detail?: string;
   before?: Prisma.InputJsonValue;
   after?: Prisma.InputJsonValue;
+  /** Where the caller came from. Left out inside a request: the database copies it from the request. */
+  ip?: string;
+  userAgent?: string;
 }
 
 // Anything with an auditLog delegate: the raw client, a transaction, or the

@@ -6,7 +6,7 @@ import { GRADE_CATEGORIES, GradeScaleSchema } from '@/lib/validations/system';
 
 // Replaces the O Level or the A Level scale. Marks already graded keep the grade they were given.
 async function _PUT(req: Request, ctx: { params: { category: string } }) {
-  const user = await requirePermission('system.grading.update');
+  const user = await requirePermission('system.settings.edit');
   const db = getScopedDb(user.schoolId, user.id);
   const category = ctx.params.category;
   if (!(GRADE_CATEGORIES as readonly string[]).includes(category)) return apiError('The scale is O_LEVEL or A_LEVEL', 404);

@@ -4,7 +4,7 @@ import { openTerm } from '@/lib/academic/terms';
 
 // Only one term is open at a time; the service refuses a second one.
 async function _POST(_req: Request, ctx: { params: { id: string } }) {
-  const user = await requirePermission('system.academic.open');
+  const user = await requirePermission('system.settings.edit');
   return apiSuccess({ term: await openTerm(user.schoolId, user.id, ctx.params.id) });
 }
 

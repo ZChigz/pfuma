@@ -7,7 +7,7 @@ import { CalendarEventUpdateSchema } from '@/lib/validations/system';
 
 // Editing or deleting a repeating event changes the whole series.
 async function _PATCH(req: Request, ctx: { params: { id: string } }) {
-  const user = await requirePermission('system.calendar.update');
+  const user = await requirePermission('system.calendar.edit');
   const db = getScopedDb(user.schoolId, user.id);
   const parsed = await parseBody(req, CalendarEventUpdateSchema);
   if ('error' in parsed) return parsed.error;

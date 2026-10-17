@@ -5,7 +5,7 @@ import { updateUser } from '@/lib/system/users';
 import { SystemUpdateUserSchema } from '@/lib/validations/system';
 
 async function _PATCH(req: Request, ctx: { params: { id: string } }) {
-  const user = await requirePermission('system.users.update');
+  const user = await requirePermission('system.users.edit');
   const db = getScopedDb(user.schoolId, user.id);
   const parsed = await parseBody(req, SystemUpdateUserSchema);
   if ('error' in parsed) return parsed.error;

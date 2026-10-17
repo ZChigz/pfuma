@@ -3,7 +3,7 @@
 // repeats, times, audience, type filter, term dates, PDF export, school isolation.
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { startTestDb, type TestDb } from '../helpers/test-db';
-import { seedSchool, type SeededSchool } from '../helpers/seed';
+import { grantPermission, revokePermission, seedSchool, type SeededSchool } from '../helpers/seed';
 import { call } from '../helpers/route';
 
 vi.mock('@/lib/auth', async () => ({ auth: (await import('../helpers/session')).mockAuth }));
@@ -317,9 +317,9 @@ describe('PDF for the notice board', () => {
     expect((await call('system/calendar/pdf', 'GET', { as: admin(), query: '?termId=nope' })).status).toBe(404);
     expect((await call('system/calendar/pdf', 'GET', { as: A.users.HEAD, query: `?termId=${A.termId}` })).status).toBe(403);
     expect((await call('system/calendar/pdf', 'GET', { as: null, query: `?termId=${A.termId}` })).status).toBe(401);
-    await prisma.rolePermission.create({ data: { schoolId: A.schoolId, role: 'HEAD', permission: 'system.calendar.export' } });
+    await grantPermission(prisma, A.schoolId, 'HEAD', 'system.calendar.export');
     expect((await call('system/calendar/pdf', 'GET', { as: A.users.HEAD, query: `?termId=${A.termId}` })).status).toBe(200);
-    await prisma.rolePermission.deleteMany({ where: { schoolId: A.schoolId } });
+    await revokePermission(prisma, A.schoolId, 'HEAD', 'system.calendar.export');
   });
 });
 
@@ -337,19 +337,19 @@ describe('the calendar page', () => {
   it('shows the access-denied page without the permission', async () => {
     const { session } = await import('../helpers/session');
     session.current = { ...A.users.TEACHER };
+    await revokePermission(prisma, A.schoolId, 'TEACHER', 'system.calendar.view');
     const mod = await import('@/app/(dashboard)/system/calendar/page');
     const tree = (await mod.default({ searchParams: {} })) as { type: { name: string } };
+    await grantPermission(prisma, A.schoolId, 'TEACHER', 'system.calendar.view');
     expect(tree.type.name).toBe('AccessDenied');
   });
 
-  it('is cut off when the System permission is missing, and the buttons follow can()', async () => {
-    await prisma.rolePermission.create({ data: { schoolId: A.schoolId, role: 'BURSAR', permission: 'system.calendar.view' } });
+  it('lets a role that may only look see the calendar without the buttons', async () => {
     const { session } = await import('../helpers/session');
     session.current = { ...A.users.BURSAR };
     const mod = await import('@/app/(dashboard)/system/calendar/page');
     const tree = (await mod.default({ searchParams: {} })) as { props: { children: { props: Record<string, unknown> }[] } };
     const client = tree.props.children[1].props;
     expect([client.canCreate, client.canUpdate, client.canDelete, client.canExport]).toEqual([false, false, false, false]);
-    await prisma.rolePermission.deleteMany({ where: { schoolId: A.schoolId } });
   });
 });

@@ -1,5 +1,4 @@
 import { Suspense } from 'react';
-import Link from 'next/link';
 import { ClassesCard } from '@/components/system/cards/ClassesCard';
 import { StaffCard } from '@/components/system/cards/StaffCard';
 import { StudentsCard } from '@/components/system/cards/StudentsCard';
@@ -14,7 +13,6 @@ import { getAccess } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { getViewTerm } from '@/lib/system/view-term';
 import { getDashboardData } from '@/lib/system/dashboard';
-import { subscriptionView } from '@/lib/system/subscription';
 import { checklistVisible, evaluateSetup, loadSetupFacts, summarize } from '@/lib/system/setup-checklist';
 import { SetupChecklist } from '@/components/system/SetupChecklist';
 import { termLabel } from '@/lib/term-label';
@@ -38,17 +36,15 @@ export default async function DashboardPage() {
 
   const { term } = await getViewTerm(user.schoolId, db);
   const showFinance = can('finance.payments.view');
-  const showSetup = can('system.setup.view');
-  const [data, sub, setup] = await Promise.all([
+  const showSetup = can('system.settings.edit');
+  const [data, setup] = await Promise.all([
     getDashboardData(db, user.schoolId, term, { finance: showFinance, audit: false }),
-    can('system.subscription.view') ? db.subscription.findFirst() : Promise.resolve(null),
     showSetup
       ? Promise.all([loadSetupFacts(db, user.schoolId, term), db.school.findUniqueOrThrow({ where: { id: user.schoolId }, select: { setupChecklistPinned: true } })])
       : Promise.resolve(null),
   ]);
   const steps = setup ? evaluateSetup(setup[0]) : null;
   const pinned = setup?.[1].setupChecklistPinned ?? false;
-  const subscription = sub ? subscriptionView(sub) : null;
 
   return (
     <div className="flex flex-col gap-5 pb-6">
@@ -61,15 +57,6 @@ export default async function DashboardPage() {
       <QuickActions user={user} />
 
       {steps && checklistVisible(summarize(steps).complete, pinned) && <SetupChecklist steps={steps} pinned={pinned} />}
-
-      {subscription && (subscription.status === 'EXPIRED' || subscription.expiringSoon) && (
-        <div role="status" className="rounded-2xl border border-warn-line bg-warn-bg px-4 py-3 text-sm text-warn">
-          {subscription.status === 'EXPIRED'
-            ? 'Your subscription has expired.'
-            : `Your subscription ends in ${subscription.daysLeft} day${subscription.daysLeft === 1 ? '' : 's'}.`}{' '}
-          {can('system.subscription.view') && <Link href="/system/subscription" className="font-semibold underline">View subscription</Link>}
-        </div>
-      )}
 
       {!term && (
         <EmptyState

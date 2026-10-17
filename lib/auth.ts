@@ -4,9 +4,11 @@ import Credentials from 'next-auth/providers/credentials';
 import { prisma } from '@/lib/prisma';
 import { authConfig } from '@/lib/auth.config';
 import { hashPassword, needsRehash } from '@/lib/password';
+import { logAudit } from '@/lib/audit';
 import { clearLoginFailures, loginLockedFor, recordLoginFailure } from '@/lib/login-guard';
 import { clientIp } from '@/lib/rate-limit';
 import { revalidateToken, type SessionToken } from '@/lib/session-check';
+import { notify } from '@/lib/system/notifications';
 import type { UserRole } from '@/types';
 
 export class AccountLockedError extends CredentialsSignin {
@@ -32,7 +34,7 @@ export async function authorizeCredentials(
 
   // The same email can exist in more than one school; the password decides which.
   const candidates = await prisma.user.findMany({
-    where: { email: { equals: email, mode: 'insensitive' } },
+    where: { email: { equals: email, mode: 'insensitive' }, isSupport: false },
   });
 
   let matched: (typeof candidates)[number] | null = null;
@@ -53,9 +55,21 @@ export async function authorizeCredentials(
 
   await clearLoginFailures(email, ip);
 
-  // Feeds "logged in this week" on the dashboard. A failure here must not block sign-in.
+  // Feeds "logged in this week" on the dashboard, the audit log, and the welcome note on the very first
+  // sign-in. A failure here must not block sign-in.
   try {
     await prisma.user.update({ where: { id: matched.id }, data: { lastLoginAt: new Date() } });
+    await logAudit({
+      schoolId: matched.schoolId, actorId: matched.id, action: 'LOGIN_SUCCESS', entityType: 'User', entityId: matched.id,
+      detail: `${matched.fullName} signed in`, ip,
+      ...(request?.headers.get('user-agent') ? { userAgent: request.headers.get('user-agent')!.slice(0, 300) } : {}),
+    });
+    if (!matched.lastLoginAt) {
+      await notify([matched.id], {
+        type: 'WELCOME', title: 'Welcome to Pfuma', body: 'Your account is ready. Start from the dashboard; your profile is under your name at the top right.',
+        link: '/system/dashboard', dedupeKey: 'welcome',
+      });
+    }
   } catch {
     // ignore
   }

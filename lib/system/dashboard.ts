@@ -39,7 +39,7 @@ export async function getDashboardData(
   const [enrolled, classes, staff, upcoming, billed, collected, pendingPayments, recent] = await Promise.all([
     term ? db.enrollment.count({ where: { schoolId, termId: term.id } }) : Promise.resolve(0),
     db.schoolClass.count({ where: { schoolId, active: true } }),
-    db.user.count({ where: { schoolId, active: true } }),
+    db.user.count({ where: { schoolId, active: true, isSupport: false } }),
     db.calendarEvent.findMany({ where: { schoolId, endDate: { gte: today } }, orderBy: [{ startDate: 'asc' }, { title: 'asc' }], take: 5 }),
     opts.finance && term ? db.charge.groupBy({ by: ['currency'], where: { schoolId, termId: term.id }, _sum: { amount: true } }) : Promise.resolve([]),
     opts.finance && verifiedWindow

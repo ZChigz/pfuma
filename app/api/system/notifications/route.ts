@@ -5,16 +5,17 @@ import { NotificationReadSchema } from '@/lib/validations/system';
 
 // A person's own notifications only. Marking one read is personal housekeeping, not a
 // school record, so it is not written to the audit log.
-async function _GET() {
+async function _GET(req: Request) {
   const user = await requirePermission('account.notifications.view');
   const db = getScopedDb(user.schoolId, user.id);
+  const limit = Math.min(50, Math.max(1, Number(new URL(req.url).searchParams.get('limit')) || 10));
   const [unread, items] = await Promise.all([
     db.notification.count({ where: { userId: user.id, readAt: null } }),
     db.notification.findMany({
       where: { userId: user.id },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: 20,
-      select: { id: true, title: true, body: true, href: true, readAt: true, createdAt: true },
+      take: limit,
+      select: { id: true, title: true, body: true, link: true, type: true, readAt: true, createdAt: true },
     }),
   ]);
   return apiSuccess({ unread, items });

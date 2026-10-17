@@ -85,7 +85,7 @@ export function NumberingTab({ school, year, nextSaved, plan, modules, canUpdate
       <Card title="Modules" subtitle="The parts of Pfuma your school uses">
         {plan && (
           <p className="mb-3 text-sm text-muted">
-            Plan: <strong className="text-ink">{plan.name.charAt(0)}{plan.name.slice(1).toLowerCase()}</strong> ({plan.status.toLowerCase()}{plan.endsAt ? `, until ${plan.endsAt}` : ''})
+            Plan: <strong className="text-ink">{plan.name}</strong> ({plan.status.toLowerCase()}{plan.endsAt ? `, until ${plan.endsAt}` : ''})
           </p>
         )}
         <ul className="divide-y divide-line">

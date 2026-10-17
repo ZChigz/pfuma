@@ -17,7 +17,7 @@ async function _GET() {
   try { await canManageUsers(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
   const users = await db.user.findMany({
-    where: { schoolId: user.schoolId },
+    where: { schoolId: user.schoolId, isSupport: false },
     select: { id: true, fullName: true, email: true, role: true, active: true, createdAt: true },
     orderBy: { fullName: 'asc' },
   });

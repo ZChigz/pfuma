@@ -248,7 +248,8 @@ describe('sign-in', () => {
     const who = A.users.LIBRARIAN;
     for (let i = 0; i < 5; i++) await authorizeCredentials({ email: who.email, password: 'bad-bad-bad-1' }, req(ip)).catch(() => null);
     const rows = await prisma.auditLog.findMany({ where: { entityId: who.id, action: { in: ['LOGIN_FAILED', 'LOGIN_LOCKED'] } }, orderBy: { createdAt: 'asc' } });
-    expect(rows.map((r) => r.action)).toEqual(['LOGIN_FAILED', 'LOGIN_FAILED', 'LOGIN_LOCKED']); // failures 3, 4 and the locking 5th
+    expect(rows.map((r) => r.action)).toEqual(['LOGIN_FAILED', 'LOGIN_FAILED', 'LOGIN_FAILED', 'LOGIN_FAILED', 'LOGIN_LOCKED']); // every failure, then the locking 5th
+    expect(rows.every((r) => r.ip === '6.6.6.6' && r.module === 'system')).toBe(true);
     expect(rows[0].detail).toMatch(/6\.6\.6\.6/);
     expect(rows.every((r) => r.schoolId === A.schoolId)).toBe(true);
   });

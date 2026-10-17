@@ -14,7 +14,9 @@
 //      migration 20261017000200 then refuse any row of another school.
 //   3. The same migration's audit trigger reads app.user_id to log who changed
 //      Student, Guardian, Enrollment, Charge, Payment, Expense, Mark and User rows.
+import { headers } from 'next/headers';
 import { Prisma } from '@prisma/client';
+import { SchoolSuspendedError } from '@/lib/errors';
 import { prisma as base } from '@/lib/prisma';
 
 export class ScopeViolationError extends Error {
@@ -148,8 +150,56 @@ export const _internal = { scopeArgs, SCOPED, VIA_PARENT };
 
 // ─── Client ──────────────────────────────────────────────────────────────────
 
-const setContext = (schoolId: string, actorId: string | undefined) =>
-  Prisma.sql`SELECT set_config('app.school_id', ${schoolId}, true), set_config('app.user_id', ${actorId ?? ''}, true)`;
+// Who is calling and from where, for the audit log (the database copies these onto each entry).
+// Outside a request (scripts, tests, the scheduler) there are no headers and both stay empty.
+function requestMeta(): { ip: string; ua: string } {
+  try {
+    const h = headers();
+    const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || '';
+    return { ip: ip.slice(0, 64), ua: (h.get('user-agent') ?? '').slice(0, 300) };
+  } catch {
+    return { ip: '', ua: '' };
+  }
+}
+
+const setContext = (schoolId: string, actorId: string | undefined) => {
+  const { ip, ua } = requestMeta();
+  return Prisma.sql`SELECT set_config('app.school_id', ${schoolId}, true), set_config('app.user_id', ${actorId ?? ''}, true), set_config('app.ip', ${ip}, true), set_config('app.user_agent', ${ua}, true)`;
+};
+
+// ─── Suspended schools can look but not change ───────────────────────────────
+// Writes are refused while the school's status is SUSPENDED. The permission check already hides the
+// buttons and refuses the routes (can() is read-only for a suspended school); this is the second
+// lock for code that never asks can(). The status is remembered for a few seconds per school.
+const STILL_WRITABLE = new Set(['AuditLog', 'Notification', 'PasswordResetToken']);
+// People can still change their own record (password, profile, last sign-in) but no new account is made.
+const STILL_UPDATABLE = new Set(['User']);
+// Pfuma's own records about the school: the school reads them and never writes them.
+const READ_ONLY_MODELS = new Set(['SubscriptionInvoice']);
+const WRITES = new Set(['create', 'createMany', 'createManyAndReturn', 'update', 'updateMany', 'delete', 'deleteMany', 'upsert']);
+const STATUS_TTL_MS = 5_000;
+const statusCache = new Map<string, { suspended: boolean; at: number }>();
+
+/** For tests: forget remembered statuses. */
+export function _resetSuspendedCache() {
+  statusCache.clear();
+}
+
+/** Reads the status when it is not remembered (or the memory is old). Never called inside a transaction. */
+async function refreshSuspended(schoolId: string) {
+  const hit = statusCache.get(schoolId);
+  if (hit && Date.now() - hit.at < STATUS_TTL_MS) return;
+  const [, school] = await base.$transaction([base.$executeRaw(setContext(schoolId, undefined)), base.school.findUnique({ where: { id: schoolId }, select: { status: true } })]);
+  statusCache.set(schoolId, { suspended: school?.status === 'SUSPENDED', at: Date.now() });
+}
+
+/** Uses what was last read, however old: a long transaction must not read the status again. */
+function assertWritable(schoolId: string, model: string, operation: string) {
+  if (WRITES.has(operation) && READ_ONLY_MODELS.has(model)) throw new ScopeViolationError(`${model} cannot be changed through the school-scoped client`);
+  if (!WRITES.has(operation) || STILL_WRITABLE.has(model)) return;
+  if (STILL_UPDATABLE.has(model) && (operation === 'update' || operation === 'updateMany')) return;
+  if (statusCache.get(schoolId)?.suspended) throw new SchoolSuspendedError();
+}
 
 // Adds schoolId; used on its own inside interactive transactions, where the
 // Postgres settings have already been applied once.
@@ -159,6 +209,7 @@ function makeScoped(schoolId: string) {
     query: {
       $allModels: {
         $allOperations({ model, operation, args, query }) {
+          assertWritable(schoolId, model, operation);
           return query(scopeArgs(model, operation, args as Args, schoolId) as never);
         },
       },
@@ -179,7 +230,8 @@ function build(schoolId: string, actorId?: string) {
     name: 'school-context',
     query: {
       $allModels: {
-        async $allOperations({ args, query }) {
+        async $allOperations({ model, operation, args, query }) {
+          if (WRITES.has(operation) && !STILL_WRITABLE.has(model) && !(STILL_UPDATABLE.has(model) && (operation === 'update' || operation === 'updateMany'))) await refreshSuspended(schoolId);
           const [, result] = await base.$transaction([base.$executeRaw(setContext(schoolId, actorId)), query(args)]);
           return result;
         },
@@ -190,10 +242,10 @@ function build(schoolId: string, actorId?: string) {
         fn: (tx: ScopedTx) => Promise<T>,
         options?: { maxWait?: number; timeout?: number },
       ): Promise<T> {
-        return scoped.$transaction(async (tx) => {
+        return refreshSuspended(schoolId).then(() => scoped.$transaction(async (tx) => {
           await tx.$executeRaw(setContext(schoolId, actorId));
           return fn(tx as unknown as ScopedTx);
-        }, options);
+        }, options));
       },
     },
   });

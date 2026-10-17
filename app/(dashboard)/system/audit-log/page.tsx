@@ -20,19 +20,19 @@ export default async function AuditLogPage({ searchParams }: { searchParams: Rec
     <div className="flex flex-col gap-4 pb-6">
       <PageHeader
         title="Audit Log"
-        description="Who changed what, and when. Entries cannot be edited or deleted."
+        description="Who did what, and when. Entries cannot be edited or deleted by anyone, and are kept for at least 7 years."
         breadcrumbs={[{ label: 'Dashboard & System' }, { label: 'Audit Log' }]}
       />
       <AuditLogClient
         rows={rows.map((r) => ({
-          id: r.id, action: r.action, entityType: r.entityType, entityId: r.entityId, detail: r.detail,
-          before: r.before, after: r.after, createdAt: r.createdAt.toISOString(), actorName: r.actor.fullName,
+          id: r.id, action: r.action, module: r.module, entityType: r.entityType, entityId: r.entityId, detail: r.detail,
+          before: r.before, after: r.after, ip: r.ip, userAgent: r.userAgent, createdAt: r.createdAt.toISOString(), actorName: r.actor.fullName,
         }))}
         total={total}
         page={q.page}
         pageSize={q.pageSize}
         actions={options.actions}
-        entities={options.entities}
+        modules={options.modules}
         users={options.users}
         canExport={can('system.audit.export')}
       />

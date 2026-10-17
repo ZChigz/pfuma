@@ -1,19 +1,24 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { DataTable, type DataColumn } from '@/components/ui/DataTable';
 import { Drawer } from '@/components/ui/Drawer';
-import { formatDateTime } from '@/lib/utils';
+import { cn, formatDateTime } from '@/lib/utils';
+import { actionLabel, diffValues, entityLabel, moduleLabel, recordHref } from '@/lib/system/audit-labels';
 
 export interface AuditRowData {
   id: string;
   action: string;
+  module: string | null;
   entityType: string;
   entityId: string;
   detail: string | null;
   before: unknown;
   after: unknown;
+  ip: string | null;
+  userAgent: string | null;
   createdAt: string;
   actorName: string;
 }
@@ -24,12 +29,10 @@ interface Props {
   page: number;
   pageSize: number;
   actions: string[];
-  entities: string[];
+  modules: string[];
   users: { id: string; fullName: string }[];
   canExport: boolean;
 }
-
-const pretty = (a: string) => a.replace(/_/g, ' ').toLowerCase();
 
 function DateFilter({ name, label }: { name: 'from' | 'to'; label: string }) {
   const router = useRouter();
@@ -53,15 +56,68 @@ function DateFilter({ name, label }: { name: 'from' | 'to'; label: string }) {
   );
 }
 
+function RecordCell({ r }: { r: AuditRowData }) {
+  const href = recordHref(r.entityType, r.entityId);
+  const text = r.detail ?? r.entityId;
+  return (
+    <span className="break-words">
+      <span className="text-xs text-subtle">{entityLabel(r.entityType)}</span>
+      <br />
+      {href ? (
+        // The row opens the drawer when clicked; the link must not.
+        <Link href={href} onClick={(e) => e.stopPropagation()} className="text-primary hover:underline">{text}</Link>
+      ) : (
+        <span className="text-ink">{text}</span>
+      )}
+    </span>
+  );
+}
+
+/** The saved values before and after a change, side by side, with what changed marked. */
+function Comparison({ before, after }: { before: unknown; after: unknown }) {
+  const rows = diffValues(before, after);
+  if (rows.length === 0) return null;
+  const changedCount = rows.filter((r) => r.changed).length;
+  return (
+    <section aria-label="Before and after">
+      <h3 className="text-xs text-subtle">Before and after · {changedCount} changed</h3>
+      <div className="mt-1 overflow-x-auto rounded-xl border border-line">
+        <table className="w-full min-w-[320px] text-left text-xs">
+          <thead className="bg-canvas text-subtle">
+            <tr>
+              <th scope="col" className="px-3 py-2 font-medium">Field</th>
+              <th scope="col" className="px-3 py-2 font-medium">Before</th>
+              <th scope="col" className="px-3 py-2 font-medium">After</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {rows.map((d) => (
+              <tr key={d.field} className={cn(d.changed && 'bg-warn-bg')}>
+                <th scope="row" className="px-3 py-2 align-top font-medium text-ink">
+                  {d.field}
+                  {d.changed && <span className="ml-1 rounded bg-warn-line px-1 text-[10px] font-semibold text-warn">changed</span>}
+                </th>
+                <td className="break-words px-3 py-2 align-top text-ink">{d.before}</td>
+                <td className={cn('break-words px-3 py-2 align-top text-ink', d.changed && 'font-semibold')}>{d.after}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export function AuditLogClient(props: Props) {
   const [open, setOpen] = useState<AuditRowData | null>(null);
 
   const columns: DataColumn<AuditRowData>[] = [
-    { key: 'createdAt', label: 'When', sortable: true, render: (r) => <span className="whitespace-nowrap">{formatDateTime(r.createdAt)}</span> },
-    { key: 'actor', label: 'Who', sortable: true, render: (r) => r.actorName },
-    { key: 'action', label: 'Action', sortable: true, render: (r) => <span className="capitalize">{pretty(r.action)}</span> },
-    { key: 'entityType', label: 'Record', sortable: true, render: (r) => r.entityType },
-    { key: 'detail', label: 'Detail', render: (r) => <span className="break-words text-muted">{r.detail ?? '—'}</span> },
+    { key: 'createdAt', label: 'Date and time', sortable: true, render: (r) => <span className="whitespace-nowrap">{formatDateTime(r.createdAt)}</span> },
+    { key: 'actor', label: 'User', sortable: true, render: (r) => r.actorName },
+    { key: 'action', label: 'Action', sortable: true, render: (r) => actionLabel(r.action) },
+    { key: 'module', label: 'Module', sortable: true, render: (r) => <span className="text-muted">{moduleLabel(r.module)}</span> },
+    { key: 'record', label: 'Record', render: (r) => <RecordCell r={r} /> },
+    { key: 'ip', label: 'IP', render: (r) => <span className="whitespace-nowrap font-mono text-xs text-muted">{r.ip ?? '—'}</span> },
   ];
 
   return (
@@ -74,11 +130,11 @@ export function AuditLogClient(props: Props) {
         page={props.page}
         pageSize={props.pageSize}
         rowKey={(r) => r.id}
-        searchPlaceholder="Search detail, person or record ID"
+        searchPlaceholder="Search by record name, person or record ID"
         filters={[
-          { key: 'action', label: 'Action', options: props.actions.map((a) => ({ value: a, label: pretty(a) })) },
-          { key: 'entity', label: 'Record', options: props.entities.map((e) => ({ value: e, label: e })) },
-          { key: 'actor', label: 'Person', options: props.users.map((u) => ({ value: u.id, label: u.fullName })) },
+          { key: 'user', label: 'User', options: props.users.map((u) => ({ value: u.id, label: u.fullName })) },
+          { key: 'module', label: 'Module', options: props.modules.map((m) => ({ value: m, label: moduleLabel(m) })) },
+          { key: 'action', label: 'Action', options: props.actions.map((a) => ({ value: a, label: actionLabel(a) })) },
         ]}
         toolbar={<><DateFilter name="from" label="From" /><DateFilter name="to" label="To" /></>}
         exportPath={props.canExport ? '/api/system/audit-log' : undefined}
@@ -89,28 +145,26 @@ export function AuditLogClient(props: Props) {
 
       <Drawer open={open !== null} onClose={() => setOpen(null)} title="Audit entry">
         {open && (
-          <dl className="flex flex-col gap-3 text-sm">
-            {[
-              ['When', formatDateTime(open.createdAt)],
-              ['Who', open.actorName],
-              ['Action', pretty(open.action)],
-              ['Record', `${open.entityType} · ${open.entityId}`],
-              ['Detail', open.detail ?? '—'],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-xs text-subtle">{k}</dt>
-                <dd className="break-words text-ink">{v}</dd>
-              </div>
-            ))}
-            {(['before', 'after'] as const).map((k) =>
-              open[k] != null ? (
+          <div className="flex flex-col gap-4 text-sm">
+            <dl className="flex flex-col gap-3">
+              {[
+                ['Date and time', formatDateTime(open.createdAt)],
+                ['User', open.actorName],
+                ['Action', `${actionLabel(open.action)} (${open.action})`],
+                ['Module', moduleLabel(open.module)],
+                ['Record', `${entityLabel(open.entityType)}${open.detail ? ` · ${open.detail}` : ''}`],
+                ['Record ID', open.entityId],
+                ['IP address', open.ip ?? '—'],
+                ['Browser', open.userAgent ?? '—'],
+              ].map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-xs text-subtle">{k === 'before' ? 'Before' : 'After'}</dt>
-                  <dd><pre className="mt-1 max-h-72 overflow-auto rounded-xl bg-canvas p-3 text-xs text-ink">{JSON.stringify(open[k], null, 2)}</pre></dd>
+                  <dt className="text-xs text-subtle">{k}</dt>
+                  <dd className="break-words text-ink">{v}</dd>
                 </div>
-              ) : null,
-            )}
-          </dl>
+              ))}
+            </dl>
+            <Comparison before={open.before ?? undefined} after={open.after ?? undefined} />
+          </div>
         )}
       </Drawer>
     </>
