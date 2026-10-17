@@ -35,6 +35,40 @@ const SPECIAL: Record<string, string> = {
   CREATE_CALENDAR_EVENT: 'Calendar event created',
   UPDATE_CALENDAR_EVENT: 'Calendar event edited',
   DELETE_CALENDAR_EVENT: 'Calendar event deleted',
+  SUSPEND_STUDENT: 'Student suspended',
+  END_SUSPENSION: 'Suspension ended',
+  REQUEST_CLASS_MOVE: 'Class move requested',
+  APPROVE_CLASS_MOVE: 'Class move approved',
+  REJECT_CLASS_MOVE: 'Class move declined',
+  ASSIGN_HOUSE: 'House assigned',
+  EXPORT_STUDENTS: 'Student list exported',
+  PRINT_STUDENT: 'Student profile or class list printed',
+  IMPORT_STUDENTS: 'Students imported',
+  REJOIN_STUDENT: 'Student rejoined',
+  MEDICAL_VIEWED: 'Medical details viewed',
+  UPDATE_MEDICAL: 'Medical details changed',
+  UPLOAD_DOCUMENT: 'Document uploaded',
+  VIEW_DOCUMENT: 'Document opened',
+  GENERATE_LETTER: 'Letter generated',
+  RECORD_INCIDENT: 'Incident recorded',
+  DECIDE_INCIDENT_ACTION: 'Discipline action decided',
+  RECORD_GUARDIAN_MEETING: 'Guardian meeting recorded',
+  START_LEAVING: 'Leaving process started',
+  APPROVE_LEAVING: 'Leaving approved',
+  COMPLETE_LEAVING: 'Student left',
+  UPDATE_ALUMNUS: 'Alumni record changed',
+  EXPORT_ALUMNI: 'Alumni list exported',
+  CREATE_INTAKE: 'Intake created',
+  UPDATE_INTAKE: 'Intake changed',
+  CREATE_APPLICATION: 'Application received',
+  UPDATE_APPLICATION: 'Application changed',
+  MOVE_APPLICATION: 'Application moved to another stage',
+  APPROVE_OFFER: 'Offer approved',
+  ENROL_APPLICANT: 'Applicant enrolled',
+  SAVE_PROMOTION_DRAFT: 'Promotion draft saved',
+  CONFIRM_PROMOTION: 'Promotion confirmed',
+  CREATE_HOUSE: 'House created',
+  UPDATE_HOUSE: 'House changed',
   SUPPORT_ACCESS_STARTED: 'Pfuma support looked in',
   SUPPORT_ACCESS_ENDED: 'Pfuma support left',
   DATA_CREATE: 'Record created',
@@ -69,7 +103,10 @@ const ENTITY_LABEL: Record<string, string> = {
   SchoolClass: 'Class', AcademicYear: 'Academic year', AcademicTerm: 'Term', CalendarEvent: 'Calendar event',
   GradeBoundary: 'Grade boundary', SchoolModule: 'Module', ExpenseRequest: 'Expense request', FeeStructure: 'Fee structure',
   LibraryMember: 'Library member', BookCopy: 'Book copy', TermResult: 'Term result', ExchangeRate: 'Exchange rate',
-  SubjectAssignment: 'Subject allocation',
+  SubjectAssignment: 'Subject allocation', ClassMove: 'Class move', PromotionRun: 'Promotion', StudentDocument: 'Student document',
+  DisciplineIncident: 'Discipline incident', IncidentStudent: 'Incident student', DisciplineAction: 'Discipline action',
+  MedicalProfile: 'Medical profile', MedicationEntry: 'Medication', SickBayVisit: 'Sick bay visit', StudentExit: 'Leaving record',
+  StudentGuardian: 'Guardian link',
 };
 export const entityLabel = (type: string) => ENTITY_LABEL[type] ?? type;
 
@@ -85,6 +122,7 @@ export function recordHref(entityType: string, entityId: string): string | null 
     case 'Stream':
     case 'Level': return '/system/settings?tab=structure';
     case 'GradeBoundary': return '/system/settings?tab=grading';
+    case 'Student': return `/students/${encodeURIComponent(entityId)}`;
     default: return null;
   }
 }

@@ -215,12 +215,30 @@ describe('every create, update and delete of the core tables is audited with bef
   });
 
   it('Student', async () => {
-    await call('accounting/students/[id]', 'PATCH', { as: A.users.HEAD, params: { id: A.studentId }, body: { medicalNotes: 'Asthma' } });
+    await call('accounting/students/[id]', 'PATCH', { as: A.users.HEAD, params: { id: A.studentId }, body: { previousSchool: 'Mbare Primary' } });
     const rows = await rowsFor('Student', A.studentId);
     const last = rows[rows.length - 1];
     expect(last.action).toBe('DATA_UPDATE');
-    expect(last.before).toMatchObject({ medicalNotes: null });
-    expect(last.after).toMatchObject({ medicalNotes: 'Asthma' });
+    expect(last.before).toMatchObject({ previousSchool: null });
+    expect(last.after).toMatchObject({ previousSchool: 'Mbare Primary' });
+  });
+
+  it('Student: private columns are recorded as changed, never as values', async () => {
+    const r = await call('students/[id]', 'PATCH', { as: A.users.ADMIN, params: { id: A.studentId }, body: { specialNeeds: true, specialNeedsNote: 'Needs a front-row seat', birthCertificateNumber: '63-999999 A 42' } });
+    expect(r.status).toBe(200);
+    const rows = await rowsFor('Student', A.studentId);
+    const last = rows[rows.length - 1];
+    expect(last.after).toMatchObject({ specialNeedsNote: '[hidden, changed]', birthCertificateNumber: '[hidden, changed]' });
+    expect(JSON.stringify(rows)).not.toContain('front-row');
+    expect(JSON.stringify(rows)).not.toContain('63999999A42');
+  });
+
+  it('The student fee statement never carries medical, ID or portal-link details', async () => {
+    const r = await call('accounting/students/[id]', 'GET', { as: A.users.BURSAR, params: { id: A.studentId } });
+    expect(r.status).toBe(200);
+    for (const field of ['medicalNotes', 'birthCertificateNumber', 'portalTokenHash', 'portalPinHash', 'portalToken', 'specialNeedsNote']) {
+      expect(Object.keys(r.json.data.student), field).not.toContain(field);
+    }
   });
 
   it('Guardian (and student admission creates Student, Guardian and Enrollment rows)', async () => {

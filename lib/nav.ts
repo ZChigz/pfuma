@@ -36,11 +36,13 @@ export const NAV_GROUPS: NavGroupDef[] = [
     module: 'students',
     label: 'Student Information',
     items: [
-      { label: 'Students',   permission: 'students.list.view',       icon: 'students' },
-      { label: 'Admissions', permission: 'students.admissions.view', icon: 'marks' },
-      { label: 'Guardians',  permission: 'students.guardians.view',  icon: 'users' },
+      { label: 'Students',   href: '/students',            permission: 'students.profiles.view',    icon: 'students' },
+      { label: 'Admissions', href: '/students/admissions', permission: 'students.admissions.view',  icon: 'marks' },
+      { label: 'Discipline', href: '/students/discipline', permission: 'students.discipline.view',  icon: 'audit' },
+      { label: 'Promotion',  href: '/students/promotion',  permission: 'students.promotion.manage', icon: 'classes' },
+      { label: 'Leavers',    href: '/students/leavers',    permission: 'students.leavers.manage',   icon: 'users' },
+      { label: 'Alumni',     href: '/students/alumni',     permission: 'students.alumni.view',      icon: 'students' },
       { label: 'Attendance', permission: 'students.attendance.view', icon: 'calendar' },
-      { label: 'Promotions', permission: 'students.promotions.view', icon: 'classes' },
     ],
   },
   {

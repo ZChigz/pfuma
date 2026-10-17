@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth';
+import { requirePermission } from '@/lib/access';
 import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
-import { canManageEnrollment } from '@/lib/permissions';
 import { LifecycleActionSchema } from '@/lib/validations/academic';
 import {
   graduateStudents,
@@ -17,11 +17,12 @@ async function _POST(req: Request) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
 
-  try { await canManageEnrollment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
-
   const parsed = await parseBody(req, LifecycleActionSchema);
   if ('error' in parsed) return parsed.error;
   const body = parsed.data;
+  // Superseded by the leaving process (/api/students/leaving) and the promotion wizard (/api/students/promotion).
+  // Until those are the only way, these shortcuts are for the people who approve them: the Head.
+  await requirePermission(body.action === 'PROMOTE' || body.action === 'REPEAT' ? 'students.promotion.approve' : 'students.leavers.approve');
   const { schoolId, id: actorId } = user;
 
   switch (body.action) {

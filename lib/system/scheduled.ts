@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getScopedDb } from '@/lib/scoped-db';
 import { adminIds, notifyUsers } from '@/lib/system/notifications';
 import { evaluateSetup, loadSetupFacts, summarize } from '@/lib/system/setup-checklist';
+import { syncSuspensions } from '@/lib/students/discipline';
 
 const DAY = 864e5;
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -20,13 +21,13 @@ export function weekStart(date: string): string {
   return iso(new Date(d.getTime() - back * DAY));
 }
 
-export interface ScheduledResult { schools: number; termReminders: number; setupReminders: number }
+export interface ScheduledResult { schools: number; termReminders: number; setupReminders: number; suspensionsStarted: number; suspensionsEnded: number }
 
 export async function runScheduledNotifications(now = new Date()): Promise<ScheduledResult> {
   const today = harareDate(now);
   const tomorrow = iso(new Date(new Date(`${today}T00:00:00Z`).getTime() + DAY));
   const week = weekStart(today);
-  const result: ScheduledResult = { schools: 0, termReminders: 0, setupReminders: 0 };
+  const result: ScheduledResult = { schools: 0, termReminders: 0, setupReminders: 0, suspensionsStarted: 0, suspensionsEnded: 0 };
 
   const schools = await prisma.school.findMany({ where: { status: { not: 'SUSPENDED' } }, select: { id: true } });
   for (const { id: schoolId } of schools) {
@@ -45,6 +46,15 @@ export async function runScheduledNotifications(now = new Date()): Promise<Sched
           }),
         );
       }
+    }
+
+    // Suspensions start on their first day and end by themselves the day after their last (Student Information).
+    // The audit entries name the person who approved each suspension; any administrator stands in for the connection.
+    const stand = (await db.$tx((tx) => adminIds(tx, schoolId)))[0];
+    if (stand) {
+      const sync = await syncSuspensions(schoolId, stand, today);
+      result.suspensionsStarted += sync.started;
+      result.suspensionsEnded += sync.ended;
     }
 
     // Weekly: a setup step is still incomplete, to the administrators.

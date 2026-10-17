@@ -88,7 +88,7 @@ export default async function AdminClassDetailPage({ params }: Props) {
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink">Students in {openTerm?.name ?? 'the current term'} ({students.length})</h2>
-          <Link href={`/admin/students?classId=${schoolClass.id}`} className="text-sm font-medium text-primary hover:underline">
+          <Link href={`/students?classId=${schoolClass.id}`} className="text-sm font-medium text-primary hover:underline">
             Manage Students →
           </Link>
         </div>

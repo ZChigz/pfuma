@@ -14,6 +14,8 @@ import { GradingTab } from '@/components/system/settings/GradingTab';
 import { NumberingTab } from '@/components/system/settings/NumberingTab';
 import { ProfileTab } from '@/components/system/settings/ProfileTab';
 import { StructureTab } from '@/components/system/settings/StructureTab';
+import { StudentsTab } from '@/components/system/settings/StudentsTab';
+import { listHouses } from '@/lib/students/houses';
 
 export const metadata = { title: 'School Settings · Pfuma' };
 
@@ -24,6 +26,7 @@ const TABS = [
   { key: 'grading', label: 'Grading' },
   { key: 'finance', label: 'Finance basics' },
   { key: 'numbering', label: 'Numbering and modules' },
+  { key: 'students', label: 'Houses and student documents' },
 ] as const;
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -60,6 +63,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: { t
     panel = <GradingTab scales={await getScales(db, user.schoolId)} canUpdate={can('system.settings.edit')} />;
   } else if (tab === 'finance') {
     panel = <FinanceTab school={school} year={year} canUpdate={can('system.settings.edit')} />;
+  } else if (tab === 'students') {
+    const docs = await db.school.findUnique({ where: { id: user.schoolId }, select: { requiredDocumentTypes: true } });
+    panel = <StudentsTab houses={await listHouses(user)} required={docs?.requiredDocumentTypes ?? []} canUpdate={can('system.settings.edit')} />;
   } else {
     const [sequences, modules, subscription] = await Promise.all([
       nextSequences(db as never, user.schoolId, [year]),

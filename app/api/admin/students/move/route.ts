@@ -1,23 +1,18 @@
-import { auth } from '@/lib/auth';
-import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
-import { canManageEnrollment } from '@/lib/permissions';
+import { requirePermission } from '@/lib/access';
+import { apiSuccess, parseBody, withApi } from '@/lib/api';
 import { MoveStudentsSchema } from '@/lib/validations/academic';
-import { transferClass } from '@/lib/students/lifecycle';
-import type { SessionUser } from '@/types';
+import { moveClass } from '@/lib/students/enrolment';
 
-// Transfer class: changes the class in the open term's Enrollment only.
+// Superseded by /api/students/move. Same rules: a reason is recorded, a move after the term has started needs
+// approval (students.enrolment.approve), and the audit entry names who approved it.
 async function _POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return apiUnauthorized();
-  const user = session.user as unknown as SessionUser;
-
-  try { await canManageEnrollment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
-
+  const user = await requirePermission('students.enrolment.manage');
   const parsed = await parseBody(req, MoveStudentsSchema);
   if ('error' in parsed) return parsed.error;
-
-  const result = await transferClass(user.schoolId, user.id, parsed.data.studentIds, parsed.data.classId);
-  return apiSuccess(result);
+  const r = await moveClass(user, {
+    studentIds: parsed.data.studentIds, toClassId: parsed.data.classId, reason: 'OTHER', reasonNote: 'Moved from the older Students page', acknowledgeFull: true,
+  });
+  return apiSuccess({ moved: r.applied, pending: r.pending, termName: r.termName, className: r.className });
 }
 
 type H = (req: Request, ctx?: unknown) => Promise<Response>;

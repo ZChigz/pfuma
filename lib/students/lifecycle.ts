@@ -6,7 +6,7 @@
 //  • writes one AuditLog row per student;
 //  • never edits enrollments of past (CLOSED) terms.
 // Admission lives in lib/students/server.ts (admitStudent).
-import type { Prisma, StudentStatus } from '@prisma/client';
+import type { StudentStatus } from '@prisma/client';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { suspendStudentMembers } from '@/lib/library';
 import { ServiceError } from '@/lib/api';

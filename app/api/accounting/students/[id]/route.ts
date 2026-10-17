@@ -19,7 +19,9 @@ async function _GET(
 
   const student = await db.student.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
-    include: {
+    // Only what a fee statement needs. Medical, ID and portal-link details are never part of this answer.
+    select: {
+      id: true, admissionNumber: true, firstName: true, surname: true, fullName: true, status: true, currentClassId: true, admissionDate: true,
       charges: { orderBy: { issuedAt: 'desc' } },
       payments: { orderBy: { recordedAt: 'desc' } },
     },

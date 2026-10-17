@@ -15,6 +15,7 @@ const ENDPOINT_ACCEPT: Record<Endpoint, string> = {
   schoolLogo:     'image/jpeg,image/png',
   headSignature:  'image/jpeg,image/png',
   profilePhoto:   'image/jpeg,image/png',
+  studentDocument: 'application/pdf,image/jpeg,image/png',
 };
 
 type Status = 'idle' | 'uploading' | 'done' | 'error';
@@ -44,7 +45,7 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
       const name = res?.[0]?.name;
       // Private uploads (proof of payment) have no public URL: the server hands
       // back a key, and the file is only ever opened through a signed link.
-      const isPrivate = endpoint === 'proofOfPayment';
+      const isPrivate = endpoint === 'proofOfPayment' || endpoint === 'studentDocument';
       const privateKey = (res?.[0]?.serverData as { key?: string } | undefined)?.key;
       const url = isPrivate ? privateKey : res?.[0]?.url;
       if (url) {

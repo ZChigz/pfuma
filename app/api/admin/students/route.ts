@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
-import { canManageEnrollment } from '@/lib/permissions';
+import { requirePermission } from '@/lib/access';
+import { studentScope } from '@/lib/students/scope';
 import { getOpenTerm, requireTerm } from '@/lib/academic/terms';
 import { fieldErrors, RegisterStudentRequestSchema, RegisterStudentSchema } from '@/lib/students/registration';
 import { admitFromForm, checkRegistration } from '@/lib/students/server';
@@ -15,6 +16,8 @@ async function _GET(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  // Superseded by /api/students: same permission, and only the students this user may reach.
+  const access = await requirePermission('students.profiles.view');
 
   const { searchParams } = req.nextUrl;
   const classId = searchParams.get('classId') || undefined;
@@ -30,6 +33,7 @@ async function _GET(req: NextRequest) {
       status: 'ACTIVE',
       ...(classId ? { classId } : {}),
       ...(levelId ? { class: { levelId } } : {}),
+      student: studentScope(access, term.id),
     },
     include: {
       student: { select: { id: true, admissionNumber: true, fullName: true, status: true } },
@@ -51,7 +55,8 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageEnrollment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  // Superseded by /api/students; same permission and the same rules.
+  await requirePermission('students.profiles.create');
 
   const body = await parseBody(req, RegisterStudentRequestSchema);
   if ('error' in body) return body.error;

@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth';
 import { apiSuccess, apiUnauthorized, apiValidationError, withApi } from '@/lib/api';
-import { canManageGuardians } from '@/lib/permissions';
+import { requirePermission } from '@/lib/access';
 import { GuardianDetailsSchema, UpdateGuardianLinkSchema } from '@/lib/validations/academic';
 import { setPrimaryGuardian, unlinkGuardian, updateGuardian, updateLink } from '@/lib/students/guardians';
 import type { SessionUser } from '@/types';
@@ -11,7 +11,7 @@ async function currentUser() {
   const s = await auth();
   if (!s?.user?.id) return null;
   const user = s.user as unknown as SessionUser;
-  await canManageGuardians(user.role);
+  await requirePermission('students.guardians.edit');
   return user;
 }
 
