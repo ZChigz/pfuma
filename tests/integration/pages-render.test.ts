@@ -22,11 +22,14 @@ const isClientPage = (file: string) => (pageSources[file] ?? '').slice(0, 400).i
 let t: TestDb;
 let A: SeededSchool;
 let prisma: typeof import('@/lib/prisma').prisma;
+let intakeId = '';
 
 beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
   A = await seedSchool(prisma, 'School A');
+  intakeId = (await prisma.intake.create({ data: { schoolId: A.schoolId, name: 'Form 1, 2027', levelId: A.levelId, year: 2027, places: 30 } })).id;
+  await prisma.application.create({ data: { schoolId: A.schoolId, intakeId, firstName: 'Apply', surname: 'Page', gender: 'F', dateOfBirth: new Date('2014-01-01'), guardianName: 'Mai Page', guardianPhone: '+263771112222' } });
   // A published result, a voided payment and an open request so the busier branches run.
   await prisma.termResult.create({ data: { schoolId: A.schoolId, studentId: A.studentId, termId: A.termId, totalMarks: 60, percentage: 60, classPosition: 1, published: true } });
   await prisma.payment.create({ data: { schoolId: A.schoolId, studentId: A.studentId, currency: 'USD', amount: 5, method: 'CASH', feeLabel: 'x', status: 'VOIDED', recordedBy: A.users.BURSAR.id, voidedBy: A.users.DIRECTOR.id } });
@@ -63,6 +66,8 @@ function propsFor(file: string) {
   if (file.includes('/classes/[id]')) params.id = A.classId;
   else if (file.includes('/accounting/students/[id]')) params.id = A.studentId;
   else if (file.includes('/assets/[id]')) params.id = A.assetId;
+  else if (file.includes('/students/[id]')) params.id = A.studentId;
+  else if (file.includes('/admissions/[intakeId]')) params.intakeId = intakeId;
   else if (file.includes('/teacher/requests/[id]')) params.id = A.requestId;
   if (file.includes('[assignmentId]')) params.assignmentId = A.assignmentId;
   return { params, searchParams: { termId: A.termId, classId: A.classId, q: '' } };

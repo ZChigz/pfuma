@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiNotFound, apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
-import { canManageGuardians } from '@/lib/permissions';
+import { requirePermission } from '@/lib/access';
 import { AddGuardianSchema } from '@/lib/validations/academic';
 import { findOrCreateGuardian, linkGuardian } from '@/lib/students/guardians';
 import type { SessionUser } from '@/types';
@@ -34,7 +34,7 @@ async function _POST(req: Request, { params }: Ctx) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
-  try { await canManageGuardians(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await requirePermission('students.guardians.edit');
 
   const student = await db.student.findFirst({ where: { id: params.id, schoolId: user.schoolId }, select: { id: true } });
   if (!student) return apiNotFound('Student');

@@ -186,7 +186,7 @@ export async function openTerm(schoolId: string, actorId: string, termId: string
       if (previous.academicYearId !== term.academicYearId && carryOver.length > 0) {
         throw new ServiceError(
           `${carryOver.length} student(s) in ${previous.name} have no end-of-year decision. ` +
-          'Promote, repeat, graduate or withdraw them under Admin → Promotions before opening a new year.',
+          'Promote, repeat, graduate or withdraw them under Students → Promotion before opening a new year.',
           409,
         );
       }

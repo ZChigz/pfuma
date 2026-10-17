@@ -5,6 +5,8 @@ import { UploadThingError, UTFiles } from 'uploadthing/server';
 import { auth } from '@/lib/auth';
 import { requirePermission } from '@/lib/access';
 import { POP_ALLOWED_TYPES, POP_MAX_BYTES, newProofKey } from '@/lib/proof-of-payment';
+import { randomUUID } from 'node:crypto';
+import { DOCUMENT_MIME_TYPES, MAX_DOCUMENT_BYTES, newDocumentKey } from '@/lib/students/documents';
 
 const f = createUploadthing();
 
@@ -52,6 +54,30 @@ export const fileRouter = {
         userId: session.user.id,
         schoolId,
         [UTFiles]: files.map((file) => ({ ...file, customId: newProofKey(schoolId) })),
+      };
+    })
+    .onUploadComplete(({ file }) => ({ key: file.customId ?? file.key })),
+
+  // Student documents (birth certificates, results slips, medical reports, signed letters ...): PDF, JPG or PNG up to
+  // 5 MB, stored privately under a key that starts with the school id, opened only through links that expire after
+  // 10 minutes (/api/students/documents/[docId]/link). Needs students.documents.upload; the type and size are
+  // checked here as well as in the route config because a client can lie about both.
+  studentDocument: f({
+    'application/pdf': { maxFileSize: '8MB', maxFileCount: 1, acl: 'private' },
+    'image/jpeg':      { maxFileSize: '8MB', maxFileCount: 1, acl: 'private' },
+    'image/png':       { maxFileSize: '8MB', maxFileCount: 1, acl: 'private' },
+  })
+    .middleware(async ({ files }) => {
+      let user;
+      try { user = await requirePermission('students.documents.upload'); } catch { throw new UploadThingError('You cannot upload student documents'); }
+      for (const file of files) {
+        if (!(DOCUMENT_MIME_TYPES as readonly string[]).includes(file.type)) throw new UploadThingError('Only PDF, JPG or PNG files are allowed');
+        if (file.size > MAX_DOCUMENT_BYTES) throw new UploadThingError('The file must be 5 MB or smaller');
+      }
+      return {
+        userId: user.id,
+        schoolId: user.schoolId,
+        [UTFiles]: files.map((file) => ({ ...file, customId: newDocumentKey(user.schoolId, randomUUID()) })),
       };
     })
     .onUploadComplete(({ file }) => ({ key: file.customId ?? file.key })),

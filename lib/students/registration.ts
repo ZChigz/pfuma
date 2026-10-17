@@ -146,10 +146,10 @@ export function formatAdmissionNumber(admissionYear: number, sequence: number): 
 
 // ─── Field schemas ───────────────────────────────────────────────────────────
 
-const custom = (ctx: z.RefinementCtx, message: string, path?: string[]) =>
+export const custom = (ctx: z.RefinementCtx, message: string, path?: string[]) =>
   ctx.addIssue({ code: 'custom', message, ...(path ? { path } : {}) });
 
-function personName(label: string) {
+export function personName(label: string) {
   return z
     .string({ error: `${label} is required` })
     .transform(normalizeName)
@@ -161,7 +161,7 @@ function personName(label: string) {
     });
 }
 
-function mobilePhone(label: string, required: boolean) {
+export function mobilePhone(label: string, required: boolean) {
   return z
     .string()
     .optional()
@@ -181,7 +181,7 @@ function mobilePhone(label: string, required: boolean) {
 }
 
 // Optional free text: blank becomes null; otherwise trimmed and length-checked.
-function optionalText(label: string, max: number, pattern?: { re: RegExp; message: string }) {
+export function optionalText(label: string, max: number, pattern?: { re: RegExp; message: string }) {
   return z
     .string()
     .optional()
@@ -194,7 +194,7 @@ function optionalText(label: string, max: number, pattern?: { re: RegExp; messag
     });
 }
 
-function isoDateField(label: string, opts: { min?: string; minMessage?: string }) {
+export function isoDateField(label: string, opts: { min?: string; minMessage?: string }) {
   return z
     .string({ error: `${label} is required` })
     .trim()

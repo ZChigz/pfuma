@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
-import { canManageEnrollment } from '@/lib/permissions';
+import { requirePermission } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { requireOpenTerm } from '@/lib/academic/terms';
 import { fieldErrors, RegisterStudentRequestSchema, RegisterStudentSchema } from '@/lib/students/registration';
@@ -16,7 +16,7 @@ async function _POST(req: Request) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageEnrollment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await requirePermission('students.profiles.create');
 
   const body = await parseBody(req, RegisterStudentRequestSchema);
   if ('error' in body) return body.error;

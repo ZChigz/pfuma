@@ -3,7 +3,9 @@ import { can, type AccessUser, type PermissionKey } from '@/lib/access-core';
 
 const ACTIONS: { label: string; href: string; permission: PermissionKey }[] = [
   { label: 'Add user', href: '/system/users?new=1', permission: 'system.users.create' },
-  { label: 'Import students', href: '/admin/students', permission: 'students.import' },
+  { label: 'Add student', href: '/students/new', permission: 'students.profiles.create' },
+  { label: 'Record incident', href: '/students/discipline?new=1', permission: 'students.discipline.create' },
+  { label: 'Import students', href: '/students/import', permission: 'students.profiles.import' },
   { label: 'Add event', href: '/system/calendar?new=1', permission: 'system.calendar.create' },
   { label: 'Open settings', href: '/system/settings', permission: 'system.settings.view' },
 ];

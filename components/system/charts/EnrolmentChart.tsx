@@ -66,7 +66,7 @@ export async function EnrolmentChart({ user, term }: { user: AccessUser; term: S
   if (data.students === 0) {
     return (
       <ChartPanel title={title}>
-        <EmptyPanel message="No students are enrolled in this term yet." action={can(user, 'students.import') ? { label: 'Import students', href: '/admin/students' } : undefined} />
+        <EmptyPanel message="No students are enrolled in this term yet." action={can(user, 'students.profiles.import') ? { label: 'Import students', href: '/students/import' } : undefined} />
       </ChartPanel>
     );
   }

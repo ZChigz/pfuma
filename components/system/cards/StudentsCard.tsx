@@ -15,7 +15,7 @@ export async function StudentsCard({ user, term }: { user: AccessUser; term: Sum
       <SummaryCardEmpty
         label="Students"
         message="No students in this term yet."
-        action={can(user, 'students.import') ? { label: 'Import students', href: '/admin/students' } : undefined}
+        action={can(user, 'students.profiles.import') ? { label: 'Import students', href: '/students/import' } : undefined}
       />
     );
   }

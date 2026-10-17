@@ -98,7 +98,7 @@ describe('enrolment and class-size charts', () => {
     // C has a class and a term but no students.
     const e = await html(EnrolmentChart({ user: userOf(C), term }));
     expect(e).toContain('No students are enrolled in this term yet.');
-    expect(e).toContain('href="/admin/students"');
+    expect(e).toContain('href="/students/import"');
     expect(e).not.toContain('View as table');
     const c = await html(ClassSizeChart({ user: userOf(C), term }));
     expect(c).toContain('Import students');

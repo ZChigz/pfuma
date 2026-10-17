@@ -206,7 +206,6 @@ export async function admitStudent(
       birthCertificateNumber: data.birthCertificateNumber,
       admissionDate:          dateOnly(data.admissionDate),
       previousSchool:         data.previousSchool,
-      medicalNotes:           data.medicalNotes,
       photoUrl:               data.photoUrl,
       houseNumber:            data.houseNumber,
       suburb:                 data.suburb,
@@ -216,6 +215,9 @@ export async function admitStudent(
       currentClassId:         opts.classId,
     },
   });
+
+  // Medical details live on the medical profile (students.medical.view), never on the student row.
+  if (data.medicalNotes) await tx.medicalProfile.create({ data: { schoolId, studentId: student.id, notes: data.medicalNotes } });
 
   // Every admitted student can borrow books.
   await ensureStudentMember(tx, schoolId, actorId, student.id);

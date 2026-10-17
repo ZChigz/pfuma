@@ -69,6 +69,8 @@ enum StudentStatus {
   SUSPENDED
   GRADUATED
   WITHDRAWN
+  EXPELLED
+  DECEASED
 }
 
 enum LevelCategory {
@@ -92,6 +94,158 @@ enum EnrollmentStatus {
   TRANSFERRED_OUT
   WITHDRAWN
   GRADUATED
+}
+
+enum BoardingType {
+  DAY
+  BOARDER
+}
+
+enum EntryType {
+  NEW_FORM_1
+  NEW_LOWER_6
+  TRANSFER_IN
+  RETURNING
+}
+
+enum OrphanStatus {
+  NONE
+  SINGLE
+  DOUBLE
+}
+
+enum ClassMoveReason {
+  WRONG_CLASS_AT_ADMISSION
+  SUBJECT_COMBINATION
+  BEHAVIOUR
+  PARENT_REQUEST
+  BALANCING_CLASS_SIZES
+  OTHER
+}
+
+// PENDING waits for the approver; the approver and time are recorded on the row.
+enum ApprovalState {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PromotionRunStatus {
+  DRAFT
+  CONFIRMED
+}
+
+enum ApplicationStage {
+  APPLIED
+  SHORTLISTED
+  TESTED
+  OFFERED
+  ACCEPTED
+  ENROLLED
+  WAITLISTED
+  REJECTED
+  DECLINED
+}
+
+enum DocumentType {
+  BIRTH_CERTIFICATE
+  GUARDIAN_ID
+  GRADE7_RESULTS_SLIP
+  OLEVEL_RESULTS_SLIP
+  PREVIOUS_SCHOOL_REPORT
+  TRANSFER_LETTER_RECEIVED
+  MEDICAL_REPORT
+  PHOTO_CONSENT
+  OTHER
+  LETTER_ADMISSION
+  LETTER_PROOF_OF_ENROLMENT
+  LETTER_TRANSFER
+  LETTER_TESTIMONIAL
+  LETTER_LEAVING_CERTIFICATE
+  LETTER_OFFER
+}
+
+enum IncidentLocation {
+  CLASSROOM
+  DORMITORY
+  SPORTS_FIELD
+  DINING_HALL
+  OFF_CAMPUS
+  OTHER
+}
+
+enum IncidentCategory {
+  LATE_COMING
+  ABSENT_WITHOUT_LEAVE
+  UNIFORM
+  HOMEWORK
+  DISRESPECT
+  BULLYING
+  FIGHTING
+  THEFT
+  VANDALISM
+  SUBSTANCE_USE
+  PHONE_USE
+  ABSCONDING
+  EXAM_DISHONESTY
+  OTHER
+}
+
+enum IncidentSeverity {
+  MINOR
+  MODERATE
+  SERIOUS
+}
+
+// No corporal punishment: it is prohibited under the Education Amendment Act, 2020.
+enum DisciplineActionType {
+  VERBAL_WARNING
+  WRITTEN_WARNING
+  DETENTION
+  MANUAL_WORK
+  COUNSELLING_REFERRAL
+  GUARDIAN_CALLED_IN
+  SUSPENSION
+  EXPULSION_RECOMMENDED
+}
+
+// RECORDED actions need nothing more. PENDING ones wait for students.discipline.approve.
+enum DisciplineActionStatus {
+  RECORDED
+  PENDING
+  APPROVED
+  REJECTED
+  ENDED
+}
+
+enum MedicationKeeper {
+  STUDENT
+  MATRON
+  OFFICE
+}
+
+enum SickBayOutcome {
+  RETURNED_TO_CLASS
+  SENT_HOME
+  SENT_TO_CLINIC
+}
+
+enum ExitReason {
+  TRANSFER
+  COMPLETED_O_LEVEL
+  COMPLETED_A_LEVEL
+  WITHDRAWN_BY_GUARDIAN
+  RELOCATED_ABROAD
+  EXPELLED
+  DECEASED
+  OTHER
+}
+
+enum ExitState {
+  STARTED
+  APPROVED
+  COMPLETED
+  CANCELLED
 }
 
 enum GuardianRelationship {
@@ -281,6 +435,40 @@ enum AuditAction {
   SUPPORT_ACCESS_ENDED
   ROLES_CHANGED
   DELETE_CALENDAR_EVENT
+  SUSPEND_STUDENT
+  END_SUSPENSION
+  REQUEST_CLASS_MOVE
+  APPROVE_CLASS_MOVE
+  REJECT_CLASS_MOVE
+  ASSIGN_HOUSE
+  EXPORT_STUDENTS
+  PRINT_STUDENT
+  IMPORT_STUDENTS
+  REJOIN_STUDENT
+  MEDICAL_VIEWED
+  UPDATE_MEDICAL
+  UPLOAD_DOCUMENT
+  VIEW_DOCUMENT
+  GENERATE_LETTER
+  RECORD_INCIDENT
+  DECIDE_INCIDENT_ACTION
+  RECORD_GUARDIAN_MEETING
+  START_LEAVING
+  APPROVE_LEAVING
+  COMPLETE_LEAVING
+  UPDATE_ALUMNUS
+  EXPORT_ALUMNI
+  CREATE_INTAKE
+  UPDATE_INTAKE
+  CREATE_APPLICATION
+  UPDATE_APPLICATION
+  MOVE_APPLICATION
+  APPROVE_OFFER
+  ENROL_APPLICANT
+  SAVE_PROMOTION_DRAFT
+  CONFIRM_PROMOTION
+  CREATE_HOUSE
+  UPDATE_HOUSE
 }
 
 enum SchoolType {
@@ -385,66 +573,70 @@ enum CalendarAudience {
 // ─── Core ────────────────────────────────────────────────────────────────────
 
 model School {
-  id                   String         @id @default(cuid())
-  name                 String
-  location             String?
+  id                    String         @id @default(cuid())
+  name                  String
+  location              String?
   // Default capacity for newly created classes.
-  maxClassSize         Int            @default(45)
+  maxClassSize          Int            @default(45)
   // Lowest grade that counts as a pass ("C or better" = C), looked up in GradeBoundary.
-  passGrade            String         @default("C")
+  passGrade             String         @default("C")
   // O Level classes: rank by average percentage, or by number of passes then average.
-  oLevelRanking        RankingMode    @default(AVERAGE)
+  oLevelRanking         RankingMode    @default(AVERAGE)
   // Library: checkout is blocked above this much unpaid fines (in the fine currency),
   // and each kind of member has its own loan limit.
-  libraryFineLimit     Decimal        @default(5) @db.Decimal(14, 2)
-  studentLoanLimit     Int            @default(2)
-  staffLoanLimit       Int            @default(5)
+  libraryFineLimit      Decimal        @default(5) @db.Decimal(14, 2)
+  studentLoanLimit      Int            @default(2)
+  staffLoanLimit        Int            @default(5)
   // Profile shown in the top bar and on documents.
-  schoolType           SchoolType     @default(GOVERNMENT)
-  phone                String?
-  email                String?
-  address              String?
-  motto                String?
-  logoUrl              String?
-  defaultCurrency      Currency       @default(USD)
-  province             String?
+  schoolType            SchoolType     @default(GOVERNMENT)
+  phone                 String?
+  email                 String?
+  address               String?
+  motto                 String?
+  logoUrl               String?
+  defaultCurrency       Currency       @default(USD)
+  province              String?
   // ZIMSEC examination centre number.
-  zimsecCentreNumber   String?
+  zimsecCentreNumber    String?
   // Receipt numbers look like <prefix>-<number>; a null prefix means not chosen yet.
-  receiptPrefix        String?
-  receiptNextNumber    Int            @default(1)
+  receiptPrefix         String?
+  receiptNextNumber     Int            @default(1)
   // Settings, Finance basics. Formats such as RCP-{YEAR}-{000000}; see lib/numbering.ts.
-  currencyUsdEnabled   Boolean        @default(true)
-  currencyZigEnabled   Boolean        @default(true)
-  receiptFormat        String?
-  invoiceFormat        String?
-  invoiceNextNumber    Int            @default(1)
+  currencyUsdEnabled    Boolean        @default(true)
+  currencyZigEnabled    Boolean        @default(true)
+  receiptFormat         String?
+  invoiceFormat         String?
+  invoiceNextNumber     Int            @default(1)
   // Settings, Numbering. The code that starts admission numbers, and their format.
-  schoolCode           String         @default("STU")
-  admissionFormat      String         @default("{SCHOOLCODE}{YEAR}{0000}")
+  schoolCode            String         @default("STU")
+  admissionFormat       String         @default("{SCHOOLCODE}{YEAR}{0000}")
   // Keeps the dashboard setup checklist visible after every step is done.
-  setupChecklistPinned Boolean        @default(false)
+  setupChecklistPinned  Boolean        @default(false)
   // School profile (Settings, tab 1). The old "location" and "address" columns stay until the
   // contract migration; district and physicalAddress replace them and were filled from them.
-  responsibleAuthority String?
-  boarding             SchoolBoarding @default(DAY)
-  studentGender        SchoolGender   @default(CO_ED)
+  responsibleAuthority  String?
+  boarding              SchoolBoarding @default(DAY)
+  studentGender         SchoolGender   @default(CO_ED)
   // ZIMSEC is always on; Cambridge is optional.
-  offersCambridge      Boolean        @default(false)
-  emisNumber           String?
-  district             String?
-  physicalAddress      String?
-  postalAddress        String?
-  website              String?
-  headName             String?
-  headSignatureUrl     String?
+  offersCambridge       Boolean        @default(false)
+  emisNumber            String?
+  district              String?
+  physicalAddress       String?
+  postalAddress         String?
+  website               String?
+  headName              String?
+  headSignatureUrl      String?
+  // Document types every student file must hold (DocumentType values), chosen in Settings.
+  requiredDocumentTypes String[]       @default([])
+  // Letter reference numbers count up from here (ADM-2026-00012).
+  letterNextNumber      Int            @default(1)
   // Subscription (managed from the Pfuma console, shown on Settings, Subscription).
-  status               SchoolStatus   @default(ACTIVE)
-  planId               String?
-  renewalDate          DateTime?      @db.Date
-  studentLimit         Int?
-  suspendedReason      String?
-  createdAt            DateTime       @default(now())
+  status                SchoolStatus   @default(ACTIVE)
+  planId                String?
+  renewalDate           DateTime?      @db.Date
+  studentLimit          Int?
+  suspendedReason       String?
+  createdAt             DateTime       @default(now())
   // Legacy column "currentTerm" still exists in the database until the
   // contract migration; the current term is now the OPEN AcademicTerm.
 
@@ -492,6 +684,20 @@ model School {
   invoices            SubscriptionInvoice[]
   plan                Plan?                 @relation(fields: [planId], references: [id])
   RolePermission      RolePermission[]
+  houses              House[]
+  classMoves          ClassMove[]
+  promotionRuns       PromotionRun[]
+  intakes             Intake[]
+  applications        Application[]
+  studentDocuments    StudentDocument[]
+  disciplineIncidents DisciplineIncident[]
+  incidentStudents    IncidentStudent[]
+  disciplineActions   DisciplineAction[]
+  medicalProfiles     MedicalProfile[]
+  medicationEntries   MedicationEntry[]
+  sickBayVisits       SickBayVisit[]
+  studentExits        StudentExit[]
+  alumni              Alumnus[]
 }
 
 model User {
@@ -581,6 +787,8 @@ model SchoolClass {
   level           Level               @relation(fields: [levelId], references: [id])
   classTeacher    User?               @relation(fields: [classTeacherId], references: [id])
   currentStudents Student[]           @relation("CurrentClass")
+  movesFrom       ClassMove[]         @relation("ClassMoveFrom")
+  movesTo         ClassMove[]         @relation("ClassMoveTo")
   enrollments     Enrollment[]
   assignments     SubjectAssignment[]
 
@@ -604,6 +812,7 @@ model Level {
   classes         SchoolClass[]
   feeStructures   FeeStructure[]
   gradeBoundaries GradeBoundary[]
+  intakes         Intake[]
 
   @@unique([schoolId, name])
   @@unique([schoolId, order])
@@ -618,8 +827,10 @@ model AcademicYear {
   endDate   DateTime @db.Date
   createdAt DateTime @default(now())
 
-  school School         @relation(fields: [schoolId], references: [id])
-  terms  AcademicTerm[]
+  school         School         @relation(fields: [schoolId], references: [id])
+  terms          AcademicTerm[]
+  promotionsFrom PromotionRun[] @relation("PromotionFromYear")
+  promotionsTo   PromotionRun[] @relation("PromotionToYear")
 
   @@unique([schoolId, year])
   @@index([schoolId])
@@ -667,7 +878,9 @@ model Enrollment {
   status    EnrollmentStatus @default(ACTIVE)
   startDate DateTime
   endDate   DateTime?
+  reason    String?
   createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
 
   school  School       @relation(fields: [schoolId], references: [id])
   student Student      @relation(fields: [studentId], references: [id])
@@ -703,6 +916,20 @@ model Student {
   suburb                 String?
   city                   String?
   address                String?
+  preferredName          String?
+  nationality            String?
+  homeLanguage           String?
+  religion               String?
+  entryType              EntryType?
+  // Grade 7 units (Form 1) or O Level passes and points (Lower 6).
+  entryResults           Json?
+  boarding               BoardingType  @default(DAY)
+  houseId                String?
+  isBeam                 Boolean       @default(false)
+  sponsorName            String?
+  orphanStatus           OrphanStatus  @default(NONE)
+  specialNeeds           Boolean       @default(false)
+  specialNeedsNote       String?
   // Legacy plaintext link token. Emptied by migration 20261017000100 and no
   // longer read or written; dropped by the contract migration.
   portalToken            String?       @unique
@@ -714,26 +941,39 @@ model Student {
   // bcrypt hash of the optional 4-digit portal PIN.
   portalPinHash          String?
   createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @default(now()) @updatedAt
   // Legacy columns "grade", "classId", "parentName", "parentPhone", "active",
   // "studentNumber", "enrollmentYear", "guardianRelationship" and
   // "secondGuardianPhone" remain in the database until the contract migration.
 
-  school        School            @relation(fields: [schoolId], references: [id])
-  currentClass  SchoolClass?      @relation("CurrentClass", fields: [currentClassId], references: [id])
-  enrollments   Enrollment[]
-  guardians     StudentGuardian[]
-  charges       Charge[]
-  payments      Payment[]
-  marks         Mark[]
-  termResults   TermResult[]
-  portalViews   PortalAccessLog[]
-  libraryMember LibraryMember?
+  school            School             @relation(fields: [schoolId], references: [id])
+  currentClass      SchoolClass?       @relation("CurrentClass", fields: [currentClassId], references: [id])
+  enrollments       Enrollment[]
+  guardians         StudentGuardian[]
+  charges           Charge[]
+  payments          Payment[]
+  marks             Mark[]
+  termResults       TermResult[]
+  portalViews       PortalAccessLog[]
+  libraryMember     LibraryMember?
+  house             House?             @relation(fields: [houseId], references: [id])
+  classMoves        ClassMove[]
+  documents         StudentDocument[]
+  incidents         IncidentStudent[]
+  disciplineActions DisciplineAction[]
+  medical           MedicalProfile?
+  sickBayVisits     SickBayVisit[]
+  exits             StudentExit[]
+  alumnus           Alumnus?
+  application       Application?
 
   @@unique([schoolId, admissionNumber])
   @@unique([schoolId, birthCertificateNumber])
   @@index([schoolId])
   @@index([schoolId, currentClassId])
   @@index([schoolId, surname, firstName])
+  @@index([schoolId, status])
+  @@index([schoolId, houseId])
 }
 
 model Guardian {
@@ -747,10 +987,12 @@ model Guardian {
   address    String?
   occupation String?
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
 
   school   School            @relation(fields: [schoolId], references: [id])
   students StudentGuardian[]
 
+  @@unique([schoolId, phone])
   @@index([schoolId])
   @@index([schoolId, phone])
 }
@@ -766,7 +1008,11 @@ model StudentGuardian {
   isPrimary        Boolean              @default(false)
   isFeePayer       Boolean              @default(false)
   canReceiveSms    Boolean              @default(true)
+  canCollect       Boolean              @default(false)
+  // e.g. "Only collect with mother"; shown in the profile alert strip.
+  custodyNote      String?
   createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @default(now()) @updatedAt
 
   student  Student  @relation(fields: [studentId], references: [id])
   guardian Guardian @relation(fields: [guardianId], references: [id])
@@ -1656,4 +1902,365 @@ model SubscriptionInvoice {
   school School @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
+}
+
+// ─── Student Information module ──────────────────────────────────────────────
+// Columns named *ById / *By point at a User of the same school. They carry no
+// Prisma relation (the database trigger check_same_school keeps them in-school),
+// so the User model does not grow a back-relation for each of them.
+
+model House {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  colour    String   @default("#6B7280")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school   School    @relation(fields: [schoolId], references: [id])
+  students Student[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+// A request to put a student in another class. After the open term has started
+// it waits for approval (students.enrolment.approve); the approver is recorded.
+model ClassMove {
+  id            String          @id @default(cuid())
+  schoolId      String
+  studentId     String
+  fromClassId   String?
+  toClassId     String
+  termId        String?
+  effectiveDate DateTime        @db.Date
+  reason        ClassMoveReason
+  reasonNote    String?
+  status        ApprovalState   @default(PENDING)
+  requestedById String
+  approvedById  String?
+  decidedAt     DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+
+  school  School       @relation(fields: [schoolId], references: [id])
+  student Student      @relation(fields: [studentId], references: [id])
+  from    SchoolClass? @relation("ClassMoveFrom", fields: [fromClassId], references: [id])
+  to      SchoolClass  @relation("ClassMoveTo", fields: [toClassId], references: [id])
+
+  @@index([schoolId, status])
+  @@index([studentId])
+}
+
+// A year-end promotion saved as a draft; nothing changes until it is CONFIRMED.
+model PromotionRun {
+  id           String             @id @default(cuid())
+  schoolId     String
+  fromYearId   String
+  toYearId     String
+  status       PromotionRunStatus @default(DRAFT)
+  // One entry per student: { studentId, fromClassId, outcome, toClassId, note }.
+  lines        Json
+  summary      Json?
+  createdById  String
+  approvedById String?
+  confirmedAt  DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @default(now()) @updatedAt
+
+  school   School       @relation(fields: [schoolId], references: [id])
+  fromYear AcademicYear @relation("PromotionFromYear", fields: [fromYearId], references: [id])
+  toYear   AcademicYear @relation("PromotionToYear", fields: [toYearId], references: [id])
+
+  @@index([schoolId, status])
+}
+
+model Intake {
+  id                String    @id @default(cuid())
+  schoolId          String
+  name              String // "Form 1, 2027"
+  levelId           String
+  year              Int
+  places            Int
+  applicationOpens  DateTime? @db.Date
+  applicationCloses DateTime? @db.Date
+  testDate          DateTime? @db.Date
+  reportingDate     DateTime? @db.Date
+  // What the applicant must bring on the reporting day; printed on the offer letter.
+  requirements      String[]  @default([])
+  applicationFee    Decimal   @default(0) @db.Decimal(14, 2)
+  feeCurrency       Currency  @default(USD)
+  closed            Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+
+  school       School        @relation(fields: [schoolId], references: [id])
+  level        Level         @relation(fields: [levelId], references: [id])
+  applications Application[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+model Application {
+  id                     String               @id @default(cuid())
+  schoolId               String
+  intakeId               String
+  firstName              String
+  surname                String
+  gender                 Gender
+  dateOfBirth            DateTime             @db.Date
+  birthCertificateNumber String?
+  previousSchool         String?
+  boarding               BoardingType         @default(DAY)
+  guardianName           String
+  guardianRelationship   GuardianRelationship @default(GUARDIAN)
+  guardianPhone          String
+  guardianPhone2         String?
+  guardianEmail          String?
+  address                String?
+  entryResults           Json?
+  testScore              Decimal?             @db.Decimal(6, 2)
+  interviewNotes         String?
+  stage                  ApplicationStage     @default(APPLIED)
+  // Array of { stage, at, byId, note }: every move, newest last.
+  stageHistory           Json                 @default("[]")
+  targetClassId          String?
+  offerApprovedById      String?
+  offerApprovedAt        DateTime?
+  offerReference         String?
+  acceptedAt             DateTime?
+  depositPaid            Boolean?
+  studentId              String?              @unique
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @default(now()) @updatedAt
+
+  school    School            @relation(fields: [schoolId], references: [id])
+  intake    Intake            @relation(fields: [intakeId], references: [id])
+  student   Student?          @relation(fields: [studentId], references: [id])
+  documents StudentDocument[]
+
+  @@index([schoolId, intakeId, stage])
+}
+
+// Uploads and generated letters. fileKey points at private storage and is only
+// ever opened through a signed link that expires after 10 minutes.
+model StudentDocument {
+  id            String       @id @default(cuid())
+  schoolId      String
+  studentId     String?
+  applicationId String?
+  type          DocumentType
+  title         String
+  fileKey       String?
+  mimeType      String?
+  sizeBytes     Int?
+  date          DateTime?    @db.Date
+  expiryDate    DateTime?    @db.Date
+  notes         String?
+  generated     Boolean      @default(false)
+  referenceNo   String?
+  // What a generated letter said when it was made, so a copy can be printed and checked later.
+  snapshot      Json?
+  uploadedById  String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+
+  school      School       @relation(fields: [schoolId], references: [id])
+  student     Student?     @relation(fields: [studentId], references: [id])
+  application Application? @relation(fields: [applicationId], references: [id])
+
+  @@unique([schoolId, referenceNo])
+  @@index([schoolId, studentId])
+}
+
+model DisciplineIncident {
+  id           String           @id @default(cuid())
+  schoolId     String
+  occurredAt   DateTime
+  location     IncidentLocation
+  category     IncidentCategory
+  severity     IncidentSeverity
+  description  String
+  witnesses    String?
+  recordedById String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @default(now()) @updatedAt
+
+  school   School             @relation(fields: [schoolId], references: [id])
+  students IncidentStudent[]
+  actions  DisciplineAction[]
+
+  @@index([schoolId, occurredAt])
+}
+
+model IncidentStudent {
+  id         String   @id @default(cuid())
+  schoolId   String
+  incidentId String
+  studentId  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  school   School             @relation(fields: [schoolId], references: [id])
+  incident DisciplineIncident @relation(fields: [incidentId], references: [id])
+  student  Student            @relation(fields: [studentId], references: [id])
+
+  @@unique([incidentId, studentId])
+  @@index([schoolId, studentId])
+}
+
+model DisciplineAction {
+  id               String                 @id @default(cuid())
+  schoolId         String
+  incidentId       String
+  studentId        String
+  type             DisciplineActionType
+  status           DisciplineActionStatus @default(RECORDED)
+  // Suspension: the status Suspended applies from startDate to endDate and ends by itself.
+  startDate        DateTime?              @db.Date
+  endDate          DateTime?              @db.Date
+  notes            String?
+  requestedById    String
+  approvedById     String?
+  decidedAt        DateTime?
+  // Expulsion recommendation: the decision and the ministry / authority reference.
+  decision         String?
+  decisionDate     DateTime?              @db.Date
+  authorityRef     String?
+  // Guardian meeting.
+  meetingDate      DateTime?              @db.Date
+  meetingAttendees String?
+  meetingOutcome   String?
+  meetingLetterKey String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @default(now()) @updatedAt
+
+  school   School             @relation(fields: [schoolId], references: [id])
+  incident DisciplineIncident @relation(fields: [incidentId], references: [id])
+  student  Student            @relation(fields: [studentId], references: [id])
+
+  @@index([schoolId, studentId])
+  @@index([schoolId, type, status])
+}
+
+// The most sensitive data in the system. Every view writes MEDICAL_VIEWED.
+model MedicalProfile {
+  id                        String    @id @default(cuid())
+  schoolId                  String
+  studentId                 String    @unique
+  // [{ name, note? }] from the fixed list (Asthma, Epilepsy, Diabetes, Sickle cell, Heart condition, Other).
+  conditions                Json      @default("[]")
+  // [{ name, severity: MILD | SEVERE }]. Severe ones show in the profile alert strip.
+  allergies                 Json      @default("[]")
+  hasSevereAllergy          Boolean   @default(false)
+  bloodGroup                String?
+  medicalAidProvider        String?
+  medicalAidNumber          String?
+  medicalAidMainMember      String?
+  doctorName                String?
+  doctorPhone               String?
+  emergencyName             String?
+  emergencyPhone            String?
+  emergencyRelationship     String?
+  specialNeedsType          String?
+  supportNeeded             String?
+  consentEmergencyTreatment Boolean?
+  consentDate               DateTime? @db.Date
+  consentFormKey            String?
+  notes                     String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @default(now()) @updatedAt
+
+  school      School            @relation(fields: [schoolId], references: [id])
+  student     Student           @relation(fields: [studentId], references: [id])
+  medications MedicationEntry[]
+
+  @@index([schoolId])
+}
+
+model MedicationEntry {
+  id        String           @id @default(cuid())
+  schoolId  String
+  profileId String
+  name      String
+  dose      String?
+  whenGiven String?
+  keptBy    MedicationKeeper @default(STUDENT)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
+
+  school  School         @relation(fields: [schoolId], references: [id])
+  profile MedicalProfile @relation(fields: [profileId], references: [id])
+
+  @@index([schoolId, profileId])
+}
+
+model SickBayVisit {
+  id               String         @id @default(cuid())
+  schoolId         String
+  studentId        String
+  visitedAt        DateTime
+  complaint        String
+  treatment        String?
+  outcome          SickBayOutcome
+  guardianInformed Boolean        @default(false)
+  recordedById     String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @default(now()) @updatedAt
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([schoolId, studentId])
+}
+
+// One per leaving. A student who rejoins and leaves again gets a second row.
+model StudentExit {
+  id                  String         @id @default(cuid())
+  schoolId            String
+  studentId           String
+  reason              ExitReason
+  reasonNote          String?
+  state               ExitState      @default(STARTED)
+  lastDay             DateTime       @db.Date
+  destinationSchool   String?
+  destinationDistrict String?
+  // [{ key, label, clear, detail, ticked }]: filled by the modules that are on, ticked by hand otherwise.
+  clearance           Json           @default("[]")
+  // The Head may approve a leaving with items outstanding, and says why.
+  overrideReason      String?
+  startedById         String
+  approvedById        String?
+  approvedAt          DateTime?
+  completedAt         DateTime?
+  // The status the student ended in and the class they left from, kept for the leavers list.
+  resultingStatus     StudentStatus?
+  lastClassId         String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @default(now()) @updatedAt
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([schoolId, studentId])
+  @@index([schoolId, state])
+}
+
+model Alumnus {
+  id          String   @id @default(cuid())
+  schoolId    String
+  studentId   String   @unique
+  yearLeft    Int
+  lastClass   String?
+  phone       String?
+  email       String?
+  destination String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([schoolId, yearLeft])
 }

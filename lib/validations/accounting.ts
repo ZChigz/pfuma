@@ -6,7 +6,7 @@ export const UpdateStudentSchema = z.object({
   firstName:      z.string().trim().min(2).max(50).optional(),
   surname:        z.string().trim().min(2).max(50).optional(),
   previousSchool: z.string().trim().max(100).nullable().optional(),
-  medicalNotes:   z.string().trim().max(500).nullable().optional(),
+  // Medical details are changed only on the student's Medical tab (students.medical.edit).
 });
 
 export const CreateChargeSchema = z.object({

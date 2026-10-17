@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, withApi } from '@/lib/api';
-import { canManageEnrollment } from '@/lib/permissions';
+import { requirePermission } from '@/lib/access';
 import { dateOnly, requireOpenTerm } from '@/lib/academic/terms';
 import { csvRowToInput, mapHeaders, parseCsv, type RejectedRow } from '@/lib/students/csv';
 import { ageWarning, ImportStudentRowSchema, type AdmissionData } from '@/lib/students/registration';
@@ -38,7 +38,7 @@ async function _POST(req: Request) {
   const db = getScopedDb(user.schoolId, user.id);
   const { schoolId } = user;
 
-  try { await canManageEnrollment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await requirePermission('students.profiles.import');
 
   const term = await requireOpenTerm(schoolId, db);
 
@@ -141,12 +141,12 @@ async function _POST(req: Request) {
         assigned.set(v.row, v.data.admissionNumber ?? takeAdmissionNumber(sequences, Number(v.data.admissionDate.slice(0, 4)), supplied));
       }
 
-      // Guardians: siblings share one row (same phone + name), including existing ones.
-      const gKey = (g: AdmissionData['guardian']) => `${g.phone}|${lower(g.fullName)}`;
+      // Guardians: a phone number belongs to one guardian per school, so siblings (and anyone sharing a number) share one row, including existing ones.
+      const gKey = (g: AdmissionData['guardian']) => g.phone;
       const existingGuardians = await tx.guardian.findMany({
         where: { schoolId, phone: { in: Array.from(new Set(toImport.map((v) => v.data.guardian.phone))) } },
       });
-      const guardianIds = new Map(existingGuardians.map((g) => [`${g.phone}|${lower(g.fullName)}`, g.id]));
+      const guardianIds = new Map(existingGuardians.map((g) => [g.phone, g.id]));
       const newGuardians = new Map<string, AdmissionData['guardian']>();
       for (const v of toImport) if (!guardianIds.has(gKey(v.data.guardian))) newGuardians.set(gKey(v.data.guardian), v.data.guardian);
       if (newGuardians.size) {
@@ -154,7 +154,7 @@ async function _POST(req: Request) {
           data: Array.from(newGuardians.values()).map((g) => ({ schoolId, ...g })),
           select: { id: true, phone: true, fullName: true },
         });
-        for (const g of created) guardianIds.set(`${g.phone}|${lower(g.fullName)}`, g.id);
+        for (const g of created) guardianIds.set(g.phone, g.id);
         await tx.auditLog.createMany({
           data: created.map((g) => ({ schoolId, actorId: user.id, action: 'CREATE_GUARDIAN' as const, entityType: 'Guardian', entityId: g.id, detail: `${g.fullName} ${g.phone} (CSV import)` })),
         });
@@ -172,7 +172,6 @@ async function _POST(req: Request) {
           birthCertificateNumber: v.data.birthCertificateNumber,
           admissionDate:          dateOnly(v.data.admissionDate),
           previousSchool:         v.data.previousSchool,
-          medicalNotes:           v.data.medicalNotes,
           address:                v.data.address,
           status:                 'ACTIVE',
           currentClassId:         classIds.get(`${v.data.level}|${lower(v.data.stream)}`)!,
@@ -180,6 +179,14 @@ async function _POST(req: Request) {
         select: { id: true, admissionNumber: true },
       });
       const studentIdByNumber = new Map(students.map((s) => [s.admissionNumber, s.id]));
+
+      // Medical details live on the medical profile (students.medical.view), never on the student row.
+      const withNotes = toImport.filter((v) => v.data.medicalNotes);
+      if (withNotes.length) {
+        await tx.medicalProfile.createMany({
+          data: withNotes.map((v) => ({ schoolId, studentId: studentIdByNumber.get(assigned.get(v.row)!)!, notes: v.data.medicalNotes })),
+        });
+      }
 
       await tx.enrollment.createMany({
         data: toImport.map((v) => {
