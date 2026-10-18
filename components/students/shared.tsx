@@ -100,11 +100,7 @@ export function Facts({ rows }: { rows: [string, ReactNode | null | undefined | 
   );
 }
 
-export const formatDay = (iso: string | null | undefined) =>
-  iso ? new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '—';
-
-export const formatWhen = (iso: string) =>
-  new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Harare' });
+export { formatDay, formatWhen } from '@/lib/students/format';
 
 /** A form row of labelled controls that stacks on a phone. */
 export function FormGrid({ children }: { children: ReactNode }) {

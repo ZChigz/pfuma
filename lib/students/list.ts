@@ -229,7 +229,7 @@ export async function listStudents(user: AccessUser, query: StudentListQuery): P
 
   const today = todayInHarare();
   const rows: StudentRow[] = students.map((s) => {
-    const primary = (s as { guardians?: { guardian: { fullName: string; phone: string } }[] }).guardians?.[0]?.guardian;
+    const primary = (s as unknown as { guardians?: { guardian: { fullName: string; phone: string } }[] }).guardians?.[0]?.guardian;
     return {
       id: s.id,
       admissionNumber: s.admissionNumber,

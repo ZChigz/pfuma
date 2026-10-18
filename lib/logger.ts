@@ -10,14 +10,11 @@ function jsonLine(
   message: string,
   meta: Record<string, unknown>,
 ): void {
-  process.stdout.write(
-    JSON.stringify({
-      level,
-      message,
-      timestamp: new Date().toISOString(),
-      ...meta,
-    }) + '\n',
-  );
+  const line = JSON.stringify({ level, message, timestamp: new Date().toISOString(), ...meta });
+  // In the browser (an error page logging itself) there is no process.stdout; throwing here would hide the real error.
+  if (typeof process !== 'undefined' && process.stdout?.write) process.stdout.write(line + '\n');
+  // eslint-disable-next-line no-console
+  else console.error(line);
 }
 
 const RESET  = '\x1b[0m';
