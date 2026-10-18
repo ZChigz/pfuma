@@ -3,7 +3,8 @@ import { Badge } from '@/components/ui/Badge';
 import { actionLabel } from '@/lib/system/audit-labels';
 import { EXIT_REASON_LABEL } from '@/lib/students/rules';
 import type { ActivityEntry, ProfileEnrolment, ProfileOverview } from '@/lib/students/profile';
-import { Facts, formatDay, formatWhen, Section, StatusBadge } from '@/components/students/shared';
+import { formatDay, formatWhen } from '@/lib/students/format';
+import { Facts, Section, StatusBadge } from '@/components/students/shared';
 
 const ENTRY: Record<string, string> = { NEW_FORM_1: 'New Form 1', NEW_LOWER_6: 'New Lower 6', TRANSFER_IN: 'Transfer in', RETURNING: 'Returning' };
 const ORPHAN: Record<string, string> = { NONE: '', SINGLE: 'Single orphan', DOUBLE: 'Double orphan' };
