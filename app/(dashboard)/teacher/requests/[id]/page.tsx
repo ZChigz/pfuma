@@ -1,6 +1,6 @@
 import { CrumbLabel } from '@/components/layout/Breadcrumbs';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect, notFound } from 'next/navigation';
 import { formatUSD, formatZiG, formatDateTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
@@ -12,9 +12,10 @@ export default async function TeacherRequestDetailPage({ params }: { params: { i
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'TEACHER') redirect('/');
 
-  const request = await prisma.expenseRequest.findUnique({
+  const request = await db.expenseRequest.findUnique({
     where: { id: params.id, schoolId: user.schoolId, requestedById: user.id },
     include: {
       requestedBy: { select: { fullName: true } },

@@ -1,29 +1,33 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { apiSuccess, apiUnauthorized, apiForbidden, apiNotFound, parseBody, withApi } from '@/lib/api';
+import { getScopedDb } from '@/lib/scoped-db';
+import { apiError, apiSuccess, apiUnauthorized, apiForbidden, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { canVerifyMarks } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { VerifyMarksSchema } from '@/lib/validations/results';
+import { classRoster } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
 
 async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canVerifyMarks(user.role); }
   catch (e) { if (e instanceof Response) return e; throw e; }
 
   const parsed = await parseBody(req, VerifyMarksSchema);
   if ('error' in parsed) return parsed.error;
-  const { assignmentId, term, force } = parsed.data;
+  const { assignmentId } = parsed.data;
 
-  const assignment = await prisma.subjectAssignment.findFirst({
+  const assignment = await db.subjectAssignment.findFirst({
     where: { id: assignmentId, schoolId: user.schoolId },
-    include: { subject: { select: { name: true } }, class: { select: { name: true } } },
+    include: { subject: { select: { name: true } }, class: { select: { name: true } }, term: { select: { name: true, status: true } } },
   });
   if (!assignment) return apiNotFound('Assignment');
+  if (assignment.term.status === 'CLOSED') return apiError(`${assignment.term.name} is closed, so its results are locked. The Director can reopen the term.`, 409);
+
 
   if (user.role === 'TEACHER' && assignment.teacherId !== user.id) {
     return apiForbidden();
@@ -33,36 +37,38 @@ async function _POST(req: NextRequest) {
     return apiSuccess({ verified: false, message: 'Marks have already been verified for this assignment' });
   }
 
-  const [students, marks] = await Promise.all([
-    prisma.student.findMany({
-      where: { schoolId: user.schoolId, classId: assignment.classId, active: true },
-      select: { id: true, fullName: true },
-    }),
-    prisma.mark.findMany({
-      where: { schoolId: user.schoolId, subjectId: assignment.subjectId, term, student: { classId: assignment.classId } },
-      select: { studentId: true },
-    }),
-  ]);
+  const students = await classRoster(assignment.classId, assignment.termId, db);
+  const studentIds = students.map((s) => s.id);
+  const marks = await db.mark.findMany({
+    where: { schoolId: user.schoolId, subjectId: assignment.subjectId, termId: assignment.termId, studentId: { in: studentIds } },
+    select: { studentId: true },
+  });
 
   const enteredStudentIds = new Set(marks.map((m) => m.studentId));
   const missingStudents = students.filter((s) => !enteredStudentIds.has(s.id));
   const missingCount = missingStudents.length;
 
-  if (missingCount > 0 && force !== true) {
-    return apiSuccess({
-      requiresConfirmation: true,
-      missingCount,
-      missingStudents: missingStudents.map((s) => s.fullName),
-      message: `${missingCount} student${missingCount !== 1 ? 's' : ''} have no mark entered. Submit anyway?`,
-    });
+  // Every enrolled student needs a mark, ABSENT or EXEMPT before the subject can be verified.
+  if (missingCount > 0) {
+    const names = missingStudents.map((s) => s.fullName);
+    const shown = names.slice(0, 5).join(', ') + (names.length > 5 ? ` and ${names.length - 5} more` : '');
+    return apiError(
+      `${missingCount} student${missingCount !== 1 ? 's have' : ' has'} no mark: ${shown}. Enter a mark, Absent or Exempt for everyone before verifying.`,
+      422,
+    );
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await db.$tx(async (tx) => {
     const now = new Date();
 
     await tx.mark.updateMany({
-      where: { schoolId: user.schoolId, subjectId: assignment.subjectId, term, status: 'DRAFT', student: { classId: assignment.classId } },
+      where: { schoolId: user.schoolId, subjectId: assignment.subjectId, termId: assignment.termId, status: 'DRAFT', studentId: { in: studentIds } },
       data: { status: 'VERIFIED', verifiedAt: now },
+    });
+    // Remember that these marks have been verified once; later changes need a reason.
+    await tx.mark.updateMany({
+      where: { schoolId: user.schoolId, subjectId: assignment.subjectId, termId: assignment.termId, status: { in: ['VERIFIED', 'ABSENT', 'EXEMPT'] }, firstVerifiedAt: null, studentId: { in: studentIds } },
+      data: { firstVerifiedAt: now },
     });
 
     await tx.subjectAssignment.update({
@@ -77,7 +83,7 @@ async function _POST(req: NextRequest) {
         action:     'VERIFY_MARKS',
         entityType: 'SubjectAssignment',
         entityId:   assignment.id,
-        detail:     `Verified marks for ${assignment.subject.name} — ${assignment.class.name} (${term})`,
+        detail:     `Verified marks for ${assignment.subject.name} — ${assignment.class.name} (${assignment.term.name})`,
       },
       tx,
     );

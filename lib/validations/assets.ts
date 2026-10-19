@@ -10,6 +10,7 @@ export const CreateAssetSchema = z.object({
   currency:        z.enum(['USD', 'ZIG']),
   location:        z.string().min(1, 'Location is required'),
   custodian:       z.string().optional(),
+  custodianId:     z.string().min(1).optional(),
   condition:       z.enum(['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'CONDEMNED']),
   imageUrl:        z.string().url('Invalid URL').optional().or(z.literal('')),
 });
@@ -18,6 +19,10 @@ export const UpdateAssetSchema = z.object({
   condition: z.enum(['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'CONDEMNED']).optional(),
   location:  z.string().min(1).optional(),
   custodian: z.string().optional(),
+  custodianId: z.string().min(1).nullable().optional(),
+  // Date of the move when it is not today; recorded in the asset's transfer history.
+  transferDate: z.string().refine((v) => !Number.isNaN(Date.parse(v)), { message: "Invalid date" }).optional(),
+  transferNote: z.string().max(300).optional(),
   status:    z.enum(['ACTIVE', 'UNDER_MAINTENANCE', 'DISPOSED']).optional(),
   imageUrl:  z.string().url('Invalid URL').optional().or(z.literal('')),
 });

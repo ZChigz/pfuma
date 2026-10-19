@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { canManageLibrary } from '@/lib/permissions';
+import { countCopies, memberName } from '@/lib/library';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { z } from 'zod';
 import type { SessionUser } from '@/types';
@@ -15,6 +16,8 @@ const UpdateBookSchema = z.object({
   year:          z.number().int().optional(),
   shelfLocation: z.string().optional(),
   coverUrl:      z.string().url().optional().or(z.literal('')),
+  replacementCost:     z.number().positive().nullable().optional(),
+  replacementCurrency: z.enum(['USD', 'ZIG']).optional(),
 });
 
 async function _GET(
@@ -24,15 +27,16 @@ async function _GET(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const book = await prisma.book.findFirst({
+  const book = await db.book.findFirst({
     where: { id: params.id, schoolId: user.schoolId },
     include: {
       copies: {
         include: {
           borrowings: {
             where:   { returnDate: null },
-            include: { member: { include: { user: { select: { fullName: true } } } } },
+            include: { member: { include: { user: { select: { fullName: true } }, student: { select: { fullName: true } } } } },
           },
         },
         orderBy: { accessionNumber: 'asc' },
@@ -41,7 +45,17 @@ async function _GET(
   });
   if (!book) return apiNotFound('Book');
 
-  return apiSuccess({ book });
+  return apiSuccess({
+    book: {
+      ...book,
+      replacementCost: book.replacementCost?.toNumber() ?? null,
+      copyCounts: countCopies(book.copies),
+      copies: book.copies.map((c) => ({
+        ...c,
+        borrowings: c.borrowings.map((b) => ({ ...b, fineAmount: b.fineAmount.toNumber(), memberName: memberName(b.member) })),
+      })),
+    },
+  });
 }
 
 async function _PATCH(
@@ -51,10 +65,11 @@ async function _PATCH(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
 
-  const existing = await prisma.book.findFirst({
+  const existing = await db.book.findFirst({
     where: { id: params.id, schoolId: user.schoolId },
   });
   if (!existing) return apiNotFound('Book');
@@ -62,7 +77,7 @@ async function _PATCH(
   const parsed = await parseBody(req, UpdateBookSchema);
   if ('error' in parsed) return parsed.error;
 
-  const book = await prisma.book.update({
+  const book = await db.book.update({
     where: { id: params.id },
     data: {
       ...(parsed.data.isbn          !== undefined ? { isbn:          parsed.data.isbn          || null } : {}),
@@ -73,6 +88,8 @@ async function _PATCH(
       ...(parsed.data.year          !== undefined ? { year:          parsed.data.year          ?? null } : {}),
       ...(parsed.data.shelfLocation !== undefined ? { shelfLocation: parsed.data.shelfLocation || null } : {}),
       ...(parsed.data.coverUrl      !== undefined ? { coverUrl:      parsed.data.coverUrl      || null } : {}),
+      ...(parsed.data.replacementCost     !== undefined ? { replacementCost:     parsed.data.replacementCost } : {}),
+      ...(parsed.data.replacementCurrency !== undefined ? { replacementCurrency: parsed.data.replacementCurrency } : {}),
     },
   });
 

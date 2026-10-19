@@ -19,11 +19,18 @@ const CURRENCY_OPTIONS = [
   { value: 'ZIG', label: 'ZiG — Zimbabwe Gold' },
 ];
 
-interface Props {
-  studentId: string;
+export interface TermOption {
+  id: string;
+  name: string;
+  status: 'PLANNED' | 'OPEN' | 'CLOSED';
 }
 
-export function ApplyChargeModal({ studentId }: Props) {
+interface Props {
+  studentId: string;
+  terms: TermOption[];
+}
+
+export function ApplyChargeModal({ studentId, terms }: Props) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const toast = useToast();
@@ -31,6 +38,7 @@ export function ApplyChargeModal({ studentId }: Props) {
   const defaultValues: Partial<FormValues> = {
     studentId,
     currency: 'USD',
+    termId: terms.find((t) => t.status === 'OPEN')?.id ?? '',
   };
 
   const {
@@ -119,13 +127,14 @@ export function ApplyChargeModal({ studentId }: Props) {
             />
           </div>
 
-          <Input
-            id="term"
+          <Select
+            id="termId"
             label="Term"
             required
-            placeholder="e.g. Term 1 2026"
-            error={errors.term?.message}
-            {...register('term')}
+            placeholder="Select a term"
+            options={terms.map((t) => ({ value: t.id, label: t.status === 'OPEN' ? `${t.name} (current)` : t.name }))}
+            error={errors.termId?.message}
+            {...register('termId')}
           />
         </form>
       </Modal>

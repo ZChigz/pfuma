@@ -1,24 +1,9 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Badge } from '@/components/ui/Badge';
-import { StatCard } from '@/components/ui/StatCard';
-import {
-  ChartRow,
-  DashboardHeader,
-  Gauge,
-  Panel,
-  PersonRow,
-  PillBars,
-  PrimaryLink,
-  SecondaryLink,
-  SmallLink,
-  StatRow,
-  TodoList,
-  type TodoItem,
-} from '@/components/dashboard/parts';
-import { formatUSD, formatZiG, getDaysOverdue } from '@/lib/utils';
+import { getDaysOverdue } from '@/lib/utils';
+import { getOpenTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 
 const METHOD_LABEL = (m: string) => m.charAt(0) + m.slice(1).toLowerCase().replace(/_/g, ' ');
@@ -27,31 +12,26 @@ export default async function HeadDashboard() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'HEAD') redirect('/');
 
   const { schoolId } = user;
 
-  const school = await prisma.school.findUnique({ where: { id: schoolId }, select: { currentTerm: true } });
-  const term = school?.currentTerm ?? '';
+  const openTerm = await getOpenTerm(schoolId, db);
+  const currentTerm = openTerm?.name ?? '';
 
-  const [pendingPayments, pendingCount, marksForTerm, publishedForTerm, students] = await Promise.all([
-    prisma.payment.findMany({
-      where: { schoolId, status: 'PENDING' },
-      orderBy: { recordedAt: 'desc' },
-      take: 6,
-      select: {
-        id: true,
-        amount: true,
-        currency: true,
-        method: true,
-        student: { select: { fullName: true } },
-      },
-    }),
-    prisma.payment.count({ where: { schoolId, status: 'PENDING' } }),
-    prisma.mark.findMany({ where: { schoolId, term }, select: { student: { select: { grade: true } } } }),
-    prisma.termResult.findMany({ where: { schoolId, term, published: true }, select: { student: { select: { grade: true } } } }),
-    prisma.student.findMany({
-      where: { schoolId, active: true },
+  const [pendingPaymentsCount, unpublishedAssignments, students] = await Promise.all([
+    db.payment.count({ where: { schoolId, status: 'PENDING' } }),
+    // Classes where marking has started but results are not yet published.
+    openTerm
+      ? db.subjectAssignment.findMany({
+          where: { schoolId, termId: openTerm.id, marksStatus: { in: ['IN_PROGRESS', 'VERIFIED'] } },
+          select: { classId: true },
+          distinct: ['classId'],
+        })
+      : [],
+    db.student.findMany({
+      where: { schoolId, status: 'ACTIVE' },
       select: {
         id: true,
         grade: true,
@@ -61,12 +41,7 @@ export default async function HeadDashboard() {
     }),
   ]);
 
-  const gradesWithMarks = new Set(marksForTerm.map((m) => m.student.grade));
-  const gradesPublished = new Set(publishedForTerm.map((r) => r.student.grade));
-  const unpublishedGrades = Array.from(gradesWithMarks).filter((g) => !gradesPublished.has(g));
-  const publishedPercent = gradesWithMarks.size
-    ? Math.round(((gradesWithMarks.size - unpublishedGrades.length) / gradesWithMarks.size) * 100)
-    : 0;
+  const unpublishedClasses = unpublishedAssignments.length;
 
   let overdueCount = 0;
   const owingByGrade = new Map<string, number>();
@@ -84,84 +59,73 @@ export default async function HeadDashboard() {
     if (getDaysOverdue(new Date(oldestMs)) >= 60) overdueCount++;
   }
 
-  const bars = Array.from(owingByGrade.entries())
-    .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
-    .slice(0, 8)
-    .map(([grade, count]) => ({ id: grade, name: grade, count }));
-
-  const todo = [
-    pendingCount > 0 && { text: `${pendingCount} payment${pendingCount === 1 ? '' : 's'} waiting to be verified`, href: '/head/payments', tone: 'bg-gold' },
-    unpublishedGrades.length > 0 && { text: `${unpublishedGrades.length} grade${unpublishedGrades.length === 1 ? '' : 's'} with unpublished results`, href: '/head/results', tone: 'bg-primary' },
-    overdueCount > 0 && { text: `${overdueCount} student${overdueCount === 1 ? '' : 's'} more than 60 days overdue`, href: '/head/fees', tone: 'bg-danger' },
-  ].filter(Boolean) as TodoItem[];
+  const summaryCards = [
+    {
+      label: 'Pending payments to verify',
+      value: pendingPaymentsCount,
+      tone: 'amber',
+      href: '/head/payments',
+    },
+    {
+      label: 'Classes with unpublished results',
+      value: unpublishedClasses,
+      tone: 'amber',
+      href: '/head/results',
+    },
+    {
+      label: 'Students 60+ days overdue',
+      value: overdueCount,
+      tone: 'red',
+      href: '/head/fees',
+    },
+  ] as const;
 
   return (
-    <div className="flex flex-col gap-4 pb-2">
-      <DashboardHeader
-        subtitle={`${term ? `${term}: ` : ''}what needs your sign-off, what is owed, and which results are ready to publish.`}
-        actions={
-          <>
-            <PrimaryLink href="/head/payments">Verify payments</PrimaryLink>
-            <SecondaryLink href="/head/results">Publish results</SecondaryLink>
-          </>
-        }
-      />
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Head&apos;s Office</h1>
+        <p className="mt-1 text-sm text-muted">{currentTerm || 'Term not set'} — overview</p>
+      </div>
 
-      <StatRow>
-        <StatCard hero label="Payments to verify" value={pendingCount} note={pendingCount ? 'Waiting for your sign-off' : 'Nothing waiting'} href="/head/payments" />
-        <StatCard label="Grades to publish" value={unpublishedGrades.length} note={unpublishedGrades.length ? 'Marks entered, not published' : 'All results published'} href="/head/results" />
-        <StatCard label="Overdue 60+ days" value={overdueCount} tone={overdueCount ? 'danger' : 'default'} note={overdueCount ? 'Students with fees outstanding' : 'No long overdue fees'} href="/head/fees" />
-        <StatCard label="Students enrolled" value={students.length} note="Active this term" href="/head/reports" />
-      </StatRow>
+      {/* Summary row */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {summaryCards.map((c, i) => (
+          <StatCard
+            key={c.label}
+            label={c.label}
+            value={c.value}
+            href={c.href}
+            hero={i === 0 && c.value > 0}
+            tone={c.value === 0 ? 'default' : c.tone === 'red' ? 'danger' : 'warning'}
+            note={c.value === 0 ? 'Nothing waiting' : 'Needs your attention'}
+          />
+        ))}
+      </div>
 
-      <ChartRow>
-        <Panel title="Students owing fees per grade" className="lg:col-span-2 xl:col-span-1">
-          {bars.length === 0 ? (
-            <p className="py-10 text-sm text-muted">No outstanding fees. Every student with charges has paid in full.</p>
-          ) : (
-            <PillBars bars={bars} unit="students owing" />
-          )}
-          {owingByGrade.size > bars.length && (
-            <Link href="/head/fees" className="mt-3 inline-block text-xs font-medium text-primary underline-offset-2 hover:underline">
-              Show all {owingByGrade.size} grades
-            </Link>
-          )}
-        </Panel>
-
-        <Panel title="Results published">
-          {gradesWithMarks.size === 0 ? (
-            <p className="py-10 text-sm text-muted">No marks entered yet{term ? ` for ${term}` : ''}.</p>
-          ) : (
-            <Gauge
-              percent={publishedPercent}
-              caption={`of grades with marks are published${term ? ` for ${term}` : ''}`}
-              filledLabel="Published"
-              emptyLabel="Not yet"
-            />
-          )}
-        </Panel>
-
-        <Panel title="Still to do">
-          <TodoList items={todo} emptyText="Nothing outstanding. All payments are verified, results are published and no fees are long overdue." />
-        </Panel>
-      </ChartRow>
-
-      <Panel title="Payments waiting to be verified" action={<SmallLink href="/head/payments">Review payments</SmallLink>}>
-        {pendingPayments.length === 0 ? (
-          <p className="text-sm text-muted">No payments waiting. New payments recorded by the bursar will show here.</p>
-        ) : (
-          <ul className="grid gap-x-8 md:grid-cols-2">
-            {pendingPayments.map((p) => (
-              <PersonRow
-                key={p.id}
-                name={p.student.fullName}
-                detail={`${p.currency === 'USD' ? formatUSD(p.amount) : formatZiG(p.amount)}, ${METHOD_LABEL(p.method)}`}
-                badge={<Badge variant="warning" label="Pending" />}
-              />
-            ))}
-          </ul>
-        )}
-      </Panel>
+      {/* Quick actions */}
+      <div>
+        <p className="mb-3 text-xs font-medium text-muted">Quick actions</p>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/head/payments"
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
+          >
+            Verify pending payments
+          </Link>
+          <Link
+            href="/head/fees"
+            className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-medium text-ink transition-colors hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-primary/40"
+          >
+            Apply fees to a level
+          </Link>
+          <Link
+            href="/head/results"
+            className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-white px-4 text-sm font-medium text-ink transition-colors hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-primary/40"
+          >
+            Publish results
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

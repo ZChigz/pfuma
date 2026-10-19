@@ -1,27 +1,30 @@
 import { test, expect } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
+import { createHash, randomBytes } from 'node:crypto';
 
 dotenv.config();
 
 let portalToken: string;
 let studentFullName: string;
 
-// Fetch the seed student's portal token directly from the database so the
-// test does not depend on a hard-coded token value.
+// Portal links are stored only as a SHA-256 hash, so the test issues itself a
+// fresh link for the seed student: a random 32-byte token plus its hash.
 test.beforeAll(async () => {
   const prisma = new PrismaClient();
   try {
-    const student = await prisma.student.findUnique({
+    const token = randomBytes(32).toString('base64url');
+    const student = await prisma.student.update({
       where:  { id: 'seed-stu-tanaka' },
-      select: { portalToken: true, fullName: true },
+      data: {
+        portalTokenHash:      createHash('sha256').update(token).digest('hex'),
+        portalTokenCreatedAt: new Date(),
+        portalTokenExpiresAt: new Date(Date.now() + 24 * 3600 * 1000),
+        portalPinHash:        null,
+      },
+      select: { fullName: true },
     });
-    if (!student) {
-      throw new Error(
-        'Seed student "seed-stu-tanaka" not found — run npm run db:seed first.',
-      );
-    }
-    portalToken     = student.portalToken;
+    portalToken     = token;
     studentFullName = student.fullName;
   } finally {
     await prisma.$disconnect();

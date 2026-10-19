@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiNotFound, apiForbidden, apiError, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { REQUEST_INCLUDE, serializeExpenseRequest } from '@/lib/expense-requests';
@@ -13,8 +13,9 @@ async function _POST(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const existing = await prisma.expenseRequest.findUnique({
+  const existing = await db.expenseRequest.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
     select: { id: true, status: true, requestedById: true },
   });
@@ -22,7 +23,7 @@ async function _POST(
   if (existing.requestedById !== user.id) return apiForbidden();
   if (existing.status !== 'DRAFT') return apiError('Only draft requests can be submitted', 409);
 
-  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await db.$tx(async (tx) => {
     const r = await tx.expenseRequest.update({
       where: { id: params.id },
       data: { status: 'PENDING', requestedAt: new Date() },

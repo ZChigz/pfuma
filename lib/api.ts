@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ZodError, type ZodSchema } from 'zod';
+import { SchoolSuspendedError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 
 export function apiSuccess<T>(data: T, status = 200): NextResponse {
@@ -33,6 +34,17 @@ export function apiValidationError(errors: ZodError): NextResponse {
   );
 }
 
+// ─── Service errors ──────────────────────────────────────────────────────────
+// Thrown by the service layer (lib/academic, lib/students…) when a business
+// rule is broken. withApi turns it into a JSON error with the given status.
+
+export class ServiceError extends Error {
+  constructor(message: string, public readonly status = 400) {
+    super(message);
+    this.name = 'ServiceError';
+  }
+}
+
 // ─── Route error wrapper ─────────────────────────────────────────────────────
 // Catches any unhandled error thrown inside a route handler, logs it with
 // structured context, and returns a clean 500 response instead of bubbling
@@ -45,6 +57,15 @@ export function withApi(label: string, handler: NextHandler): NextHandler {
     try {
       return await handler(req, ctx);
     } catch (err) {
+      if (err instanceof ServiceError) return apiError(err.message, err.status);
+      if (err instanceof Response) return err;
+      if (err instanceof SchoolSuspendedError) return apiError(err.message, 403);
+      // The database refused a reference into another school (trigger
+      // check_same_school). Treat it like any record the caller cannot see.
+      if (err instanceof Error && err.message.includes('Cross-school reference')) {
+        logger.warn(`Cross-school reference refused: ${label}`, { url: req.url });
+        return NextResponse.json({ success: false, message: 'Referenced record not found' }, { status: 404 });
+      }
       logger.error(`Unhandled route error: ${label}`, err, { url: req.url });
       return NextResponse.json(
         { success: false, message: 'Internal server error' },

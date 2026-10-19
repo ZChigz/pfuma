@@ -1,8 +1,9 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { Permission } from '@/lib/permissions';
 import { formatDateTime } from '@/lib/utils';
+import { rateFor } from '@/lib/exchange-rate';
 import { UpdateRateForm } from '@/components/accounting/UpdateRateForm';
 import type { SessionUser } from '@/types';
 
@@ -10,19 +11,16 @@ export default async function SettingsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   if (!Permission.manageStudents.includes(user.role)) redirect('/accounting');
 
   const [current, history] = await Promise.all([
-    prisma.exchangeRate.findFirst({
+    rateFor(db, new Date()),
+    db.exchangeRate.findMany({
       where:   { schoolId: user.schoolId },
-      orderBy: { createdAt: 'desc' },
-      include: { user: { select: { fullName: true } } },
-    }),
-    prisma.exchangeRate.findMany({
-      where:   { schoolId: user.schoolId },
-      orderBy: { createdAt: 'desc' },
-      take:    10,
+      orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
+      take:    15,
       include: { user: { select: { fullName: true } } },
     }),
   ]);
@@ -45,7 +43,7 @@ export default async function SettingsPage() {
           </p>
           {current ? (
             <div className="mt-3 space-y-1 text-sm text-muted">
-              <p>Set by <span className="font-medium text-ink">{current.user.fullName}</span>, {formatDateTime(current.createdAt)}</p>
+              <p>In force since {formatDateTime(current.effectiveFrom)} · {current.source === 'RBZ' ? 'RBZ rate' : current.source === 'OTHER' ? 'Other source' : 'School rate'} · set by <span className="font-medium text-ink">{current.user.fullName}</span></p>
               {current.note && (
                 <p className="italic">&ldquo;{current.note}&rdquo;</p>
               )}
@@ -72,7 +70,7 @@ export default async function SettingsPage() {
             <table className="w-full text-left text-sm text-ink">
               <thead className="border-b border-line bg-white">
                 <tr>
-                  {['Date', 'Rate (ZiG / USD)', 'Set By', 'Note'].map((h) => (
+                  {['Effective from', 'Rate (ZiG / USD)', 'Source', 'Set By', 'Entered', 'Note'].map((h) => (
                     <th
                       key={h}
                       className="px-4 py-3.5 text-xs font-medium text-subtle"
@@ -86,12 +84,14 @@ export default async function SettingsPage() {
                 {history.map((r, i) => (
                   <tr key={r.id} className={i === 0 ? 'bg-success-bg' : ''}>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-muted">
-                      {formatDateTime(r.createdAt)}
+                      {formatDateTime(r.effectiveFrom)}
                     </td>
                     <td className="px-4 py-3 tabular-nums font-semibold text-primary">
                       {r.usdToZig.toNumber().toFixed(2)}
                     </td>
+                    <td className="px-4 py-3">{r.source}</td>
                     <td className="px-4 py-3">{r.user.fullName}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted">{formatDateTime(r.createdAt)}</td>
                     <td className="px-4 py-3 text-muted">{r.note ?? '—'}</td>
                   </tr>
                 ))}

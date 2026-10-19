@@ -1,28 +1,30 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { formatUSD, formatZiG, formatDateTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { PaymentActionButton } from '@/components/accounting/PaymentActionButton';
+import { ProofLink } from '@/components/accounting/ProofLink';
 import type { SessionUser } from '@/types';
 
 export default async function HeadPaymentsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'HEAD') redirect('/');
 
   const include = {
-    student: { select: { fullName: true, grade: true, class: { select: { name: true } } } },
+    student: { select: { fullName: true, currentClass: { select: { name: true } } } },
   } as const;
 
   const [pending, verified] = await Promise.all([
-    prisma.payment.findMany({
+    db.payment.findMany({
       where: { schoolId: user.schoolId, status: 'PENDING' },
       include,
       orderBy: { recordedAt: 'asc' },
     }),
-    prisma.payment.findMany({
+    db.payment.findMany({
       where: { schoolId: user.schoolId, status: 'VERIFIED' },
       include,
       orderBy: { recordedAt: 'desc' },
@@ -57,7 +59,7 @@ export default async function HeadPaymentsPage() {
                 {pending.map((p) => (
                   <tr key={p.id}>
                     <td className="px-4 py-3 font-medium">{p.student.fullName}</td>
-                    <td className="px-4 py-3 text-muted">{p.student.class?.name ?? p.student.grade}</td>
+                    <td className="px-4 py-3 text-muted">{p.student.currentClass?.name ?? '—'}</td>
                     <td className="px-4 py-3">
                       <Badge label={p.method} variant={p.method === 'CASH' ? 'success' : 'neutral'} />
                     </td>
@@ -66,7 +68,19 @@ export default async function HeadPaymentsPage() {
                       {p.currency === 'USD' ? formatUSD(p.amount.toNumber()) : formatZiG(p.amount.toNumber())}
                     </td>
                     <td className="px-4 py-3">
-                      <PaymentActionButton paymentId={p.id} action="verify" />
+                      <div className="flex items-center gap-3">
+                        {p.recordedBy === user.id ? (
+                          <PaymentActionButton
+                            paymentId={p.id}
+                            action="verify"
+                            disabled
+                            disabledLabel="You recorded this — someone else must verify"
+                          />
+                        ) : (
+                          <PaymentActionButton paymentId={p.id} action="verify" />
+                        )}
+                        {(p.popKey || p.popUrl) && <ProofLink paymentId={p.id} />}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -96,7 +110,7 @@ export default async function HeadPaymentsPage() {
                 {verified.map((p) => (
                   <tr key={p.id}>
                     <td className="px-4 py-3 font-medium">{p.student.fullName}</td>
-                    <td className="px-4 py-3 text-muted">{p.student.class?.name ?? p.student.grade}</td>
+                    <td className="px-4 py-3 text-muted">{p.student.currentClass?.name ?? '—'}</td>
                     <td className="px-4 py-3">
                       <Badge label={p.method} variant="neutral" />
                     </td>

@@ -8,15 +8,27 @@ export interface AuditParams {
   entityType: string;
   entityId: string;
   detail?: string;
+  before?: Prisma.InputJsonValue;
+  after?: Prisma.InputJsonValue;
+  /** Where the caller came from. Left out inside a request: the database copies it from the request. */
+  ip?: string;
+  userAgent?: string;
 }
 
-// tx is separate so the call site is explicit about whether it is inside a
-// $transaction. A failed audit write intentionally propagates — it should
-// roll back the whole operation, not be silently swallowed.
-export async function logAudit(
-  params: AuditParams,
-  tx?: Prisma.TransactionClient,
-): Promise<void> {
-  const client = tx ?? prisma;
+// Anything with an auditLog delegate: the raw client, a transaction, or the
+// school-scoped client / transaction from lib/scoped-db.ts.
+export interface AuditClient {
+  auditLog: { create(args: { data: AuditParams }): PromiseLike<unknown> };
+}
+
+// Business-level entries ("Verified payment", "Published results"). Row-level
+// before/after history for the core tables is written by the database trigger
+// audit_row_change (migration 20261017000200), not here.
+//
+// `db` is separate so the call site is explicit about whether it is inside a
+// transaction. A failed audit write intentionally propagates — it should roll
+// back the whole operation, not be silently swallowed.
+export async function logAudit(params: AuditParams, db?: AuditClient): Promise<void> {
+  const client: AuditClient = db ?? (prisma as unknown as AuditClient);
   await client.auditLog.create({ data: params });
 }

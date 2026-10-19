@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -7,7 +7,11 @@ import { TermSelect } from '@/components/results/TermSelect';
 import { PublishResultsButton } from '@/components/results/PublishResultsButton';
 import { ExportResultsButton } from '@/components/results/ExportResultsButton';
 import { UnlockSubjectLink } from '@/components/results/UnlockSubjectLink';
-import { TERMS } from '@/lib/results';
+import { ReopenResultsButton } from '@/components/results/ReopenResultsButton';
+import { ExcuseAbsenceButton } from '@/components/results/ExcuseAbsenceButton';
+import { ReportCardDetails, type DetailRow } from '@/components/results/ReportCardDetails';
+import { listTerms } from '@/lib/academic/terms';
+import { classRoster, classRosterIds } from '@/lib/academic/roster';
 import type { SessionUser, AssignmentMarkStatus } from '@/types';
 
 const STATUS_DISPLAY: Record<AssignmentMarkStatus, { icon: string; label: string; className: string }> = {
@@ -20,24 +24,27 @@ const STATUS_DISPLAY: Record<AssignmentMarkStatus, { icon: string; label: string
 export default async function HeadResultsPage({
   searchParams,
 }: {
-  searchParams: { classId?: string; term?: string };
+  searchParams: { classId?: string; termId?: string };
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'HEAD') redirect('/');
 
   const { schoolId } = user;
 
-  const [school, classes] = await Promise.all([
-    prisma.school.findUnique({ where: { id: schoolId }, select: { currentTerm: true } }),
-    prisma.schoolClass.findMany({
+  const [terms, classes] = await Promise.all([
+    listTerms(schoolId, db),
+    db.schoolClass.findMany({
       where: { schoolId, active: true },
-      orderBy: [{ grade: 'asc' }, { section: 'asc' }],
+      orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }],
     }),
   ]);
 
-  const selectedTerm = searchParams.term || school?.currentTerm || TERMS[0];
+  const term = terms.find((t) => t.id === searchParams.termId) ?? terms.find((t) => t.status === 'OPEN') ?? terms[0];
+  const selectedTermId = term?.id ?? '';
+  const selectedTerm = term?.name ?? 'No terms yet';
   const selectedClassId = searchParams.classId || classes[0]?.id || '';
   const selectedClass = classes.find((c) => c.id === selectedClassId);
 
@@ -57,11 +64,14 @@ export default async function HeadResultsPage({
     total: number;
     percentage: number;
     position: number | null;
+    subjectsSat: number | null;
+    subjectsOffered: number | null;
   }> = [];
+  let rankedOutOf: number | null = null;
 
-  if (selectedClass) {
-    assignments = await prisma.subjectAssignment.findMany({
-      where: { schoolId, classId: selectedClass.id, term: selectedTerm, subject: { active: true } },
+  if (selectedClass && term) {
+    assignments = await db.subjectAssignment.findMany({
+      where: { schoolId, classId: selectedClass.id, termId: selectedTermId, subject: { active: true } },
       include: {
         subject: { select: { id: true, name: true, maxMark: true } },
         teacher: { select: { fullName: true } },
@@ -70,20 +80,57 @@ export default async function HeadResultsPage({
     });
   }
 
+  // Absences in this class and term: the Head can excuse them (left out instead of counting as 0).
+  const absences =
+    selectedClass && term && assignments.length > 0
+      ? await db.mark.findMany({
+          where: {
+            schoolId,
+            termId: selectedTermId,
+            status: 'ABSENT',
+            subjectId: { in: assignments.map((a) => a.subjectId) },
+            studentId: { in: await classRosterIds(selectedClass.id, selectedTermId, db) },
+          },
+          include: { student: { select: { fullName: true } }, subject: { select: { name: true } } },
+          orderBy: [{ student: { fullName: 'asc' } }],
+        })
+      : [];
+
+  // Report-card extras (remarks, days present / absent) for everyone in the class.
+  let detailRows: DetailRow[] = [];
+  if (selectedClass && term && user.role === 'HEAD') {
+    const roster = await classRoster(selectedClass.id, selectedTermId, db);
+    const saved = await db.termResult.findMany({ where: { schoolId, termId: selectedTermId, studentId: { in: roster.map((s) => s.id) } } });
+    const byStudent = new Map(saved.map((r) => [r.studentId, r]));
+    detailRows = roster.map((s) => {
+      const r = byStudent.get(s.id);
+      return {
+        studentId: s.id,
+        fullName: s.fullName,
+        classTeacherRemark: r?.classTeacherRemark ?? '',
+        headRemark: r?.headRemark ?? '',
+        daysPresent: r?.daysPresent != null ? String(r.daysPresent) : '',
+        daysAbsent: r?.daysAbsent != null ? String(r.daysAbsent) : '',
+      };
+    });
+  }
+
   const verifiedCount = assignments.filter((a) => a.marksStatus === 'VERIFIED' || a.marksStatus === 'PUBLISHED').length;
   const allVerified = assignments.length > 0 && verifiedCount === assignments.length;
   const isPublished = assignments.length > 0 && assignments.every((a) => a.marksStatus === 'PUBLISHED');
 
-  if (selectedClass && isPublished) {
+  if (selectedClass && term && isPublished) {
     const subjectIds = assignments.map((a) => a.subjectId);
+    // The class list for that term comes from Enrollment.
+    const studentIds = await classRosterIds(selectedClass.id, selectedTermId, db);
     const [termResults, marks] = await Promise.all([
-      prisma.termResult.findMany({
-        where: { schoolId, term: selectedTerm, student: { classId: selectedClass.id } },
+      db.termResult.findMany({
+        where: { schoolId, termId: selectedTermId, studentId: { in: studentIds } },
         include: { student: { select: { id: true, fullName: true } } },
         orderBy: { classPosition: 'asc' },
       }),
-      prisma.mark.findMany({
-        where: { schoolId, subjectId: { in: subjectIds }, term: selectedTerm, status: 'PUBLISHED', student: { classId: selectedClass.id } },
+      db.mark.findMany({
+        where: { schoolId, subjectId: { in: subjectIds }, termId: selectedTermId, status: 'PUBLISHED', studentId: { in: studentIds } },
       }),
     ]);
 
@@ -99,8 +146,11 @@ export default async function HeadResultsPage({
         total:      tr.totalMarks.toNumber(),
         percentage: tr.percentage.toNumber(),
         position:   tr.classPosition,
+        subjectsSat: tr.subjectsSat,
+        subjectsOffered: tr.subjectsOffered,
       };
     });
+    rankedOutOf = termResults.find((tr) => tr.rankedOutOf != null)?.rankedOutOf ?? null;
   }
 
   return (
@@ -112,13 +162,16 @@ export default async function HeadResultsPage({
         </div>
         {selectedClass && (
           <div className="flex items-center gap-3">
-            <TermSelect classId={selectedClass.id} term={selectedTerm} />
+            <TermSelect classId={selectedClass.id} termId={selectedTermId} terms={terms.map((t) => ({ id: t.id, name: t.name }))} />
             {isPublished && (
               <span className="inline-flex items-center rounded-full bg-success-bg px-3 py-1 text-sm font-medium text-primary">
                 ✓ Published
               </span>
             )}
-            {isPublished && <ExportResultsButton classId={selectedClass.id} className={selectedClass.name} term={selectedTerm} />}
+            {isPublished && term?.status !== 'CLOSED' && user.role === 'HEAD' && (
+              <ReopenResultsButton classId={selectedClass.id} className={selectedClass.name} termId={selectedTermId} termName={selectedTerm} />
+            )}
+            {isPublished && <ExportResultsButton classId={selectedClass.id} className={selectedClass.name} termId={selectedTermId} termName={selectedTerm} />}
           </div>
         )}
       </div>
@@ -128,7 +181,7 @@ export default async function HeadResultsPage({
         {classes.map((c) => (
           <Link
             key={c.id}
-            href={`/head/results?classId=${c.id}&term=${encodeURIComponent(selectedTerm)}`}
+            href={`/head/results?classId=${c.id}&termId=${selectedTermId}`}
             className={cn(
               'min-h-[44px] border-b-2 px-4 py-2 text-sm font-medium transition-colors',
               selectedClassId === c.id
@@ -190,6 +243,31 @@ export default async function HeadResultsPage({
             </table>
           </div>
 
+          {absences.length > 0 && (
+            <div className="overflow-hidden rounded-2xl bg-white">
+              <p className="border-b border-line px-4 py-3 text-xs font-medium text-muted">
+                Absences — count as 0 unless excused{user.role === 'HEAD' && !isPublished ? '' : ' (unpublish the class to change)'}
+              </p>
+              <table className="w-full text-left text-sm text-ink">
+                <tbody className="divide-y divide-line">
+                  {absences.map((m) => (
+                    <tr key={m.id}>
+                      <td className="px-4 py-3 font-medium">{m.student.fullName}</td>
+                      <td className="px-4 py-3 text-muted">{m.subject.name}</td>
+                      <td className="px-4 py-3 text-muted">{m.absenceReason ?? '—'}</td>
+                      <td className="px-4 py-3">{m.excused ? 'Excused' : 'Counts as 0'}</td>
+                      <td className="px-4 py-3">
+                        {user.role === 'HEAD' && !isPublished && term?.status !== 'CLOSED' && (
+                          <ExcuseAbsenceButton markId={m.id} excused={m.excused} />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <p className="text-sm font-medium text-ink">
             {verifiedCount} of {assignments.length} subjects verified
           </p>
@@ -204,12 +282,20 @@ export default async function HeadResultsPage({
             <PublishResultsButton
               classId={selectedClass.id}
               className={selectedClass.name}
-              term={selectedTerm}
+              termId={selectedTermId}
+              termName={selectedTerm}
               disabled={!allVerified}
             />
           )}
 
           {/* Results table */}
+          {isPublished && resultRows.length > 0 && (
+            <p className="text-sm text-muted">
+              Positions use each student&apos;s average percentage over the subjects they sat, so a missed exam or a different
+              elective is not counted as zero. {rankedOutOf != null ? `${rankedOutOf} of ${resultRows.length} students are ranked; ` : ''}
+              a student who sat fewer than half of the core subjects is shown as &ldquo;Not ranked&rdquo;.
+            </p>
+          )}
           {isPublished && resultRows.length > 0 && (
             <div className="overflow-x-auto rounded-2xl bg-white">
               <table className="w-full text-left text-sm text-ink">
@@ -224,12 +310,13 @@ export default async function HeadResultsPage({
                     ))}
                     <th className="px-4 py-3.5 text-xs font-medium text-subtle">Total</th>
                     <th className="px-4 py-3.5 text-xs font-medium text-subtle">%</th>
+                    <th className="px-4 py-3.5 text-xs font-medium text-subtle">Subjects sat</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line bg-white">
                   {resultRows.map((r) => (
                     <tr key={r.studentId}>
-                      <td className="px-4 py-3 font-bold tabular-nums">{r.position ?? '—'}</td>
+                      <td className="px-4 py-3 font-bold tabular-nums">{r.position ?? 'Not ranked'}</td>
                       <td className="px-4 py-3 font-medium">{r.fullName}</td>
                       {assignments.map((a) => (
                         <td key={a.subjectId} className="px-4 py-3 tabular-nums">
@@ -238,6 +325,9 @@ export default async function HeadResultsPage({
                       ))}
                       <td className="px-4 py-3 tabular-nums font-medium">{r.total}</td>
                       <td className="px-4 py-3 tabular-nums font-medium">{r.percentage.toFixed(1)}%</td>
+                      <td className="px-4 py-3 tabular-nums text-muted">
+                        {r.subjectsSat != null ? `${r.subjectsSat} of ${r.subjectsOffered}` : '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -246,6 +336,8 @@ export default async function HeadResultsPage({
           )}
         </>
       )}
+
+      {detailRows.length > 0 && term?.status !== 'CLOSED' && <ReportCardDetails key={`${selectedClassId}-${selectedTermId}`} termId={selectedTermId} rows={detailRows} />}
     </div>
   );
 }

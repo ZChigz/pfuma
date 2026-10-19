@@ -1,7 +1,8 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { LibraryOverviewClient } from '@/components/library/LibraryOverviewClient';
+import { memberName } from '@/lib/library';
 import { getDaysOverdue } from '@/lib/utils';
 import type { SessionUser } from '@/types';
 
@@ -9,23 +10,24 @@ export default async function LibraryPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   const { schoolId, role } = user;
 
   const now = new Date();
 
   const [totalTitles, borrowedCount, overdueCount, availableAgg, overdueRaw] =
     await Promise.all([
-      prisma.book.count({ where: { schoolId } }),
-      prisma.borrowing.count({ where: { schoolId, returnDate: null } }),
-      prisma.borrowing.count({ where: { schoolId, returnDate: null, dueDate: { lt: now } } }),
-      prisma.bookCopy.aggregate({
+      db.book.count({ where: { schoolId } }),
+      db.borrowing.count({ where: { schoolId, returnDate: null } }),
+      db.borrowing.count({ where: { schoolId, returnDate: null, dueDate: { lt: now } } }),
+      db.bookCopy.aggregate({
         where: { schoolId, status: 'AVAILABLE' },
         _count: { id: true },
       }),
-      prisma.borrowing.findMany({
+      db.borrowing.findMany({
         where:   { schoolId, returnDate: null, dueDate: { lt: now } },
         include: {
-          member: { include: { user: { select: { fullName: true } } } },
+          member: { include: { user: { select: { fullName: true } }, student: { select: { fullName: true } } } },
           copy:   { include: { book: { select: { title: true } } } },
         },
         orderBy: { dueDate: 'asc' },
@@ -37,10 +39,12 @@ export default async function LibraryPage() {
     id:          b.id,
     bookTitle:   b.copy.book.title,
     accession:   b.copy.accessionNumber,
-    memberName:  b.member.user.fullName,
+    memberName:  memberName(b.member),
     dueDate:     b.dueDate.toISOString(),
     daysOverdue: getDaysOverdue(b.dueDate),
   }));
+
+  const school = await db.school.findUnique({ where: { id: schoolId }, select: { libraryFineLimit: true, studentLoanLimit: true, staffLoanLimit: true } });
 
   return (
     <LibraryOverviewClient
@@ -52,6 +56,11 @@ export default async function LibraryPage() {
       }}
       overdueList={overdueList}
       userRole={role}
+      settings={{
+        libraryFineLimit: school?.libraryFineLimit.toNumber() ?? 5,
+        studentLoanLimit: school?.studentLoanLimit ?? 2,
+        staffLoanLimit: school?.staffLoanLimit ?? 5,
+      }}
     />
   );
 }

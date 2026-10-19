@@ -1,8 +1,8 @@
-import type { Prisma } from '@prisma/client';
+import type { Db } from '@/lib/scoped-db';
 
 export async function generateRequestNumber(
   schoolId: string,
-  tx: Prisma.TransactionClient,
+  tx: Db,
 ): Promise<string> {
   const year = new Date().getFullYear();
   const count = await tx.expenseRequest.count({

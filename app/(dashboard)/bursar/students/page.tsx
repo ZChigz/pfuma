@@ -1,7 +1,8 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { BursarStudentsTable } from '@/components/accounting/BursarStudentsTable';
+import { PRIMARY_GUARDIAN_INCLUDE } from '@/lib/students/guardians';
 import type { SessionUser } from '@/types';
 
 export default async function BursarStudentsPage({
@@ -12,18 +13,20 @@ export default async function BursarStudentsPage({
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   if (user.role !== 'BURSAR') redirect('/');
 
   const q = searchParams.q?.trim() ?? '';
 
-  const rows = await prisma.student.findMany({
+  const rows = await db.student.findMany({
     where: {
       schoolId: user.schoolId,
-      active: true,
-      ...(q ? { fullName: { contains: q, mode: 'insensitive' } } : {}),
+      status: 'ACTIVE',
+      ...(q ? { OR: [{ fullName: { contains: q, mode: 'insensitive' } }, { admissionNumber: { contains: q, mode: 'insensitive' } }] } : {}),
     },
     include: {
-      class: { select: { name: true } },
+      currentClass: { select: { name: true, level: { select: { name: true } } } },
+      guardians: PRIMARY_GUARDIAN_INCLUDE,
       charges: { select: { currency: true, amount: true } },
       payments: { where: { status: 'VERIFIED' }, select: { currency: true, amount: true } },
     },
@@ -39,9 +42,9 @@ export default async function BursarStudentsPage({
     return {
       id: s.id,
       fullName: s.fullName,
-      grade: s.grade,
-      className: s.class?.name ?? s.grade,
-      parentPhone: s.parentPhone,
+      grade: s.currentClass?.name ?? '',
+      className: s.currentClass?.name ?? '—',
+      parentPhone: s.guardians[0]?.guardian.phone ?? '',
       balanceUSD: cUSD - pUSD,
       balanceZiG: cZiG - pZiG,
     };
@@ -59,7 +62,7 @@ export default async function BursarStudentsPage({
           type="search"
           name="q"
           defaultValue={q}
-          placeholder="Search student by name"
+          placeholder="Search by name or admission number"
           className="min-h-[44px] w-full max-w-sm rounded-xl border border-line bg-white px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
         <button

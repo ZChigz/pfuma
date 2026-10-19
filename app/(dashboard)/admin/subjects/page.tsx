@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/Badge';
 import { AddSubjectModal } from '@/components/admin/AddSubjectModal';
@@ -7,42 +7,48 @@ import { SubjectRowActions } from '@/components/admin/SubjectRowActions';
 import { AssignSubjectModal } from '@/components/admin/AssignSubjectModal';
 import { RemoveAssignmentButton } from '@/components/admin/RemoveAssignmentButton';
 import { GradeBoundariesManager } from '@/components/results/GradeBoundariesManager';
+import { ResultsSettings } from '@/components/results/ResultsSettings';
 import { canManageSubjects } from '@/lib/permissions';
+import { getOpenTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 
 export default async function AdminSubjectsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageSubjects(user.role); } catch { redirect('/'); }
 
   const { schoolId } = user;
 
-  const [subjects, classes, teachers, school] = await Promise.all([
-    prisma.subject.findMany({
+  const [gradeLevels, gradeTerms] = await Promise.all([
+    db.level.findMany({ where: { schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
+    db.academicTerm.findMany({ where: { schoolId }, select: { id: true, name: true }, orderBy: { startDate: 'desc' } }),
+  ]);
+  const resultsSchool = await db.school.findUnique({ where: { id: schoolId }, select: { passGrade: true, oLevelRanking: true } });
+
+  const [subjects, classes, teachers, openTerm] = await Promise.all([
+    db.subject.findMany({
       where: { schoolId },
       orderBy: { name: 'asc' },
     }),
-    prisma.schoolClass.findMany({
+    db.schoolClass.findMany({
       where: { schoolId, active: true },
-      orderBy: [{ grade: 'asc' }, { section: 'asc' }],
+      orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }],
     }),
-    prisma.user.findMany({
+    db.user.findMany({
       where: { schoolId, role: 'TEACHER', active: true },
       select: { id: true, fullName: true },
       orderBy: { fullName: 'asc' },
     }),
-    prisma.school.findUnique({
-      where: { id: schoolId },
-      select: { currentTerm: true },
-    }),
+    getOpenTerm(schoolId, db),
   ]);
 
-  const currentTerm = school?.currentTerm ?? '';
+  const currentTerm = openTerm?.name ?? '';
 
-  const assignments = await prisma.subjectAssignment.findMany({
-    where: { schoolId, term: currentTerm },
+  const assignments = !openTerm ? [] : await db.subjectAssignment.findMany({
+    where: { schoolId, termId: openTerm.id },
     include: {
       subject: { select: { id: true, name: true, code: true } },
       teacher: { select: { id: true, fullName: true } },
@@ -152,7 +158,8 @@ export default async function AdminSubjectsPage() {
                     <AssignSubjectModal
                       classId={c.id}
                       className={c.name}
-                      term={currentTerm}
+                      termId={openTerm?.id ?? ''}
+                      termName={currentTerm}
                       subjects={availableSubjects}
                       teachers={teachersWithLoad}
                     />
@@ -197,8 +204,10 @@ export default async function AdminSubjectsPage() {
 
       {/* Section 3 — Grade boundaries */}
       <section className="rounded-2xl bg-white p-5">
-        <GradeBoundariesManager />
+        <GradeBoundariesManager levels={gradeLevels} terms={gradeTerms} />
       </section>
+
+      <ResultsSettings passGrade={resultsSchool?.passGrade ?? 'C'} oLevelRanking={resultsSchool?.oLevelRanking ?? 'AVERAGE'} />
     </div>
   );
 }

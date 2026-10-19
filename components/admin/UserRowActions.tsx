@@ -14,6 +14,7 @@ interface Props {
 export function UserRowActions({ userId, active }: Props) {
   const [busy, setBusy] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [resetLink, setResetLink] = useState<string | null>(null);
   const router = useRouter();
   const toast = useToast();
 
@@ -52,6 +53,34 @@ export function UserRowActions({ userId, active }: Props) {
     }
   }
 
+  async function makeResetLink() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/reset-link`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.message ?? 'Could not create a reset link'); return; }
+      setResetLink(data.data.resetUrl);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function logOut() {
+    if (!confirm('Sign this user out of every device? They will need to sign in again.')) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/logout`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message ?? 'Failed to sign the user out');
+        return;
+      }
+      toast.success('User signed out everywhere');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function handleCloseTempPassword() {
     setTempPassword(null);
     router.refresh();
@@ -75,6 +104,39 @@ export function UserRowActions({ userId, active }: Props) {
       >
         Reset Password
       </button>
+      <button
+        type="button"
+        onClick={logOut}
+        disabled={busy}
+        className="rounded px-2 py-1 text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
+      >
+        Log out
+      </button>
+      <button
+        type="button"
+        onClick={makeResetLink}
+        disabled={busy || !active}
+        className="rounded px-2 py-1 text-xs font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
+      >
+        Reset link
+      </button>
+
+      <Modal
+        open={resetLink != null}
+        onClose={() => setResetLink(null)}
+        title="Password reset link"
+        footer={<Button onClick={() => setResetLink(null)}>Done</Button>}
+      >
+        {resetLink && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted">
+              Give this link to the user. It works once and expires in 30 minutes. It will not be shown again.
+            </p>
+            <div className="break-all rounded-xl border border-line bg-rowhover p-4 font-mono text-xs text-primary">{resetLink}</div>
+            <Button variant="secondary" onClick={() => navigator.clipboard.writeText(resetLink)}>Copy link</Button>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         open={tempPassword != null}

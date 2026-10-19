@@ -6,40 +6,53 @@ export const CreateUserSchema = z.object({
   role:     z.enum(['ADMIN', 'DIRECTOR', 'HEAD', 'BURSAR', 'TEACHER', 'LIBRARIAN']),
 });
 
+const capacity = z
+  .number({ error: 'Capacity must be a number' })
+  .int('Capacity must be a whole number')
+  .min(1, 'Capacity must be at least 1')
+  .max(200, 'Capacity must be 200 or fewer');
+
+const stream = z
+  .string()
+  .trim()
+  .max(30, 'Stream must be 30 characters or fewer')
+  .regex(/^[A-Za-z0-9 ]*$/, 'Stream can only contain letters, numbers and spaces');
+
 export const CreateClassSchema = z.object({
-  grade:          z.string().min(1, 'Grade is required'),
-  section:        z.string().optional(),
+  levelId:        z.string().min(1, 'Level is required'),
+  stream:         stream.optional().default(''),
+  capacity:       capacity.optional(),
   classTeacherId: z.string().optional(),
 });
 
 export const UpdateClassSchema = z.object({
-  grade:          z.string().min(1).optional(),
-  section:        z.string().nullable().optional(),
+  levelId:        z.string().min(1).optional(),
+  stream:         stream.optional(),
+  capacity:       capacity.optional(),
   classTeacherId: z.string().nullable().optional(),
   active:         z.boolean().optional(),
 });
 
-export const CreateAdminStudentSchema = z.object({
-  fullName:    z.string().min(1, 'Full name is required'),
-  classId:     z.string().min(1, 'Class is required'),
-  parentName:  z.string().min(1, 'Parent/guardian name is required'),
-  parentPhone: z.string().min(1, 'Parent phone is required'),
-});
+// Student admission rules live in lib/students/registration.ts; lifecycle and
+// calendar schemas in lib/validations/academic.ts.
 
-export const MoveStudentsSchema = z.object({
-  studentIds: z.array(z.string().min(1)).min(1, 'Select at least one student'),
-  classId:    z.string().min(1, 'Class is required'),
+export const UpdateSchoolSettingsSchema = z.object({
+  maxClassSize: z
+    .number({ error: 'Default class capacity must be a number' })
+    .int('Default class capacity must be a whole number')
+    .min(1, 'Default class capacity must be at least 1')
+    .max(200, 'Default class capacity must be 200 or fewer'),
 });
 
 export const BulkApplyFeesSchema = z
   .object({
-    scope:          z.enum(['class', 'grade']),
+    scope:          z.enum(['class', 'level']),
     classId:        z.string().optional(),
-    grade:          z.string().optional(),
+    levelId:        z.string().optional(),
     feeStructureId: z.string().min(1, 'Fee structure is required'),
-    term:           z.string().min(1, 'Term is required'),
+    termId:         z.string().min(1, 'Term is required'),
   })
-  .refine((d) => (d.scope === 'class' ? !!d.classId : !!d.grade), {
-    message: 'classId is required when scope is "class", grade is required when scope is "grade"',
+  .refine((d) => (d.scope === 'class' ? !!d.classId : !!d.levelId), {
+    message: 'Choose a class or a level',
     path: ['scope'],
   });

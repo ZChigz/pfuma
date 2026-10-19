@@ -21,12 +21,13 @@ interface TeacherLoadEntry { id: string; class: { name: string }; subject: { nam
 interface Props {
   classId:   string;
   className: string;
-  term:      string;
+  termId:    string;
+  termName:  string;
   subjects:  SubjectOption[];
   teachers:  TeacherOption[];
 }
 
-export function AssignSubjectModal({ classId, className, term, subjects, teachers }: Props) {
+export function AssignSubjectModal({ classId, className, termId, termName, subjects, teachers }: Props) {
   const [open, setOpen] = useState(false);
   const [teacherLoad, setTeacherLoad] = useState<TeacherLoadEntry[]>([]);
   const [loadingLoad, setLoadingLoad] = useState(false);
@@ -41,11 +42,11 @@ export function AssignSubjectModal({ classId, className, term, subjects, teacher
     reset,
   } = useForm<FormValues>({
     resolver: zodResolver(CreateAssignmentSchema),
-    defaultValues: { classId, term, subjectId: '', teacherId: '' },
+    defaultValues: { classId, termId, subjectId: '', teacherId: '' },
   });
 
   const selectedTeacherId = watch('teacherId');
-  const selectedTerm = watch('term');
+  const selectedTerm = watch('termId');
 
   useEffect(() => {
     if (!open || !selectedTeacherId || !selectedTerm) {
@@ -53,7 +54,7 @@ export function AssignSubjectModal({ classId, className, term, subjects, teacher
       return;
     }
     setLoadingLoad(true);
-    fetch(`/api/admin/assignments/teacher-load?teacherId=${selectedTeacherId}&term=${encodeURIComponent(selectedTerm)}`)
+    fetch(`/api/admin/assignments/teacher-load?teacherId=${selectedTeacherId}&termId=${selectedTerm}`)
       .then((r) => r.json())
       .then((body) => {
         if (body.success) setTeacherLoad(body.data.assignments);
@@ -64,7 +65,7 @@ export function AssignSubjectModal({ classId, className, term, subjects, teacher
   function handleClose() {
     setOpen(false);
     setTeacherLoad([]);
-    reset({ classId, term, subjectId: '', teacherId: '' });
+    reset({ classId, termId, subjectId: '', teacherId: '' });
   }
 
   async function onSubmit(values: FormValues) {
@@ -86,7 +87,7 @@ export function AssignSubjectModal({ classId, className, term, subjects, teacher
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)} disabled={subjects.length === 0}>
+      <Button size="sm" onClick={() => setOpen(true)} disabled={subjects.length === 0 || !termId}>
         Assign subject
       </Button>
 
@@ -124,13 +125,8 @@ export function AssignSubjectModal({ classId, className, term, subjects, teacher
             error={errors.teacherId?.message}
             {...register('teacherId')}
           />
-          <Input
-            id="term"
-            label="Term"
-            required
-            error={errors.term?.message}
-            {...register('term')}
-          />
+          <input type="hidden" {...register('termId')} />
+          <Input id="termName" label="Term" readOnly value={termName} className="bg-canvas" />
 
           {selectedTeacherId && (
             <div className="rounded-xl border border-line bg-rowhover p-3">

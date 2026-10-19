@@ -46,8 +46,20 @@ type DisposalRecord = {
   recorder: { fullName: string };
 } | null;
 
+type TransferRecord = {
+  id: string;
+  date: string;
+  fromLocation: string;
+  toLocation: string;
+  fromCustodian: string | null;
+  toCustodian: string | null;
+  recordedBy: string;
+  note: string | null;
+};
+
 type Asset = {
   id: string;
+  transfers?: TransferRecord[];
   name: string;
   tagNumber: string;
   description: string | null;
@@ -354,6 +366,29 @@ export function AssetDetailClient({ asset: initialAsset, categories, userRole }:
           data={asset.maintenance}
           emptyMessage="No maintenance records yet."
         />
+      </Card>
+
+      {/* Custody history */}
+      <Card title="Custody & location history" subtitle={`${asset.transfers?.length ?? 0} move${(asset.transfers?.length ?? 0) !== 1 ? 's' : ''}`}>
+        {(asset.transfers?.length ?? 0) === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-muted">Not moved or handed over since it was registered.</p>
+        ) : (
+          <table className="w-full text-left text-sm text-ink">
+            <thead className="border-b border-line">
+              <tr>{['Date', 'From', 'To', 'Recorded by'].map((h) => <th key={h} className="px-4 py-3 text-xs font-medium text-subtle">{h}</th>)}</tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {asset.transfers!.map((t) => (
+                <tr key={t.id}>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-muted">{formatDate(t.date)}</td>
+                  <td className="px-4 py-2.5">{t.fromLocation}{t.fromCustodian ? ` · ${t.fromCustodian}` : ''}</td>
+                  <td className="px-4 py-2.5">{t.toLocation}{t.toCustodian ? ` · ${t.toCustodian}` : ''}{t.note ? <span className="block text-xs text-muted">{t.note}</span> : null}</td>
+                  <td className="px-4 py-2.5 text-muted">{t.recordedBy}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
 
       {/* Modals */}

@@ -1,7 +1,36 @@
 // Public portal — NO auth(), NO redirect('/login'). Accessible without a session.
-import { prisma } from '@/lib/prisma';
+import { cookies, headers } from 'next/headers';
+import type { Metadata } from 'next';
+import { getScopedDb } from '@/lib/scoped-db';
+import { clientIp } from '@/lib/rate-limit';
+import { lookupPortalToken, pinCookieName, pinCookieValid, recordPortalView } from '@/lib/portal';
+import { PortalPinForm } from '@/components/portal/PortalPinForm';
 
 export const dynamic = 'force-dynamic';
+
+// The link is a secret: keep it out of search engines and out of Referer headers.
+export const metadata: Metadata = {
+  title: 'Student Portal',
+  robots: { index: false, follow: false, nocache: true },
+  referrer: 'no-referrer',
+};
+
+function PortalMessage({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
+      <div className="w-full max-w-md rounded-2xl bg-white p-10 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-danger-bg">
+          <svg className="h-7 w-7 text-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M15 9l-6 6M9 9l6 6" />
+          </svg>
+        </div>
+        <h1 className="text-base font-semibold text-ink">{title}</h1>
+        <p className="mt-1 text-sm text-muted">{body}</p>
+      </div>
+    </div>
+  );
+}
 
 function fmt(n: number, currency: string) {
   return currency === 'USD'
@@ -16,8 +45,23 @@ function fmtDate(d: Date | string) {
 }
 
 export default async function PortalPage({ params }: { params: { token: string } }) {
-  const student = await prisma.student.findUnique({
-    where: { portalToken: params.token },
+  // The token is looked up by its SHA-256 hash; expired links are refused.
+  const found = await lookupPortalToken(params.token);
+  if (found.status === 'expired') {
+    return <PortalMessage title="This link has expired" body="Please ask the school office for a new portal link." />;
+  }
+  if (found.status !== 'ok') {
+    return <PortalMessage title="Link not found or expired" body="This portal link is invalid. Please contact the school office for a new link." />;
+  }
+
+  // Links protected by a PIN ask for it once per device.
+  if (!pinCookieValid(found.student, cookies().get(pinCookieName(found.student.portalTokenHash))?.value)) {
+    return <PortalPinForm token={params.token} />;
+  }
+
+  const db = getScopedDb(found.student.schoolId);
+  const student = await db.student.findUnique({
+    where: { id: found.student.id },
     include: {
       school: {
         select: {
@@ -36,34 +80,25 @@ export default async function PortalPage({ params }: { params: { token: string }
       marks: {
         where:   { status: 'PUBLISHED' },
         include: { subject: { select: { name: true, maxMark: true } } },
-        orderBy: [{ term: 'asc' }, { subject: { name: 'asc' } }],
+        orderBy: [{ term: { startDate: 'asc' } }, { subject: { name: 'asc' } }],
       },
       termResults: {
         where:   { published: true },
-        orderBy: { term: 'asc' },
+        include: { term: { select: { name: true } } },
+        orderBy: { term: { startDate: 'asc' } },
       },
+      currentClass: { select: { name: true } },
+      enrollments: { select: { termId: true, classId: true } },
     },
   });
 
-  // ── Not found ──────────────────────────────────────────────────────────────
   if (!student) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
-        <div className="w-full max-w-md rounded-2xl bg-white p-10 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-danger-bg">
-            <svg className="h-7 w-7 text-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M15 9l-6 6M9 9l6 6" />
-            </svg>
-          </div>
-          <h1 className="text-base font-semibold text-ink">Link not found or expired</h1>
-          <p className="mt-1 text-sm text-muted">
-            This portal link is invalid. Please contact the school office for a new link.
-          </p>
-        </div>
-      </div>
-    );
+    return <PortalMessage title="Link not found or expired" body="This portal link is invalid. Please contact the school office for a new link." />;
   }
+
+  // Every view is logged for the school (student, time, IP).
+  const h = headers();
+  await recordPortalView(student.id, student.schoolId, clientIp(h), h.get('user-agent'));
 
   // ── Compute fee balances ───────────────────────────────────────────────────
   const chargesUSD = student.charges.filter(c => c.currency === 'USD').reduce((n, c) => n + c.amount.toNumber(), 0);
@@ -78,9 +113,9 @@ export default async function PortalPage({ params }: { params: { token: string }
   // ── Group marks by term ────────────────────────────────────────────────────
   const marksByTerm = new Map<string, typeof student.marks>();
   for (const m of student.marks) {
-    const arr = marksByTerm.get(m.term) ?? [];
+    const arr = marksByTerm.get(m.termId) ?? [];
     arr.push(m);
-    marksByTerm.set(m.term, arr);
+    marksByTerm.set(m.termId, arr);
   }
 
   // ── Letter grade helper ────────────────────────────────────────────────────
@@ -92,19 +127,20 @@ export default async function PortalPage({ params }: { params: { token: string }
   const publishedTerms = student.termResults;
 
   // ── Class size per term (for "Position N out of M") ───────────────────────
+  // Classmates are the students enrolled in the same class for that term.
   const classSizeByTerm = new Map<string, number>();
-  if (publishedTerms.length > 0 && student.classId) {
-    const counts = await prisma.termResult.groupBy({
-      by: ['term'],
+  const classByTerm = new Map(student.enrollments.map((e) => [e.termId, e.classId]));
+  for (const tr of publishedTerms) {
+    const classId = classByTerm.get(tr.termId);
+    if (!classId) continue;
+    classSizeByTerm.set(tr.termId, await db.termResult.count({
       where: {
         schoolId:  student.schoolId,
         published: true,
-        term:      { in: publishedTerms.map((tr) => tr.term) },
-        student:   { classId: student.classId },
+        termId:    tr.termId,
+        student:   { enrollments: { some: { termId: tr.termId, classId } } },
       },
-      _count: { _all: true },
-    });
-    for (const c of counts) classSizeByTerm.set(c.term, c._count._all);
+    }));
   }
 
   return (
@@ -122,7 +158,7 @@ export default async function PortalPage({ params }: { params: { token: string }
         <div className="rounded-2xl bg-white p-5">
           <p className="text-xs font-medium text-muted">Student</p>
           <p className="mt-1 text-xl font-bold text-ink">{student.fullName}</p>
-          <p className="text-sm text-muted">{student.grade}</p>
+          <p className="text-sm text-muted">{student.currentClass?.name ?? ''}</p>
         </div>
 
         {/* ── Section 1: Fee Balance ──────────────────────────────────────── */}
@@ -202,17 +238,22 @@ export default async function PortalPage({ params }: { params: { token: string }
             <h2 className="mb-3 text-base font-semibold text-ink">Academic Results</h2>
             <div className="flex flex-col gap-4">
               {publishedTerms.map((tr) => {
-                const termMarks = marksByTerm.get(tr.term) ?? [];
+                const termMarks = marksByTerm.get(tr.termId) ?? [];
                 const pct = tr.percentage.toNumber();
-                const classSize = classSizeByTerm.get(tr.term);
+                const classSize = classSizeByTerm.get(tr.termId);
                 return (
                   <div key={tr.id} className="rounded-2xl bg-white overflow-hidden">
                     {/* Term header */}
                     <div className="border-b border-line bg-primary px-4 py-3 text-white">
-                      <p className="text-sm font-bold">{tr.term}</p>
-                      {tr.classPosition != null && classSize != null && (
+                      <p className="text-sm font-bold">{tr.term.name}</p>
+                      {tr.classPosition != null && (tr.rankedOutOf ?? classSize) != null && (
                         <p className="mt-0.5 text-xs text-emerald-100">
-                          Position {tr.classPosition} out of {classSize} students
+                          Position {tr.classPosition} of {tr.classSize ?? tr.rankedOutOf ?? classSize}
+                        </p>
+                      )}
+                      {tr.classPosition == null && tr.subjectsSat != null && (
+                        <p className="mt-0.5 text-xs text-emerald-100">
+                          Not ranked — sat {tr.subjectsSat} of {tr.subjectsOffered} subjects
                         </p>
                       )}
                     </div>
@@ -222,7 +263,7 @@ export default async function PortalPage({ params }: { params: { token: string }
                       {[
                         { label: 'Total', value: tr.totalMarks.toNumber().toFixed(1) },
                         { label: 'Percentage', value: `${pct.toFixed(1)}%` },
-                        { label: 'Grade', value: getGrade(pct) },
+                        { label: 'Grade', value: tr.letterGrade ?? getGrade(pct) }, // frozen when published
                       ].map(({ label, value }) => (
                         <div key={label} className="p-3 text-center">
                           <p className="text-xs text-muted">{label}</p>

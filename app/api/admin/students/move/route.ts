@@ -1,46 +1,18 @@
-import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { apiSuccess, apiUnauthorized, apiError, parseBody, withApi } from '@/lib/api';
-import { logAudit } from '@/lib/audit';
-import { canManageStudents } from '@/lib/permissions';
-import { MoveStudentsSchema } from '@/lib/validations/admin';
-import type { SessionUser } from '@/types';
-import type { NextRequest } from 'next/server';
+import { requirePermission } from '@/lib/access';
+import { apiSuccess, parseBody, withApi } from '@/lib/api';
+import { MoveStudentsSchema } from '@/lib/validations/academic';
+import { moveClass } from '@/lib/students/enrolment';
 
-async function _POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return apiUnauthorized();
-  const user = session.user as unknown as SessionUser;
-
-  try { await canManageStudents(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
-
+// Superseded by /api/students/move. Same rules: a reason is recorded, a move after the term has started needs
+// approval (students.enrolment.approve), and the audit entry names who approved it.
+async function _POST(req: Request) {
+  const user = await requirePermission('students.enrolment.manage');
   const parsed = await parseBody(req, MoveStudentsSchema);
   if ('error' in parsed) return parsed.error;
-  const { studentIds, classId } = parsed.data;
-
-  const schoolClass = await prisma.schoolClass.findUnique({ where: { id: classId } });
-  if (!schoolClass || schoolClass.schoolId !== user.schoolId) return apiError('Class not found', 404);
-
-  const moved = await prisma.$transaction(async (tx) => {
-    const result = await tx.student.updateMany({
-      where: { id: { in: studentIds }, schoolId: user.schoolId },
-      data: { classId: schoolClass.id, grade: schoolClass.grade },
-    });
-    await logAudit(
-      {
-        schoolId:   user.schoolId,
-        actorId:    user.id,
-        action:     'MOVE_STUDENT',
-        entityType: 'SchoolClass',
-        entityId:   schoolClass.id,
-        detail:     `Moved ${result.count} student(s) to ${schoolClass.name}`,
-      },
-      tx,
-    );
-    return result.count;
+  const r = await moveClass(user, {
+    studentIds: parsed.data.studentIds, toClassId: parsed.data.classId, reason: 'OTHER', reasonNote: 'Moved from the older Students page', acknowledgeFull: true,
   });
-
-  return apiSuccess({ moved });
+  return apiSuccess({ moved: r.applied, pending: r.pending, termName: r.termName, className: r.className });
 }
 
 type H = (req: Request, ctx?: unknown) => Promise<Response>;

@@ -76,7 +76,7 @@ export function PaymentModal({ open, student, onSuccess, onClose }: Props) {
       amount:           undefined,
       reference:        '',
       feeLabel:         '',
-      popUrl:           '',
+      popKey:           '',
       paidInZig:        false,
       zigAmountPaid:    undefined,
       exchangeRateUsed: undefined,
@@ -385,7 +385,7 @@ export function PaymentModal({ open, student, onSuccess, onClose }: Props) {
             <FileUpload
               endpoint="proofOfPayment"
               label="Proof of Payment (optional)"
-              onUpload={(url) => setValue('popUrl', url)}
+              onUpload={(key) => setValue('popKey', key)}
             />
           </>
         )}

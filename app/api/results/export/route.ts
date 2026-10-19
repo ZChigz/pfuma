@@ -1,9 +1,11 @@
 import { type NextRequest } from 'next/server';
 import ExcelJS from 'exceljs';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { canExportResults } from '@/lib/permissions';
+import { requireTerm } from '@/lib/academic/terms';
+import { classRoster } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
 
 const HEADER_FILL: ExcelJS.Fill = {
@@ -22,48 +24,45 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canExportResults(user.role); }
   catch (e) { if (e instanceof Response) return e; throw e; }
 
   const { searchParams } = new URL(req.url);
   const classId = searchParams.get('classId');
-  const term    = searchParams.get('term');
-  if (!classId || !term) return apiNotFound('Class');
+  const termId  = searchParams.get('termId');
+  if (!classId || !termId) return apiNotFound('Class');
 
-  const schoolClass = await prisma.schoolClass.findFirst({
+  const schoolClass = await db.schoolClass.findFirst({
     where: { id: classId, schoolId: user.schoolId },
   });
   if (!schoolClass) return apiNotFound('Class');
+  const term = (await requireTerm(user.schoolId, termId, db)).name;
 
-  const school = await prisma.school.findUnique({
+  const school = await db.school.findUnique({
     where: { id: user.schoolId },
     select: { name: true },
   });
 
-  const [assignments, students, marks] = await Promise.all([
-    prisma.subjectAssignment.findMany({
-      where: { schoolId: user.schoolId, classId, term },
+  const [assignments, students] = await Promise.all([
+    db.subjectAssignment.findMany({
+      where: { schoolId: user.schoolId, classId, termId },
       include: { subject: { select: { id: true, name: true, maxMark: true } } },
       orderBy: { subject: { name: 'asc' } },
     }),
-    prisma.student.findMany({
-      where: { schoolId: user.schoolId, classId, active: true },
-      select: { id: true, fullName: true },
+    classRoster(classId, termId, db),
+  ]);
+  const studentIds = students.map((s) => s.id);
+
+  const [marks, termResults] = await Promise.all([
+    db.mark.findMany({
+      where: { schoolId: user.schoolId, termId, status: { in: ['VERIFIED', 'PUBLISHED'] }, studentId: { in: studentIds } },
     }),
-    prisma.mark.findMany({
-      where: {
-        schoolId:  user.schoolId,
-        term,
-        status:    { in: ['VERIFIED', 'PUBLISHED'] },
-        student:   { classId },
-      },
+    db.termResult.findMany({
+      where: { schoolId: user.schoolId, termId, studentId: { in: studentIds } },
     }),
   ]);
-
-  const termResults = await prisma.termResult.findMany({
-    where: { schoolId: user.schoolId, term, studentId: { in: students.map((s) => s.id) } },
-  });
 
   const subjects = assignments.map((a) => a.subject);
   const totalPossible = subjects.reduce((n, s) => n + s.maxMark, 0);

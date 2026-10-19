@@ -1,22 +1,31 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Permission } from '@/lib/permissions';
 import { ResultsFilters } from '@/components/results/ResultsFilters';
+import { listTerms } from '@/lib/academic/terms';
+import { boundariesFor, gradeFor } from '@/lib/results';
 import type { SessionUser } from '@/types';
 
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: { grade?: string; term?: string };
+  searchParams: { levelId?: string; termId?: string };
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const grade = searchParams.grade ?? '';
-  const term  = searchParams.term  ?? '';
+  const levelId = searchParams.levelId ?? '';
+  const termId  = searchParams.termId  ?? '';
+  const [levels, terms] = await Promise.all([
+    db.level.findMany({ where: { schoolId: user.schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
+    listTerms(user.schoolId, db),
+  ]);
+  const grade = levels.find((l) => l.id === levelId)?.name ?? '';
+  const term  = terms.find((t) => t.id === termId)?.name ?? '';
 
   const canPublish = Permission.publishResults.includes(user.role);
 
@@ -24,12 +33,11 @@ export default async function ReportsPage({
   type ResultRow = {
     id: string;
     studentId: string;
-    term: string;
     totalMarks: number;
     percentage: number;
     classPosition: number | null;
     published: boolean;
-    student: { fullName: string; grade: string };
+    student: { fullName: string; className: string };
     letterGrade: string;
   };
 
@@ -38,44 +46,52 @@ export default async function ReportsPage({
   let pendingMarkCount = 0;
 
   if (grade && term) {
-    const gradeBoundaries = await prisma.gradeBoundary.findMany({
-      where: { schoolId: user.schoolId },
+    const [boundaryRows, levelRow] = await Promise.all([
+      db.gradeBoundary.findMany({ where: { schoolId: user.schoolId } }),
+      db.level.findFirst({ where: { id: levelId, schoolId: user.schoolId }, select: { category: true } }),
+    ]);
+    // The set that applies to this level and term (most specific wins), not any band that happens to fit.
+    const gradeBoundaries = boundariesFor(
+      boundaryRows.map((b) => ({ minPercent: b.minPercent.toNumber(), maxPercent: b.maxPercent.toNumber(), letterGrade: b.letterGrade, levelId: b.levelId, termId: b.termId, category: b.category })),
+      levelId,
+      termId,
+      levelRow?.category ?? null,
+    );
+
+    const getLetterGrade = (pct: number): string => gradeFor(pct, gradeBoundaries)?.letterGrade ?? '—';
+
+    // Students in that level FOR THAT TERM (from Enrollment), not their level today.
+    const enrolled = await db.enrollment.findMany({
+      where: { schoolId: user.schoolId, termId, class: { levelId } },
+      select: { studentId: true, class: { select: { name: true } } },
     });
-
-    function getLetterGrade(pct: number): string {
-      const b = gradeBoundaries.find(
-        (b) => pct >= b.minPercent.toNumber() && pct <= b.maxPercent.toNumber(),
-      );
-      return b?.letterGrade ?? '—';
-    }
-
-    const rows = await prisma.termResult.findMany({
+    const classByStudent = new Map(enrolled.map((e) => [e.studentId, e.class.name]));
+    const rows = await db.termResult.findMany({
       where: {
-        schoolId: user.schoolId,
-        term,
-        student: { grade },
+        schoolId: user.schoolId, termId, studentId: { in: Array.from(classByStudent.keys()) },
+        // not the empty rows that only hold remarks until the class is published
+        OR: [{ published: true }, { subjectsOffered: { not: null } }],
       },
-      include: { student: { select: { fullName: true, grade: true } } },
+      include: { student: { select: { fullName: true } } },
       orderBy: [{ classPosition: 'asc' }, { student: { fullName: 'asc' } }],
     });
 
     results = rows.map((r) => ({
       id:            r.id,
       studentId:     r.studentId,
-      term:          r.term,
       totalMarks:    r.totalMarks.toNumber(),
       percentage:    r.percentage.toNumber(),
       classPosition: r.classPosition,
       published:     r.published,
-      student:       r.student,
-      letterGrade:   getLetterGrade(r.percentage.toNumber()),
+      student:       { fullName: r.student.fullName, className: classByStudent.get(r.studentId) ?? '' },
+      letterGrade:   r.letterGrade ?? getLetterGrade(r.percentage.toNumber()),
     }));
 
     isPublished = results.some((r) => r.published);
 
     if (results.length === 0) {
-      pendingMarkCount = await prisma.mark.count({
-        where: { schoolId: user.schoolId, term, student: { grade } },
+      pendingMarkCount = await db.mark.count({
+        where: { schoolId: user.schoolId, termId, studentId: { in: Array.from(classByStudent.keys()) } },
       });
     }
   }
@@ -104,12 +120,12 @@ export default async function ReportsPage({
       </div>
 
       {/* Filters */}
-      <ResultsFilters currentGrade={grade} currentTerm={term} />
+      <ResultsFilters levels={levels} terms={terms.map((t) => ({ id: t.id, name: t.name }))} currentLevelId={levelId} currentTermId={termId} />
 
       {/* Results table */}
       {!grade || !term ? (
         <p className="rounded-2xl bg-white px-4 py-12 text-center text-sm text-muted">
-          Select a grade and term to view results.
+          Select a level and term to view results.
         </p>
       ) : results.length === 0 ? (
         <div className="rounded-2xl bg-white px-4 py-12 text-center">
@@ -152,7 +168,7 @@ export default async function ReportsPage({
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-medium">{r.student.fullName}</p>
-                    <p className="text-xs text-muted">{r.student.grade}</p>
+                    <p className="text-xs text-muted">{r.student.className}</p>
                   </td>
                   <td className="px-4 py-3 tabular-nums">{r.totalMarks.toFixed(1)}</td>
                   <td className="px-4 py-3 tabular-nums font-medium">
@@ -165,7 +181,7 @@ export default async function ReportsPage({
                   </td>
                   <td className="px-4 py-3">
                     <a
-                      href={`/api/results/reports/${r.studentId}?term=${encodeURIComponent(term)}`}
+                      href={`/api/results/reports/${r.studentId}?termId=${termId}`}
                       download
                       className="inline-flex min-h-[32px] items-center gap-1 rounded-xl border border-line bg-white px-2.5 py-1 text-xs font-medium text-primary hover:bg-rowhover focus:outline-none focus:ring-2 focus:ring-primary/40"
                     >

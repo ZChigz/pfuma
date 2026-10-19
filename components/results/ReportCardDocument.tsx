@@ -1,19 +1,40 @@
-import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 
 export interface ReportCardData {
   schoolName:    string;
+  /** From Settings → School profile. Images are loaded by the route; any that failed to load are null. */
+  motto?:        string | null;
+  logo?:         { data: Buffer; format: 'png' | 'jpg' } | null;
+  headName?:     string | null;
+  headSignature?: { data: Buffer; format: 'png' | 'jpg' } | null;
   studentName:   string;
+  admissionNumber?: string;
+  /** e.g. "Form 2" and "North" */
+  level?:        string;
+  stream?:       string;
   grade:         string;
   term:          string;
   classPosition: number | null;
+  /** Students in the class: "Position 2 of 42". */
+  classSize?:    number | null;
+  rankedOutOf:   number | null;
+  subjectsSat:   number | null;
+  subjectsOffered: number | null;
   percentage:    number;
   headRemark:    string | null;
+  classTeacherRemark?: string | null;
+  daysPresent?:  number | null;
+  daysAbsent?:   number | null;
+  /** ISO date (YYYY-MM-DD) the next term starts. */
+  nextTermStartDate?: string | null;
   marks: Array<{
     subjectName: string;
     rawMark:     number;
     maxMark:     number;
     percentage:  number;
     letterGrade: string | null;
+    /** 'Absent', 'Absent (excused)' or 'Exempt' instead of a score. */
+    note?:       string | null;
   }>;
 }
 
@@ -29,7 +50,12 @@ const S = StyleSheet.create({
 
   // ── Header
   header: { alignItems: 'center', marginBottom: 20 },
+  logo: { height: 48, maxWidth: 160, objectFit: 'contain', marginBottom: 6 },
   schoolName: { fontSize: 22, fontFamily: 'Helvetica-Bold', color: '#14613f', marginBottom: 3 },
+  motto: { fontSize: 9, color: '#6b7a70', fontStyle: 'italic', marginBottom: 4 },
+  signatureBlock: { marginTop: 18, width: 200 },
+  signatureImage: { height: 36, maxWidth: 160, objectFit: 'contain' },
+  signatureLine: { borderTopWidth: 1, borderTopColor: '#14301f', borderTopStyle: 'solid', marginTop: 2, paddingTop: 3, fontSize: 9 },
   reportTitle: { fontSize: 11, color: '#6b7a70', letterSpacing: 1.5 },
 
   divider: { borderBottomWidth: 1, borderBottomColor: '#e3e9e4', borderBottomStyle: 'solid', marginVertical: 10 },
@@ -87,7 +113,9 @@ export function ReportCardDocument({ data }: Props) {
 
         {/* Header */}
         <View style={S.header}>
+          {data.logo && <Image src={data.logo} style={S.logo} />}
           <Text style={S.schoolName}>{schoolName}</Text>
+          {data.motto && <Text style={S.motto}>{data.motto}</Text>}
           <Text style={S.reportTitle}>ACADEMIC REPORT CARD</Text>
         </View>
 
@@ -97,11 +125,17 @@ export function ReportCardDocument({ data }: Props) {
         <View style={S.infoGrid}>
           {[
             { label: 'Student Name', value: studentName },
-            { label: 'Grade / Class', value: grade },
+            { label: 'Admission Number', value: data.admissionNumber ?? '—' },
+            { label: 'Level', value: data.level ?? '—' },
+            { label: 'Stream / Class', value: data.stream ? `${data.stream} (${grade})` : grade },
             { label: 'Term',          value: term },
-            { label: 'Class Position', value: classPosition != null ? `${classPosition}` : '—' },
+            { label: 'Class Position', value: classPosition != null ? `Position ${classPosition} of ${data.classSize ?? data.rankedOutOf ?? '—'}` : data.subjectsSat != null ? 'Not ranked' : '—' },
             { label: 'Overall %',     value: `${percentage.toFixed(1)}%` },
-            { label: 'Total Subjects', value: `${marks.length}` },
+            { label: 'Subjects taken', value: data.subjectsSat != null && data.subjectsOffered != null ? `${data.subjectsSat} of ${data.subjectsOffered}` : `${marks.length}` },
+            ...(data.daysPresent != null || data.daysAbsent != null
+              ? [{ label: 'Days present / absent', value: `${data.daysPresent ?? '—'} / ${data.daysAbsent ?? '—'}` }]
+              : []),
+            ...(data.nextTermStartDate ? [{ label: 'Next term starts', value: data.nextTermStartDate }] : []),
           ].map(({ label, value }) => (
             <View key={label} style={S.infoCell}>
               <Text style={S.infoLabel}>{label}</Text>
@@ -126,10 +160,10 @@ export function ReportCardDocument({ data }: Props) {
         {marks.map((m, i) => (
           <View key={i} style={[S.row, i % 2 === 1 ? S.rowAlt : {}]}>
             <Text style={S.colSubject}>{m.subjectName}</Text>
-            <Text style={S.colMark}>{m.rawMark.toFixed(1)}</Text>
+            <Text style={S.colMark}>{m.note && m.note !== 'Absent' ? '—' : m.rawMark.toFixed(1)}</Text>
             <Text style={S.colMax}>{m.maxMark}</Text>
-            <Text style={S.colPct}>{m.percentage.toFixed(1)}%</Text>
-            <Text style={S.colGrade}>{m.letterGrade ?? '—'}</Text>
+            <Text style={S.colPct}>{m.note && m.note !== 'Absent' ? '—' : `${m.percentage.toFixed(1)}%`}</Text>
+            <Text style={S.colGrade}>{m.note ?? m.letterGrade ?? '—'}</Text>
           </View>
         ))}
 
@@ -139,11 +173,27 @@ export function ReportCardDocument({ data }: Props) {
           </View>
         )}
 
+        {/* Class teacher's remark */}
+        {data.classTeacherRemark && (
+          <View style={S.remarkBox}>
+            <Text style={S.remarkLabel}>Class Teacher's Remark</Text>
+            <Text style={S.remarkText}>{data.classTeacherRemark}</Text>
+          </View>
+        )}
+
         {/* Head's remark */}
         {headRemark && (
           <View style={S.remarkBox}>
             <Text style={S.remarkLabel}>Head Teacher's Remark</Text>
             <Text style={S.remarkText}>{headRemark}</Text>
+          </View>
+        )}
+
+        {/* Head of school */}
+        {(data.headName || data.headSignature) && (
+          <View style={S.signatureBlock} wrap={false}>
+            {data.headSignature && <Image src={data.headSignature} style={S.signatureImage} />}
+            <Text style={S.signatureLine}>{data.headName ? `${data.headName}, Head` : 'Head'}</Text>
           </View>
         )}
 

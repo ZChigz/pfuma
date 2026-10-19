@@ -22,7 +22,8 @@ export function WhatsAppRemindersButton({ owingStudents, currency }: Props) {
   const handleSend = () => {
     if (owingStudents.length === 0) return;
 
-    for (const s of owingStudents) {
+    // An empty phone means the primary guardian has opted out of messages.
+    for (const s of owingStudents.filter((o) => o.parentPhone)) {
       const balance =
         currency === 'USD'
           ? formatUSD(s.balanceUSD)

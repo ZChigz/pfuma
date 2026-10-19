@@ -1,8 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { canManageLibrary } from '@/lib/permissions';
+import { copyCounts } from '@/lib/library';
 import { parseBody, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { CreateBookSchema } from '@/lib/validations/library';
 import type { SessionUser } from '@/types';
@@ -11,12 +12,13 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const { searchParams } = req.nextUrl;
   const q         = searchParams.get('q')         || undefined;
   const available = searchParams.get('available') === 'true';
 
-  const books = await prisma.book.findMany({
+  const books = await db.book.findMany({
     where: {
       schoolId: user.schoolId,
       ...(q ? {
@@ -35,11 +37,14 @@ async function _GET(req: NextRequest) {
     },
     orderBy: { title: 'asc' },
   });
+  const counts = await copyCounts(db, books.map((b) => b.id));
 
   const result = books
     .map((b) => ({
       ...b,
-      availableCopiesCount: b.copies.filter((c) => c.status === 'AVAILABLE').length,
+      replacementCost: b.replacementCost?.toNumber() ?? null,
+      copyCounts: counts.get(b.id)!,
+      availableCopiesCount: counts.get(b.id)!.available,
     }))
     .filter((b) => !available || b.availableCopiesCount > 0);
 
@@ -50,6 +55,7 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
 
@@ -58,7 +64,7 @@ async function _POST(req: NextRequest) {
 
   const currentYear = new Date().getFullYear();
 
-  const { book, copies } = await prisma.$transaction(async (tx) => {
+  const { book, copies } = await db.$tx(async (tx) => {
     const b = await tx.book.create({
       data: {
         schoolId:     user.schoolId,
@@ -70,14 +76,15 @@ async function _POST(req: NextRequest) {
         year:          parsed.data.year          ?? null,
         shelfLocation: parsed.data.shelfLocation || null,
         coverUrl:      parsed.data.coverUrl      || null,
-        totalCopies:   parsed.data.totalCopies,
+        replacementCost:     parsed.data.replacementCost ?? null,
+        replacementCurrency: parsed.data.replacementCurrency ?? 'USD',
       },
     });
 
     const existingCount = await tx.bookCopy.count({ where: { schoolId: user.schoolId } });
 
     const cs = [];
-    for (let i = 0; i < parsed.data.totalCopies; i++) {
+    for (let i = 0; i < parsed.data.copies; i++) {
       const copy = await tx.bookCopy.create({
         data: {
           schoolId:        user.schoolId,
@@ -95,7 +102,7 @@ async function _POST(req: NextRequest) {
         action:     'CREATE_ASSET',
         entityType: 'Book',
         entityId:   b.id,
-        detail:     `${b.title} by ${b.author} (${parsed.data.totalCopies} copies)`,
+        detail:     `${b.title} by ${b.author} (${parsed.data.copies} copies)`,
       },
       tx,
     );
@@ -103,7 +110,7 @@ async function _POST(req: NextRequest) {
     return { book: b, copies: cs };
   });
 
-  return apiSuccess({ book, copies }, 201);
+  return apiSuccess({ book: { ...book, replacementCost: book.replacementCost?.toNumber() ?? null }, copies }, 201);
 }
 
 type H = (req: Request, ctx?: unknown) => Promise<Response>;

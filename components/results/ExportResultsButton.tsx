@@ -7,17 +7,18 @@ import { useToast } from '@/components/ui/Toast';
 interface Props {
   classId:   string;
   className: string;
-  term:      string;
+  termId:    string;
+  termName:  string;
 }
 
-export function ExportResultsButton({ classId, className, term }: Props) {
+export function ExportResultsButton({ classId, className, termId, termName }: Props) {
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
   async function handleExport() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/results/export?classId=${classId}&term=${encodeURIComponent(term)}`);
+      const res = await fetch(`/api/results/export?classId=${classId}&termId=${termId}`);
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         toast.error(body?.message ?? 'Export failed');
@@ -27,7 +28,7 @@ export function ExportResultsButton({ classId, className, term }: Props) {
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
       a.href     = url;
-      a.download = `${className}_${term}_Results.xlsx`;
+      a.download = `${className}_${termName}_Results.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();

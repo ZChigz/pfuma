@@ -1,8 +1,9 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { isoWeekKey } from '@/lib/utils';
+import { PRIMARY_GUARDIAN_INCLUDE } from '@/lib/students/guardians';
 import { type Currency } from '@prisma/client';
 import type { SessionUser } from '@/types';
 
@@ -10,6 +11,7 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
   const { schoolId } = user;
 
   const rawCurr = new URL(req.url).searchParams.get('currency');
@@ -20,33 +22,38 @@ async function _GET(req: NextRequest) {
     collectedZiGRaw,
     spentUSDRaw,
     spentZiGRaw,
+    otherIncomeUSDRaw,
+    otherIncomeZiGRaw,
     expCatRaw,
     pmRaw,
     students,
     recentPayments,
   ] = await Promise.all([
-    prisma.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'USD' }, _sum: { amount: true } }),
-    prisma.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'ZIG' }, _sum: { amount: true } }),
-    prisma.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'USD' }, _sum: { amount: true } }),
-    prisma.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'ZIG' }, _sum: { amount: true } }),
-    prisma.expense.groupBy({
+    db.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'USD' }, _sum: { amount: true } }),
+    db.payment.aggregate({ where: { schoolId, status: 'VERIFIED', currency: 'ZIG' }, _sum: { amount: true } }),
+    db.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'USD' }, _sum: { amount: true } }),
+    db.expense.aggregate({ where: { schoolId, status: 'ACTIVE', currency: 'ZIG' }, _sum: { amount: true } }),
+    // Other income, e.g. proceeds from disposed assets
+    db.income.aggregate({ where: { schoolId, currency: 'USD' }, _sum: { amount: true } }),
+    db.income.aggregate({ where: { schoolId, currency: 'ZIG' }, _sum: { amount: true } }),
+    db.expense.groupBy({
       by: ['category'],
       where: { schoolId, status: 'ACTIVE', currency },
       _sum: { amount: true },
       orderBy: { _sum: { amount: 'desc' } },
     }),
-    prisma.payment.groupBy({
+    db.payment.groupBy({
       by: ['method'],
       where: { schoolId, status: 'VERIFIED', currency },
       _sum: { amount: true },
       _count: { id: true },
     }),
-    prisma.student.findMany({
-      where: { schoolId, active: true },
+    db.student.findMany({
+      where: { schoolId, status: 'ACTIVE' },
       select: {
         id: true,
         fullName: true,
-        parentPhone: true,
+        guardians: PRIMARY_GUARDIAN_INCLUDE,
         charges: { select: { currency: true, amount: true, issuedAt: true } },
         payments: {
           where: { status: 'VERIFIED' },
@@ -54,7 +61,7 @@ async function _GET(req: NextRequest) {
         },
       },
     }),
-    prisma.payment.findMany({
+    db.payment.findMany({
       where: {
         schoolId,
         status: 'VERIFIED',
@@ -69,6 +76,8 @@ async function _GET(req: NextRequest) {
   const collectedZiG = collectedZiGRaw._sum.amount?.toNumber() ?? 0;
   const spentUSD     = spentUSDRaw._sum.amount?.toNumber() ?? 0;
   const spentZiG     = spentZiGRaw._sum.amount?.toNumber() ?? 0;
+  const otherIncomeUSD = otherIncomeUSDRaw._sum.amount?.toNumber() ?? 0;
+  const otherIncomeZiG = otherIncomeZiGRaw._sum.amount?.toNumber() ?? 0;
 
   // ── Per-student balances ──────────────────────────────────────────────────
   let outstandingUSD = 0;
@@ -93,7 +102,9 @@ async function _GET(req: NextRequest) {
 
     if (balUSD > 0 || balZiG > 0) {
       owingCount++;
-      owingStudents.push({ id: s.id, fullName: s.fullName, parentPhone: s.parentPhone, balanceUSD: balUSD, balanceZiG: balZiG });
+      // Reminders go to the primary guardian, and only if they accept messages.
+      const g = s.guardians[0];
+      owingStudents.push({ id: s.id, fullName: s.fullName, parentPhone: g?.canReceiveSms ? g.guardian.phone : '', balanceUSD: balUSD, balanceZiG: balZiG });
 
       if (balUSD > 0) {
         const usdCharges = s.charges.filter(c => c.currency === 'USD');
@@ -162,8 +173,10 @@ async function _GET(req: NextRequest) {
     collectedZiG,
     spentUSD,
     spentZiG,
-    netUSD: collectedUSD - spentUSD,
-    netZiG: collectedZiG - spentZiG,
+    otherIncomeUSD,
+    otherIncomeZiG,
+    netUSD: collectedUSD + otherIncomeUSD - spentUSD,
+    netZiG: collectedZiG + otherIncomeZiG - spentZiG,
     outstandingUSD,
     outstandingZiG,
     expensesByCategory,

@@ -41,9 +41,23 @@ export function PaymentActionButton({ paymentId, action, disabled, disabledLabel
     const label = action === 'verify' ? 'Verify' : 'Void';
     if (!confirm(`${label} this payment?`)) return;
     setLoading(true);
-    const res  = await fetch(`/api/accounting/payments/${paymentId}/${action}`, { method: 'POST' });
+    const post = (reason?: string) =>
+      fetch(`/api/accounting/payments/${paymentId}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reason ? { reason } : {}),
+      });
+    let res  = await post();
+    let data = await res.json();
+    // A sole director may void a payment they recorded, but must say why.
+    if (!res.ok && action === 'void' && res.status === 403 && /Give a reason/.test(data.message ?? '')) {
+      const reason = window.prompt(data.message);
+      if (reason) {
+        res  = await post(reason);
+        data = await res.json();
+      }
+    }
     setLoading(false);
-    const data = await res.json();
     if (!res.ok) {
       toast.error(data.message ?? 'Action failed');
       return;

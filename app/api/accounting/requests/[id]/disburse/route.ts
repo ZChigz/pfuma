@@ -1,8 +1,8 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canDisburseRequest } from '@/lib/permissions';
+import { assertCanDisburseExpenseRequest, canDisburseRequest } from '@/lib/permissions';
 import { EXPENSE_CATEGORY_BY_TYPE, REQUEST_INCLUDE, serializeExpenseRequest } from '@/lib/expense-requests';
 import { DisburseExpenseRequestSchema } from '@/lib/validations/accounting';
 import type { SessionUser } from '@/types';
@@ -15,21 +15,27 @@ async function _POST(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canDisburseRequest(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
-  const existing = await prisma.expenseRequest.findUnique({
+  const existing = await db.expenseRequest.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
-    select: { id: true, status: true, type: true, title: true, requestNumber: true, currency: true },
+    select: {
+      id: true, status: true, type: true, title: true, requestNumber: true, currency: true,
+      requestedById: true, approvedById: true,
+    },
   });
   if (!existing) return apiNotFound('Request');
   if (existing.status !== 'APPROVED') return apiError('Only approved requests can be disbursed', 409);
+  // Separation of duties: neither the requester nor the approver may disburse.
+  assertCanDisburseExpenseRequest(user, existing);
 
   const parsed = await parseBody(req, DisburseExpenseRequestSchema);
   if ('error' in parsed) return parsed.error;
   const { actualTotal, paymentMethod, disbursementNote } = parsed.data;
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await db.$tx(async (tx) => {
     const r = await tx.expenseRequest.update({
       where: { id: params.id },
       data: {

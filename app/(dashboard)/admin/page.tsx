@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
@@ -19,6 +19,9 @@ import {
   type TodoItem,
 } from '@/components/dashboard/parts';
 import { ROLE_LABELS } from '@/components/layout/nav-config';
+import { ClassSizeSetting } from '@/components/admin/ClassSizeSetting';
+import { getOpenTerm } from '@/lib/academic/terms';
+import { cn } from '@/lib/utils';
 import type { SessionUser, UserRole } from '@/types';
 
 const ROLE_BADGE: Record<UserRole, BadgeVariant> = {
@@ -34,31 +37,37 @@ export default async function AdminDashboard() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   if (!(['ADMIN', 'DIRECTOR'] as string[]).includes(user.role)) redirect('/');
   const { schoolId } = user;
 
-  const school = await prisma.school.findUnique({ where: { id: schoolId }, select: { currentTerm: true } });
-  const term = school?.currentTerm ?? undefined;
+  const [school, openTerm] = await Promise.all([
+    db.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } }),
+    getOpenTerm(schoolId, db),
+  ]);
+  const term = openTerm?.name;
+  const openTermId = openTerm?.id ?? '';
 
   const [totalUsers, totalStudents, totalSubjects, unplacedStudents, classes, recentUsers] = await Promise.all([
-    prisma.user.count({ where: { schoolId } }),
-    prisma.student.count({ where: { schoolId, active: true } }),
-    prisma.subject.count({ where: { schoolId } }),
-    prisma.student.count({ where: { schoolId, active: true, classId: null } }),
-    prisma.schoolClass.findMany({
+    db.user.count({ where: { schoolId, isSupport: false } }),
+    db.student.count({ where: { schoolId, status: 'ACTIVE' } }),
+    db.subject.count({ where: { schoolId } }),
+    // Active students with no class in the open term.
+    db.student.count({ where: { schoolId, status: 'ACTIVE', enrollments: { none: { termId: openTermId, status: 'ACTIVE' } } } }),
+    db.schoolClass.findMany({
       where: { schoolId, active: true },
-      orderBy: { name: 'asc' },
+      orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }],
       select: {
         id: true,
         name: true,
         classTeacherId: true,
-        _count: { select: { students: { where: { active: true } } } },
-        assignments: { where: term ? { term } : {}, select: { id: true }, take: 1 },
+        _count: { select: { enrollments: { where: { termId: openTermId, status: 'ACTIVE' } } } },
+        assignments: { where: { termId: openTermId }, select: { id: true }, take: 1 },
       },
     }),
-    prisma.user.findMany({
-      where: { schoolId },
+    db.user.findMany({
+      where: { schoolId, isSupport: false },
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: { id: true, fullName: true, email: true, role: true, active: true },
@@ -70,7 +79,9 @@ export default async function AdminDashboard() {
   const withoutSubjects = classes.filter((c) => c.assignments.length === 0);
   const setupPercent = totalClasses ? Math.round(((totalClasses - withoutSubjects.length) / totalClasses) * 100) : 0;
 
-  const bars = classes.slice(0, 8).map((c) => ({ id: c.id, name: c.name, count: c._count.students }));
+  const bars = classes.slice(0, 8).map((c) => ({ id: c.id, name: c.name, count: c._count.enrollments }));
+  const maxCount = Math.max(1, ...bars.map((b) => b.count));
+  const topId = bars.reduce<string | null>((best, b) => (b.count > 0 && (!best || b.count > (bars.find((x) => x.id === best)?.count ?? 0)) ? b.id : best), null);
 
   const nextSteps = [
     unplacedStudents > 0 && { text: `${unplacedStudents} student${unplacedStudents === 1 ? '' : 's'} not placed in a class`, href: '/admin/students', tone: 'bg-gold' },
@@ -80,15 +91,22 @@ export default async function AdminDashboard() {
 
   return (
     <div className="flex flex-col gap-4 pb-2">
-      <DashboardHeader
-        subtitle={`${term ? `${term}: ` : ''}who is enrolled, who teaches, and what still needs setting up.`}
-        actions={
-          <>
-            <PrimaryLink href="/admin/users"><span aria-hidden="true" className="text-lg leading-none">+</span> Add user</PrimaryLink>
-            <SecondaryLink href="/admin/students">Import students</SecondaryLink>
-          </>
-        }
-      />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted">
+            {term ? `${term}: ` : ''}who is enrolled, who teaches, and what still needs setting up.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/admin/users" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2">
+            <span aria-hidden="true" className="text-lg leading-none">+</span> Add user
+          </Link>
+          <Link href="/students" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-primary bg-white px-5 text-sm font-semibold text-primary transition-colors hover:bg-tint focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2">
+            Import students
+          </Link>
+        </div>
+      </div>
 
       <StatRow>
         <StatCard hero label="Students enrolled" value={totalStudents} note={unplacedStudents ? `${unplacedStudents} not in a class` : 'All placed in classes'} href="/admin/students" />
@@ -144,6 +162,10 @@ export default async function AdminDashboard() {
             ))}
           </ul>
         )}
+      </Panel>
+
+      <Panel title="Settings">
+        <ClassSizeSetting initial={school?.maxClassSize ?? 45} />
       </Panel>
     </div>
   );

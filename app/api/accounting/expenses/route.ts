@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canRecordExpense } from '@/lib/permissions';
@@ -11,6 +11,7 @@ async function _GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const { searchParams } = req.nextUrl;
   const currency = searchParams.get('currency') || undefined;
@@ -18,7 +19,7 @@ async function _GET(req: NextRequest) {
   const from     = searchParams.get('from')     || undefined;
   const to       = searchParams.get('to')       || undefined;
 
-  const expenses = await prisma.expense.findMany({
+  const expenses = await db.expense.findMany({
     where: {
       schoolId: user.schoolId,
       ...(currency ? { currency: currency as never } : {}),
@@ -46,13 +47,14 @@ async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canRecordExpense(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 
   const parsed = await parseBody(req, CreateExpenseSchema);
   if ('error' in parsed) return parsed.error;
 
-  const expense = await prisma.$transaction(async (tx) => {
+  const expense = await db.$tx(async (tx) => {
     const e = await tx.expense.create({
       data: {
         schoolId:   user.schoolId,

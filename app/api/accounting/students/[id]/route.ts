@@ -1,9 +1,10 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canManageStudents } from '@/lib/permissions';
 import { UpdateStudentSchema } from '@/lib/validations/accounting';
+import { normalizeName } from '@/lib/students/registration';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -14,10 +15,13 @@ async function _GET(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
-  const student = await prisma.student.findUnique({
+  const student = await db.student.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
-    include: {
+    // Only what a fee statement needs. Medical, ID and portal-link details are never part of this answer.
+    select: {
+      id: true, admissionNumber: true, firstName: true, surname: true, fullName: true, status: true, currentClassId: true, admissionDate: true,
       charges: { orderBy: { issuedAt: 'desc' } },
       payments: { orderBy: { recordedAt: 'desc' } },
     },
@@ -43,6 +47,7 @@ async function _PATCH(
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   const parsed = await parseBody(req, UpdateStudentSchema);
   if ('error' in parsed) return parsed.error;
@@ -54,23 +59,25 @@ async function _PATCH(
     throw e;
   }
 
-  const existing = await prisma.student.findUnique({
+  const existing = await db.student.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
-    select: { id: true },
+    select: { id: true, firstName: true, surname: true },
   });
   if (!existing) return apiNotFound('Student');
 
-  const student = await prisma.student.update({
-    where: { id: params.id },
-    data: parsed.data,
-  });
+  const firstName = parsed.data.firstName ? normalizeName(parsed.data.firstName) : existing.firstName;
+  const surname = parsed.data.surname ? normalizeName(parsed.data.surname) : existing.surname;
 
-  await logAudit({
-    schoolId: user.schoolId,
-    actorId: user.id,
-    action: 'UPDATE_STUDENT',
-    entityType: 'Student',
-    entityId: student.id,
+  const student = await db.$tx(async (tx) => {
+    const s = await tx.student.update({
+      where: { id: params.id },
+      data: { ...parsed.data, firstName, surname, fullName: `${firstName} ${surname}`.trim() },
+    });
+    await logAudit(
+      { schoolId: user.schoolId, actorId: user.id, action: 'UPDATE_STUDENT', entityType: 'Student', entityId: s.id, detail: s.fullName },
+      tx,
+    );
+    return s;
   });
 
   return apiSuccess({ student });

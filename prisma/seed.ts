@@ -4,7 +4,8 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 const SCHOOL_ID = 'seed-school';
-const TERM      = 'Term 2, 2026';
+const YEAR      = 2026;
+const TERM_ID   = 'seed-term-2026-2'; // the open term
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -18,17 +19,49 @@ async function main() {
   // ── 1. School ────────────────────────────────────────────────────────────────
   const school = await prisma.school.upsert({
     where:  { id: SCHOOL_ID },
-    update: { name: 'Ruvimbo Independent College', location: 'Glen Lorne, Harare', currentTerm: TERM },
+    update: { name: 'Ruvimbo Independent College', location: 'Glen Lorne, Harare' },
     create: {
       id:          SCHOOL_ID,
       name:        'Ruvimbo Independent College',
       location:    'Glen Lorne, Harare',
-      currentTerm: TERM,
     },
   });
 
+  // ── 1b. Levels (Form 1–6) and the 2026 academic year ─────────────────────────
+  const levelIds: Record<number, string> = {};
+  for (let order = 1; order <= 6; order++) {
+    const level = await prisma.level.upsert({
+      where:  { schoolId_order: { schoolId: SCHOOL_ID, order } },
+      update: {},
+      create: { id: `seed-level-${order}`, schoolId: SCHOOL_ID, name: `Form ${order}`, order, category: order <= 4 ? 'O_LEVEL' : 'A_LEVEL' },
+    });
+    levelIds[order] = level.id;
+  }
+
+  await prisma.academicYear.upsert({
+    where:  { schoolId_year: { schoolId: SCHOOL_ID, year: YEAR } },
+    update: {},
+    create: { id: 'seed-year-2026', schoolId: SCHOOL_ID, year: YEAR, startDate: d('2026-01-01'), endDate: d('2026-12-31') },
+  });
+  const termDefs = [
+    { id: 'seed-term-2026-1', termNumber: 1, start: '2026-01-13', end: '2026-04-10', status: 'CLOSED'  as const },
+    { id: TERM_ID,            termNumber: 2, start: '2026-05-05', end: '2026-08-07', status: 'OPEN'    as const },
+    { id: 'seed-term-2026-3', termNumber: 3, start: '2026-09-08', end: '2026-12-04', status: 'PLANNED' as const },
+  ];
+  for (const t of termDefs) {
+    await prisma.academicTerm.upsert({
+      where:  { id: t.id },
+      update: {},
+      create: {
+        id: t.id, schoolId: SCHOOL_ID, academicYearId: 'seed-year-2026', termNumber: t.termNumber,
+        name: `Term ${t.termNumber} ${YEAR}`, startDate: d(t.start), endDate: d(t.end), status: t.status,
+        closedAt: t.status === 'CLOSED' ? d('2026-04-10') : undefined,
+      },
+    });
+  }
+
   // ── 2. Users ─────────────────────────────────────────────────────────────────
-  const pw = await bcrypt.hash('School@2026', 10);
+  const pw = await bcrypt.hash('School@2026', 12);
 
   const [director, head, bursar, teacher, librarian, admin, teacher2] = await Promise.all([
     prisma.user.upsert({
@@ -119,17 +152,17 @@ async function main() {
 
   // ── 3. Classes ───────────────────────────────────────────────────────────────
   const classesData = [
-    { id: 'seed-class-form1a', name: 'Form 1A', grade: 'Form 1', section: 'A' },
-    { id: 'seed-class-form2a', name: 'Form 2A', grade: 'Form 2', section: 'A' },
-    { id: 'seed-class-form3a', name: 'Form 3A', grade: 'Form 3', section: 'A' },
-    { id: 'seed-class-form4a', name: 'Form 4A', grade: 'Form 4', section: 'A' },
+    { id: 'seed-class-form1a', name: 'Form 1 North', order: 1, stream: 'North' },
+    { id: 'seed-class-form2a', name: 'Form 2 North', order: 2, stream: 'North' },
+    { id: 'seed-class-form3a', name: 'Form 3 North', order: 3, stream: 'North' },
+    { id: 'seed-class-form4a', name: 'Form 4 North', order: 4, stream: 'North' },
   ];
 
   for (const c of classesData) {
     await prisma.schoolClass.upsert({
       where:  { id: c.id },
       update: {},
-      create: { ...c, schoolId: SCHOOL_ID },
+      create: { id: c.id, name: c.name, levelId: levelIds[c.order], stream: c.stream, capacity: 45, schoolId: SCHOOL_ID },
     });
   }
 
@@ -186,45 +219,77 @@ async function main() {
 
   // ── 6. Students ──────────────────────────────────────────────────────────────
   const studentsData = [
-    { id: 'seed-stu-tanaka',   fullName: 'Tanaka Mutasa',   grade: 'Form 4', parentName: 'Mrs S. Mutasa', parentPhone: '0772114552' },
-    { id: 'seed-stu-nyasha',   fullName: 'Nyasha Banda',    grade: 'Form 4', parentName: 'Mr K. Banda',   parentPhone: '0783220117' },
-    { id: 'seed-stu-rutendo',  fullName: 'Rutendo Zhou',    grade: 'Form 3', parentName: 'Mrs T. Zhou',   parentPhone: '0712889030' },
-    { id: 'seed-stu-farai',    fullName: 'Farai Gumbo',     grade: 'Form 3', parentName: 'Mr L. Gumbo',   parentPhone: '0775661204' },
-    { id: 'seed-stu-anesu',    fullName: 'Anesu Phiri',     grade: 'Form 2', parentName: 'Mrs P. Phiri',  parentPhone: '0719442880' },
-    { id: 'seed-stu-chiedza',  fullName: 'Chiedza Mhaka',   grade: 'Form 2', parentName: 'Mr D. Mhaka',   parentPhone: '0773005661' },
-    { id: 'seed-stu-takudzwa', fullName: 'Takudzwa Dube',   grade: 'Form 1', parentName: 'Mrs C. Dube',   parentPhone: '0788119743' },
-    { id: 'seed-stu-tinashe',  fullName: 'Tinashe Ncube',   grade: 'Form 1', parentName: 'Mr B. Ncube',   parentPhone: '0714770218' },
-    { id: 'seed-stu-vimbai',   fullName: 'Vimbai Nhari',    grade: 'Form 3', parentName: 'Mrs M. Nhari',  parentPhone: '0786233540' },
-    { id: 'seed-stu-kudzai',   fullName: 'Kudzai Mutisi',   grade: 'Form 2', parentName: 'Mr A. Mutisi',  parentPhone: '0772660391' },
+    { id: 'seed-stu-tanaka',   firstName: 'Tanaka',   surname: 'Mutasa', gender: 'M' as const, dob: '2010-03-14', grade: 'Form 4', parentName: 'Shamiso Mutasa',   relationship: 'MOTHER' as const, parentPhone: '+263772114552' },
+    { id: 'seed-stu-nyasha',   firstName: 'Nyasha',   surname: 'Banda',  gender: 'F' as const, dob: '2010-07-02', grade: 'Form 4', parentName: 'Kudakwashe Banda', relationship: 'FATHER' as const, parentPhone: '+263783220117' },
+    { id: 'seed-stu-rutendo',  firstName: 'Rutendo',  surname: 'Zhou',   gender: 'F' as const, dob: '2011-01-20', grade: 'Form 3', parentName: 'Tsitsi Zhou',      relationship: 'MOTHER' as const, parentPhone: '+263712889030' },
+    { id: 'seed-stu-farai',    firstName: 'Farai',    surname: 'Gumbo',  gender: 'M' as const, dob: '2011-05-11', grade: 'Form 3', parentName: 'Lovemore Gumbo',   relationship: 'FATHER' as const, parentPhone: '+263775661204' },
+    { id: 'seed-stu-anesu',    firstName: 'Anesu',    surname: 'Phiri',  gender: 'F' as const, dob: '2012-02-28', grade: 'Form 2', parentName: 'Precious Phiri',   relationship: 'MOTHER' as const, parentPhone: '+263719442880' },
+    { id: 'seed-stu-chiedza',  firstName: 'Chiedza',  surname: 'Mhaka',  gender: 'F' as const, dob: '2012-09-09', grade: 'Form 2', parentName: 'Daniel Mhaka',     relationship: 'FATHER' as const, parentPhone: '+263773005661' },
+    { id: 'seed-stu-takudzwa', firstName: 'Takudzwa', surname: 'Dube',   gender: 'M' as const, dob: '2013-04-17', grade: 'Form 1', parentName: 'Chipo Dube',       relationship: 'MOTHER' as const, parentPhone: '+263788119743' },
+    { id: 'seed-stu-tinashe',  firstName: 'Tinashe',  surname: 'Ncube',  gender: 'M' as const, dob: '2013-11-30', grade: 'Form 1', parentName: 'Bongani Ncube',    relationship: 'FATHER' as const, parentPhone: '+263714770218' },
+    { id: 'seed-stu-vimbai',   firstName: 'Vimbai',   surname: 'Nhari',  gender: 'F' as const, dob: '2011-08-05', grade: 'Form 3', parentName: 'Memory Nhari',     relationship: 'MOTHER' as const, parentPhone: '+263786233540' },
+    { id: 'seed-stu-kudzai',   firstName: 'Kudzai',   surname: 'Mutisi', gender: 'M' as const, dob: '2012-06-21', grade: 'Form 2', parentName: 'Arthur Mutisi',    relationship: 'FATHER' as const, parentPhone: '+263772660391' },
   ];
 
-  for (const s of studentsData) {
+  for (let i = 0; i < studentsData.length; i++) {
+    const s = studentsData[i];
     const classId = classIdByGrade[s.grade];
     await prisma.student.upsert({
       where:  { id: s.id },
-      update: { classId },
-      create: { ...s, classId, schoolId: SCHOOL_ID },
+      update: { currentClassId: classId },
+      create: {
+        id: s.id,
+        schoolId: SCHOOL_ID,
+        admissionNumber: `STU2026${String(i + 1).padStart(4, '0')}`,
+        firstName: s.firstName,
+        surname: s.surname,
+        fullName: `${s.firstName} ${s.surname}`,
+        gender: s.gender,
+        dateOfBirth: d(s.dob),
+        admissionDate: d('2026-01-13'),
+        currentClassId: classId,
+        address: 'Glen Lorne, Harare',
+      },
+    });
+    await prisma.enrollment.upsert({
+      where:  { studentId_termId: { studentId: s.id, termId: TERM_ID } },
+      update: {},
+      create: { schoolId: SCHOOL_ID, studentId: s.id, classId, termId: TERM_ID, status: 'ACTIVE', startDate: d('2026-05-05') },
+    });
+    const guardianId = `seed-guardian-${s.id}`;
+    await prisma.guardian.upsert({
+      where:  { id: guardianId },
+      update: {},
+      create: { id: guardianId, schoolId: SCHOOL_ID, fullName: s.parentName, phone: s.parentPhone },
+    });
+    await prisma.studentGuardian.upsert({
+      where:  { studentId_guardianId: { studentId: s.id, guardianId } },
+      update: {},
+      create: { studentId: s.id, guardianId, relationship: s.relationship, isPrimary: true, isFeePayer: true },
     });
   }
 
   // ── 7. FeeStructures ─────────────────────────────────────────────────────────
   const feeStructures = [
-    { id: 'seed-fs-f4-tuition',   grade: 'Form 4', label: 'Tuition',        currency: 'USD' as const, amount: 320  },
-    { id: 'seed-fs-f4-transport', grade: 'Form 4', label: 'Transport Levy', currency: 'USD' as const, amount: 45   },
-    { id: 'seed-fs-f3-tuition',   grade: 'Form 3', label: 'Tuition',        currency: 'USD' as const, amount: 300  },
-    { id: 'seed-fs-f3-transport', grade: 'Form 3', label: 'Transport Levy', currency: 'USD' as const, amount: 45   },
-    { id: 'seed-fs-f2-tuition',   grade: 'Form 2', label: 'Tuition',        currency: 'USD' as const, amount: 280  },
-    { id: 'seed-fs-f2-transport', grade: 'Form 2', label: 'Transport Levy', currency: 'USD' as const, amount: 40   },
-    { id: 'seed-fs-f1-tuition',   grade: 'Form 1', label: 'Tuition',        currency: 'USD' as const, amount: 280  },
-    { id: 'seed-fs-f1-transport', grade: 'Form 1', label: 'Transport Levy', currency: 'USD' as const, amount: 40   },
-    { id: 'seed-fs-all-sports',   grade: 'All',    label: 'Sports Levy',    currency: 'ZIG' as const, amount: 1450 },
+    { id: 'seed-fs-f4-tuition',   level: 4,    label: 'Tuition',        currency: 'USD' as const, amount: 320  },
+    { id: 'seed-fs-f4-transport', level: 4,    label: 'Transport Levy', currency: 'USD' as const, amount: 45   },
+    { id: 'seed-fs-f3-tuition',   level: 3,    label: 'Tuition',        currency: 'USD' as const, amount: 300  },
+    { id: 'seed-fs-f3-transport', level: 3,    label: 'Transport Levy', currency: 'USD' as const, amount: 45   },
+    { id: 'seed-fs-f2-tuition',   level: 2,    label: 'Tuition',        currency: 'USD' as const, amount: 280  },
+    { id: 'seed-fs-f2-transport', level: 2,    label: 'Transport Levy', currency: 'USD' as const, amount: 40   },
+    { id: 'seed-fs-f1-tuition',   level: 1,    label: 'Tuition',        currency: 'USD' as const, amount: 280  },
+    { id: 'seed-fs-f1-transport', level: 1,    label: 'Transport Levy', currency: 'USD' as const, amount: 40   },
+    { id: 'seed-fs-all-sports',   level: null, label: 'Sports Levy',    currency: 'ZIG' as const, amount: 1450 },
   ];
 
   for (const fs of feeStructures) {
     await prisma.feeStructure.upsert({
       where:  { id: fs.id },
       update: {},
-      create: { ...fs, schoolId: SCHOOL_ID, term: TERM },
+      create: {
+        id: fs.id, label: fs.label, currency: fs.currency, amount: fs.amount,
+        levelId: fs.level ? levelIds[fs.level] : null, schoolId: SCHOOL_ID, termId: TERM_ID,
+      },
     });
   }
 
@@ -248,7 +313,7 @@ async function main() {
       await prisma.charge.upsert({
         where:  { id: c.id },
         update: {},
-        create: { ...c, schoolId: SCHOOL_ID, studentId: s.id, term: TERM },
+        create: { ...c, schoolId: SCHOOL_ID, studentId: s.id, termId: TERM_ID },
       });
     }
   }
@@ -432,17 +497,17 @@ async function main() {
     { id: 'seed-sa-6', teacherId: teacher2.id, subjectId: 'seed-sub-sho',  classId: 'seed-class-form4a' },
   ];
 
-  await prisma.subjectAssignment.deleteMany({ where: { schoolId: SCHOOL_ID, term: TERM } });
-
   for (const a of assignmentsData) {
-    await prisma.subjectAssignment.create({
-      data: {
+    await prisma.subjectAssignment.upsert({
+      where:  { id: a.id },
+      update: {},
+      create: {
         id:        a.id,
         schoolId:  SCHOOL_ID,
         teacherId: a.teacherId,
         subjectId: a.subjectId,
         classId:   a.classId,
-        term:      TERM,
+        termId:    TERM_ID,
       },
     });
   }
@@ -457,13 +522,13 @@ async function main() {
 
   for (const m of marksData) {
     await prisma.mark.upsert({
-      where:  { studentId_subjectId_term: { studentId: m.studentId, subjectId: m.subjectId, term: TERM } },
+      where:  { studentId_subjectId_termId: { studentId: m.studentId, subjectId: m.subjectId, termId: TERM_ID } },
       update: {},
       create: {
         schoolId:    SCHOOL_ID,
         studentId:   m.studentId,
         subjectId:   m.subjectId,
-        term:        TERM,
+        termId:      TERM_ID,
         rawMark:     m.rawMark,
         percentage:  m.percentage,
         letterGrade: m.letterGrade,
@@ -544,7 +609,6 @@ async function main() {
         publisher:     b.publisher ?? undefined,
         year:          b.year,
         shelfLocation: b.shelf,
-        totalCopies:   2,
       },
     });
 

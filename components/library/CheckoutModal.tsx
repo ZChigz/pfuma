@@ -10,7 +10,9 @@ import { useToast } from '@/components/ui/Toast';
 type Member = {
   id: string;
   borrowingSuspended: boolean;
-  user: { fullName: string; role: string };
+  name: string;
+  detail: string;
+  memberType?: 'STAFF' | 'STUDENT';
   _count: { borrowings: number };
 };
 
@@ -149,7 +151,7 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
           {selectedMember ? (
             <div className="flex items-center justify-between rounded-xl border border-primary bg-success-bg px-3 py-2">
               <div>
-                <p className="text-sm font-medium text-ink">{selectedMember.user.fullName}</p>
+                <p className="text-sm font-medium text-ink">{selectedMember.name}</p>
                 <p className="text-xs text-muted">
                   {selectedMember._count.borrowings} active borrowing{selectedMember._count.borrowings !== 1 ? 's' : ''}
                   {selectedMember.borrowingSuspended && ' · ⚠ Suspended'}
@@ -181,8 +183,8 @@ export function CheckoutModal({ open, onClose, onSuccess }: Props) {
                         onClick={() => { setSelectedMember(m); setMemberResults([]); }}
                         className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-rowhover"
                       >
-                        <span className="font-medium text-ink">{m.user.fullName}</span>
-                        <span className="text-xs text-muted">{m.user.role}</span>
+                        <span className="font-medium text-ink">{m.name}</span>
+                        <span className="text-xs text-muted">{m.detail}</span>
                       </button>
                     ))
                   )}

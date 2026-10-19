@@ -30,7 +30,7 @@ export type ExpenseRequestType =
 
 export type SubjectType = 'CORE' | 'ELECTIVE';
 
-export type MarkStatus = 'DRAFT' | 'VERIFIED' | 'PUBLISHED';
+export type MarkStatus = 'DRAFT' | 'VERIFIED' | 'PUBLISHED' | 'ABSENT' | 'EXEMPT';
 
 export type AssignmentMarkStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'VERIFIED' | 'PUBLISHED';
 
@@ -42,7 +42,7 @@ export type DisposalMethod = 'SOLD' | 'SCRAPPED' | 'DONATED';
 
 export type CopyCondition = 'NEW' | 'GOOD' | 'FAIR' | 'DAMAGED';
 
-export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'LOST';
+export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'LOST' | 'DAMAGED' | 'WITHDRAWN';
 
 export type AuditAction =
   | 'RECORD_PAYMENT'
@@ -75,4 +75,5 @@ export type AuditAction =
   | 'SUBMIT_EXPENSE_REQUEST'
   | 'APPROVE_EXPENSE_REQUEST'
   | 'REJECT_EXPENSE_REQUEST'
-  | 'DISBURSE_EXPENSE_REQUEST';
+  | 'DISBURSE_EXPENSE_REQUEST'
+  | 'UPDATE_SCHOOL_SETTINGS';

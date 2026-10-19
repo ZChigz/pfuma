@@ -1,16 +1,18 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { apiSuccess, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
+import { getScopedDb } from '@/lib/scoped-db';
+import { apiError, apiSuccess, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { canUnverifyMarks } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { UnverifyMarksSchema } from '@/lib/validations/results';
+import { classRosterIds } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
 
 async function _POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
+  const db = getScopedDb(user.schoolId, user.id);
 
   try { await canUnverifyMarks(user.role); }
   catch (e) { if (e instanceof Response) return e; throw e; }
@@ -19,20 +21,27 @@ async function _POST(req: NextRequest) {
   if ('error' in parsed) return parsed.error;
   const { assignmentId } = parsed.data;
 
-  const assignment = await prisma.subjectAssignment.findFirst({
+  const assignment = await db.subjectAssignment.findFirst({
     where: { id: assignmentId, schoolId: user.schoolId },
-    include: { subject: { select: { name: true } }, class: { select: { name: true } } },
+    include: { subject: { select: { name: true } }, class: { select: { name: true } }, term: { select: { name: true, status: true } } },
   });
   if (!assignment) return apiNotFound('Assignment');
+  if (assignment.term.status === 'CLOSED') return apiError(`${assignment.term.name} is closed, so its results are locked. The Director can reopen the term.`, 409);
+  if (assignment.marksStatus === 'PUBLISHED') {
+    return apiError('These results are published. Unpublish the class results first, then unlock the subject.', 409);
+  }
 
-  await prisma.$transaction(async (tx) => {
+
+  const studentIds = await classRosterIds(assignment.classId, assignment.termId, db);
+
+  await db.$tx(async (tx) => {
     await tx.mark.updateMany({
       where: {
         schoolId:  user.schoolId,
         subjectId: assignment.subjectId,
-        term:      assignment.term,
+        termId:    assignment.termId,
         status:    'VERIFIED',
-        student:   { classId: assignment.classId },
+        studentId: { in: studentIds },
       },
       data: { status: 'DRAFT', verifiedAt: null },
     });
@@ -49,7 +58,7 @@ async function _POST(req: NextRequest) {
         action:     'UNVERIFY_MARKS',
         entityType: 'SubjectAssignment',
         entityId:   assignment.id,
-        detail:     `Unlocked marks for ${assignment.subject.name} — ${assignment.class.name} (${assignment.term})`,
+        detail:     `Unlocked marks for ${assignment.subject.name} — ${assignment.class.name} (${assignment.term.name})`,
       },
       tx,
     );

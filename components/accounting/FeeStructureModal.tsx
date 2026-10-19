@@ -8,30 +8,35 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { useToast } from '@/components/ui/Toast';
 
-const GRADE_OPTIONS = [
-  'ECD A', 'ECD B',
-  'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7',
-  'Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6',
-];
+// "" in the level dropdown means the fee applies to every level.
+const ALL_LEVELS = '';
 
 export interface FeeStructureOption {
   id: string;
   label: string;
-  grade: string;
-  term: string;
+  levelId: string | null;
+  levelName: string;   // "All levels" when levelId is null
+  termId: string;
+  termName: string;
   currency: 'USD' | 'ZIG';
   amount: number;
 }
 
+export interface LevelOption { id: string; name: string }
+export interface TermOption { id: string; name: string; status: 'PLANNED' | 'OPEN' | 'CLOSED' }
+
 interface Props {
   feeStructure?: FeeStructureOption;
+  levels: LevelOption[];
+  terms: TermOption[];
 }
 
-export function FeeStructureModal({ feeStructure }: Props) {
+export function FeeStructureModal({ feeStructure, levels, terms }: Props) {
   const isEdit = !!feeStructure;
+  const openTermId = terms.find((t) => t.status === 'OPEN')?.id ?? '';
   const [open, setOpen] = useState(false);
-  const [grade, setGrade] = useState(feeStructure?.grade ?? '');
-  const [term, setTerm] = useState(feeStructure?.term ?? '');
+  const [levelId, setLevelId] = useState(feeStructure?.levelId ?? ALL_LEVELS);
+  const [termId, setTermId] = useState(feeStructure?.termId ?? openTermId);
   const [label, setLabel] = useState(feeStructure?.label ?? '');
   const [currency, setCurrency] = useState<'USD' | 'ZIG'>(feeStructure?.currency ?? 'USD');
   const [amount, setAmount] = useState(feeStructure ? String(feeStructure.amount) : '');
@@ -42,11 +47,11 @@ export function FeeStructureModal({ feeStructure }: Props) {
   function handleClose() {
     setOpen(false);
     if (!isEdit) {
-      setGrade(''); setTerm(''); setLabel(''); setCurrency('USD'); setAmount('');
+      setLevelId(ALL_LEVELS); setTermId(openTermId); setLabel(''); setCurrency('USD'); setAmount('');
     }
   }
 
-  const valid = !!grade && !!term.trim() && !!label.trim() && Number(amount) > 0;
+  const valid = !!termId && !!label.trim() && Number(amount) > 0;
 
   async function handleSubmit() {
     setBusy(true);
@@ -56,7 +61,7 @@ export function FeeStructureModal({ feeStructure }: Props) {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grade, term, label: label.trim(), currency, amount: Number(amount) }),
+        body: JSON.stringify({ levelId: levelId || null, termId, label: label.trim(), currency, amount: Number(amount) }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -92,21 +97,21 @@ export function FeeStructureModal({ feeStructure }: Props) {
       >
         <div className="flex flex-col gap-4">
           <Select
-            id="fs-grade"
-            label="Grade"
-            required
-            options={GRADE_OPTIONS.map((g) => ({ value: g, label: g }))}
-            placeholder="Select a grade"
-            value={grade}
-            onChange={(e) => setGrade(e.target.value)}
+            id="fs-level"
+            label="Level"
+            options={[{ value: ALL_LEVELS, label: 'All levels' }, ...levels.map((l) => ({ value: l.id, label: l.name }))]}
+            value={levelId}
+            onChange={(e) => setLevelId(e.target.value)}
           />
-          <Input
+          <Select
             id="fs-term"
             label="Term"
             required
-            placeholder="e.g. Term 1 2026"
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
+            placeholder="Select a term"
+            options={terms.filter((t) => t.status !== 'CLOSED' || t.id === feeStructure?.termId)
+              .map((t) => ({ value: t.id, label: t.status === 'OPEN' ? `${t.name} (current)` : t.name }))}
+            value={termId}
+            onChange={(e) => setTermId(e.target.value)}
           />
           <Input
             id="fs-label"
