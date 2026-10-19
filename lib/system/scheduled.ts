@@ -5,6 +5,7 @@ import { getScopedDb } from '@/lib/scoped-db';
 import { adminIds, notifyUsers } from '@/lib/system/notifications';
 import { evaluateSetup, loadSetupFacts, summarize } from '@/lib/system/setup-checklist';
 import { syncSuspensions } from '@/lib/students/discipline';
+import { remindRecordOfWork } from '@/lib/academics/curriculum';
 
 const DAY = 864e5;
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -21,13 +22,13 @@ export function weekStart(date: string): string {
   return iso(new Date(d.getTime() - back * DAY));
 }
 
-export interface ScheduledResult { schools: number; termReminders: number; setupReminders: number; suspensionsStarted: number; suspensionsEnded: number }
+export interface ScheduledResult { schools: number; termReminders: number; setupReminders: number; suspensionsStarted: number; suspensionsEnded: number; recordReminders: number }
 
 export async function runScheduledNotifications(now = new Date()): Promise<ScheduledResult> {
   const today = harareDate(now);
   const tomorrow = iso(new Date(new Date(`${today}T00:00:00Z`).getTime() + DAY));
   const week = weekStart(today);
-  const result: ScheduledResult = { schools: 0, termReminders: 0, setupReminders: 0, suspensionsStarted: 0, suspensionsEnded: 0 };
+  const result: ScheduledResult = { schools: 0, termReminders: 0, setupReminders: 0, suspensionsStarted: 0, suspensionsEnded: 0, recordReminders: 0 };
 
   const schools = await prisma.school.findMany({ where: { status: { not: 'SUSPENDED' } }, select: { id: true } });
   for (const { id: schoolId } of schools) {
@@ -56,6 +57,9 @@ export async function runScheduledNotifications(now = new Date()): Promise<Sched
       result.suspensionsStarted += sync.started;
       result.suspensionsEnded += sync.ended;
     }
+
+    // Fridays (Academics): teachers whose week is not recorded yet are reminded to record the work covered.
+    result.recordReminders += await remindRecordOfWork(schoolId, today);
 
     // Weekly: a setup step is still incomplete, to the administrators.
     const open = await db.academicTerm.findFirst({ where: { status: 'OPEN' }, select: { startDate: true, endDate: true } });

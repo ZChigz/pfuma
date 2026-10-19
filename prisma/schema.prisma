@@ -469,6 +469,53 @@ enum AuditAction {
   CONFIRM_PROMOTION
   CREATE_HOUSE
   UPDATE_HOUSE
+  CREATE_DEPARTMENT
+  UPDATE_DEPARTMENT
+  DELETE_DEPARTMENT
+  CREATE_SUBJECT
+  UPDATE_SUBJECT
+  REQUEST_SUBJECT_CHANGE
+  DECIDE_SUBJECT_CHANGE
+  LOAD_STARTER_SUBJECTS
+  SAVE_SUBJECT_COMBINATION
+  DELETE_SUBJECT_COMBINATION
+  ASSIGN_STUDENT_SUBJECTS
+  SET_CLASS_TEACHER
+  COPY_FROM_LAST_TERM
+  SAVE_TEACHING_GROUP
+  CREATE_TEACHER_ASSIGNMENT
+  UPDATE_TEACHER_ASSIGNMENT
+  END_TEACHER_ASSIGNMENT
+  REPLACE_TEACHER
+  SUBMIT_ASSIGNMENTS
+  APPROVE_ASSIGNMENTS
+  RETURN_ASSIGNMENTS
+  MARK_REGISTER
+  CORRECT_REGISTER
+  REGISTER_CONFLICT
+  REMIND_REGISTER
+  QUEUE_SMS
+  SAVE_BELL_SCHEDULE
+  SAVE_ROOM
+  SET_AVAILABILITY
+  PLACE_LESSON
+  REMOVE_LESSON
+  SUBMIT_TIMETABLE
+  PUBLISH_TIMETABLE
+  RETURN_TIMETABLE
+  ASSIGN_COVER
+  SAVE_SYLLABUS
+  IMPORT_SYLLABUS
+  SHARE_SYLLABUS
+  SAVE_SCHEME
+  SUBMIT_SCHEME
+  APPROVE_SCHEME
+  RETURN_SCHEME
+  RECORD_WORK
+  SAVE_LESSON_PLAN
+  UPDATE_ACADEMICS_SETTINGS
+  SET_SCHEME_DUE_DATE
+  EXPORT_ACADEMICS
 }
 
 enum SchoolType {
@@ -646,58 +693,86 @@ model School {
   enrollments   Enrollment[]
   guardians     Guardian[]
 
-  users               User[]
-  students            Student[]
-  feeStructures       FeeStructure[]
-  charges             Charge[]
-  payments            Payment[]
-  expenses            Expense[]
-  expenseRequests     ExpenseRequest[]
-  auditLogs           AuditLog[]
-  subjects            Subject[]
-  subjectAssignments  SubjectAssignment[]
-  marks               Mark[]
-  markChanges         MarkChange[]
-  termResults         TermResult[]
-  gradeBoundaries     GradeBoundary[]
-  assetCategories     AssetCategory[]
-  assets              Asset[]
-  assetMaintenances   AssetMaintenance[]
-  assetDisposals      AssetDisposal[]
-  books               Book[]
-  bookCopies          BookCopy[]
-  libraryMembers      LibraryMember[]
-  borrowings          Borrowing[]
-  exchangeRates       ExchangeRate[]
-  schoolClasses       SchoolClass[]
-  passwordResetTokens PasswordResetToken[]
-  assetTransfers      AssetTransfer[]
-  incomes             Income[]
-  subscription        Subscription?
-  modules             SchoolModule[]
-  notifications       Notification[]
-  calendarEvents      CalendarEvent[]
-  CalendarHolidayYear CalendarHolidayYear[]
-  streams             Stream[]
-  roleDefinitions     RoleDefinition[]
-  userRoles           UserRole[]
-  invoices            SubscriptionInvoice[]
-  plan                Plan?                 @relation(fields: [planId], references: [id])
-  RolePermission      RolePermission[]
-  houses              House[]
-  classMoves          ClassMove[]
-  promotionRuns       PromotionRun[]
-  intakes             Intake[]
-  applications        Application[]
-  studentDocuments    StudentDocument[]
-  disciplineIncidents DisciplineIncident[]
-  incidentStudents    IncidentStudent[]
-  disciplineActions   DisciplineAction[]
-  medicalProfiles     MedicalProfile[]
-  medicationEntries   MedicationEntry[]
-  sickBayVisits       SickBayVisit[]
-  studentExits        StudentExit[]
-  alumni              Alumnus[]
+  users                     User[]
+  students                  Student[]
+  feeStructures             FeeStructure[]
+  charges                   Charge[]
+  payments                  Payment[]
+  expenses                  Expense[]
+  expenseRequests           ExpenseRequest[]
+  auditLogs                 AuditLog[]
+  subjects                  Subject[]
+  subjectAssignments        SubjectAssignment[]
+  marks                     Mark[]
+  markChanges               MarkChange[]
+  termResults               TermResult[]
+  gradeBoundaries           GradeBoundary[]
+  assetCategories           AssetCategory[]
+  assets                    Asset[]
+  assetMaintenances         AssetMaintenance[]
+  assetDisposals            AssetDisposal[]
+  books                     Book[]
+  bookCopies                BookCopy[]
+  libraryMembers            LibraryMember[]
+  borrowings                Borrowing[]
+  exchangeRates             ExchangeRate[]
+  schoolClasses             SchoolClass[]
+  passwordResetTokens       PasswordResetToken[]
+  assetTransfers            AssetTransfer[]
+  incomes                   Income[]
+  subscription              Subscription?
+  modules                   SchoolModule[]
+  notifications             Notification[]
+  calendarEvents            CalendarEvent[]
+  CalendarHolidayYear       CalendarHolidayYear[]
+  streams                   Stream[]
+  roleDefinitions           RoleDefinition[]
+  userRoles                 UserRole[]
+  invoices                  SubscriptionInvoice[]
+  plan                      Plan?                     @relation(fields: [planId], references: [id])
+  RolePermission            RolePermission[]
+  houses                    House[]
+  classMoves                ClassMove[]
+  promotionRuns             PromotionRun[]
+  intakes                   Intake[]
+  applications              Application[]
+  studentDocuments          StudentDocument[]
+  disciplineIncidents       DisciplineIncident[]
+  incidentStudents          IncidentStudent[]
+  disciplineActions         DisciplineAction[]
+  medicalProfiles           MedicalProfile[]
+  medicationEntries         MedicationEntry[]
+  sickBayVisits             SickBayVisit[]
+  studentExits              StudentExit[]
+  alumni                    Alumnus[]
+  academicsSettings         AcademicsSettings?
+  classTeachers             ClassTeacher[]
+  departments               Department[]
+  subjectLevels             SubjectLevel[]
+  subjectChanges            SubjectChange[]
+  subjectCombinations       SubjectCombination[]
+  subjectCombinationItems   SubjectCombinationItem[]
+  subjectCombinationClasses SubjectCombinationClass[]
+  studentSubjects           StudentSubject[]
+  teachingGroups            TeachingGroup[]
+  teachingGroupStudents     TeachingGroupStudent[]
+  teacherAssignments        TeacherAssignment[]
+  assignmentSets            AssignmentSet[]
+  bellSchedules             BellSchedule[]
+  periods                   Period[]
+  rooms                     Room[]
+  timetables                Timetable[]
+  timetableSlots            TimetableSlot[]
+  teacherAvailability       TeacherAvailability[]
+  coverLessons              CoverLesson[]
+  attendanceRegisters       AttendanceRegister[]
+  attendanceEntries         AttendanceEntry[]
+  messageOutbox             MessageOutbox[]
+  syllabusTopics            SyllabusTopic[]
+  schemesOfWork             SchemeOfWork[]
+  schemeWeeks               SchemeWeek[]
+  recordsOfWork             RecordOfWork[]
+  lessonPlans               LessonPlan[]
 }
 
 model User {
@@ -752,16 +827,24 @@ model User {
   closedTerms         AcademicTerm[]      @relation("ClosedTerms")
 
   exchangeRates         ExchangeRate[]
-  resetTokens           PasswordResetToken[] @relation("ResetTokenUser")
-  resetTokensCreated    PasswordResetToken[] @relation("ResetTokenCreator")
-  custodianOf           Asset[]              @relation("AssetCustodian")
-  transfersFrom         AssetTransfer[]      @relation("TransferFrom")
-  transfersTo           AssetTransfer[]      @relation("TransferTo")
-  transfersRecorded     AssetTransfer[]      @relation("TransfersRecorded")
+  resetTokens           PasswordResetToken[]  @relation("ResetTokenUser")
+  resetTokensCreated    PasswordResetToken[]  @relation("ResetTokenCreator")
+  custodianOf           Asset[]               @relation("AssetCustodian")
+  transfersFrom         AssetTransfer[]       @relation("TransferFrom")
+  transfersTo           AssetTransfer[]       @relation("TransferTo")
+  transfersRecorded     AssetTransfer[]       @relation("TransfersRecorded")
   incomeRecorded        Income[]
   userRoles             UserRole[]
   notifications         Notification[]
   calendarEventsCreated CalendarEvent[]
+  classTeacherOf        ClassTeacher[]
+  departmentsHeaded     Department[]          @relation("DepartmentHod")
+  teachingAssignments   TeacherAssignment[]   @relation("AssignmentTeacher")
+  coTeachingAssignments TeacherAssignment[]   @relation("AssignmentCoTeacher")
+  timetableSlots        TimetableSlot[]       @relation("SlotTeacher")
+  unavailablePeriods    TeacherAvailability[]
+  coversAbsent          CoverLesson[]         @relation("CoverAbsent")
+  coversTaken           CoverLesson[]         @relation("CoverTeacher")
 
   @@unique([schoolId, email])
   @@index([schoolId])
@@ -783,14 +866,18 @@ model SchoolClass {
   // Legacy columns "grade" and "section" remain in the database until the
   // contract migration and are no longer read or written.
 
-  school          School              @relation(fields: [schoolId], references: [id])
-  level           Level               @relation(fields: [levelId], references: [id])
-  classTeacher    User?               @relation(fields: [classTeacherId], references: [id])
-  currentStudents Student[]           @relation("CurrentClass")
-  movesFrom       ClassMove[]         @relation("ClassMoveFrom")
-  movesTo         ClassMove[]         @relation("ClassMoveTo")
-  enrollments     Enrollment[]
-  assignments     SubjectAssignment[]
+  school             School                    @relation(fields: [schoolId], references: [id])
+  level              Level                     @relation(fields: [levelId], references: [id])
+  classTeacher       User?                     @relation(fields: [classTeacherId], references: [id])
+  currentStudents    Student[]                 @relation("CurrentClass")
+  movesFrom          ClassMove[]               @relation("ClassMoveFrom")
+  movesTo            ClassMove[]               @relation("ClassMoveTo")
+  enrollments        Enrollment[]
+  assignments        SubjectAssignment[]
+  classTeachers      ClassTeacher[]
+  teacherAssignments TeacherAssignment[]
+  combinationLinks   SubjectCombinationClass[]
+  registers          AttendanceRegister[]
 
   @@unique([schoolId, name])
   @@unique([schoolId, levelId, stream])
@@ -808,11 +895,15 @@ model Level {
   // Switched off when the school does not have this form (e.g. no A Level). Off forms offer no classes.
   active   Boolean       @default(true)
 
-  school          School          @relation(fields: [schoolId], references: [id])
+  school          School               @relation(fields: [schoolId], references: [id])
   classes         SchoolClass[]
   feeStructures   FeeStructure[]
   gradeBoundaries GradeBoundary[]
   intakes         Intake[]
+  subjectLevels   SubjectLevel[]
+  combinations    SubjectCombination[]
+  teachingGroups  TeachingGroup[]
+  syllabusTopics  SyllabusTopic[]
 
   @@unique([schoolId, name])
   @@unique([schoolId, order])
@@ -850,11 +941,13 @@ model AcademicTerm {
   status         TermStatus @default(PLANNED)
   closedAt       DateTime?
   closedById     String?
+  // The date by which teachers hand in their schemes of work (set by the Head).
+  schemeDueDate  DateTime?  @db.Date
   createdAt      DateTime   @default(now())
 
-  school             School              @relation(fields: [schoolId], references: [id])
-  academicYear       AcademicYear        @relation(fields: [academicYearId], references: [id])
-  closedBy           User?               @relation("ClosedTerms", fields: [closedById], references: [id])
+  school             School               @relation(fields: [schoolId], references: [id])
+  academicYear       AcademicYear         @relation(fields: [academicYearId], references: [id])
+  closedBy           User?                @relation("ClosedTerms", fields: [closedById], references: [id])
   feeStructures      FeeStructure[]
   charges            Charge[]
   subjectAssignments SubjectAssignment[]
@@ -862,6 +955,15 @@ model AcademicTerm {
   termResults        TermResult[]
   enrollments        Enrollment[]
   gradeBoundaries    GradeBoundary[]
+  classTeachers      ClassTeacher[]
+  studentSubjects    StudentSubject[]
+  teachingGroups     TeachingGroup[]
+  teacherAssignments TeacherAssignment[]
+  assignmentSet      AssignmentSet?
+  bellSchedules      BellSchedule[]
+  timetables         Timetable[]
+  registers          AttendanceRegister[]
+  schemesOfWork      SchemeOfWork[]
 
   @@unique([academicYearId, termNumber])
   @@index([schoolId])
@@ -946,8 +1048,8 @@ model Student {
   // "studentNumber", "enrollmentYear", "guardianRelationship" and
   // "secondGuardianPhone" remain in the database until the contract migration.
 
-  school            School             @relation(fields: [schoolId], references: [id])
-  currentClass      SchoolClass?       @relation("CurrentClass", fields: [currentClassId], references: [id])
+  school            School                 @relation(fields: [schoolId], references: [id])
+  currentClass      SchoolClass?           @relation("CurrentClass", fields: [currentClassId], references: [id])
   enrollments       Enrollment[]
   guardians         StudentGuardian[]
   charges           Charge[]
@@ -956,7 +1058,7 @@ model Student {
   termResults       TermResult[]
   portalViews       PortalAccessLog[]
   libraryMember     LibraryMember?
-  house             House?             @relation(fields: [houseId], references: [id])
+  house             House?                 @relation(fields: [houseId], references: [id])
   classMoves        ClassMove[]
   documents         StudentDocument[]
   incidents         IncidentStudent[]
@@ -966,6 +1068,9 @@ model Student {
   exits             StudentExit[]
   alumnus           Alumnus?
   application       Application?
+  subjectChoices    StudentSubject[]
+  teachingGroups    TeachingGroupStudent[]
+  attendance        AttendanceEntry[]
 
   @@unique([schoolId, admissionNumber])
   @@unique([schoolId, birthCertificateNumber])
@@ -1222,17 +1327,35 @@ model PortalAccessLog {
 // ─── Results ─────────────────────────────────────────────────────────────────
 
 model Subject {
-  id       String      @id @default(cuid())
-  schoolId String
-  name     String
-  code     String
-  maxMark  Int         @default(100)
-  type     SubjectType @default(CORE)
-  active   Boolean     @default(true)
+  id            String           @id @default(cuid())
+  schoolId      String
+  name          String
+  code          String
+  maxMark       Int              @default(100)
+  // Legacy: the type now lives per level in SubjectLevel.
+  type          SubjectType      @default(CORE)
+  active        Boolean          @default(true)
+  // Academics module: the school's own editable list, grouped into departments.
+  shortName     String?
+  zimsecCode    String?
+  cambridgeCode String?
+  departmentId  String?
+  examBoard     SubjectExamBoard @default(ZIMSEC)
+  isPractical   Boolean          @default(false)
+  colour        String           @default("#0F766E")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @default(now()) @updatedAt
 
-  school      School              @relation(fields: [schoolId], references: [id])
-  assignments SubjectAssignment[]
-  marks       Mark[]
+  school             School                   @relation(fields: [schoolId], references: [id])
+  department         Department?              @relation(fields: [departmentId], references: [id])
+  assignments        SubjectAssignment[]
+  marks              Mark[]
+  levels             SubjectLevel[]
+  combinationItems   SubjectCombinationItem[]
+  studentSubjects    StudentSubject[]
+  teachingGroups     TeachingGroup[]
+  teacherAssignments TeacherAssignment[]
+  syllabusTopics     SyllabusTopic[]
 
   @@unique([schoolId, code])
   @@index([schoolId])
@@ -2263,4 +2386,709 @@ model Alumnus {
   student Student @relation(fields: [studentId], references: [id])
 
   @@index([schoolId, yearLeft])
+}
+
+// ─── Academics ───────────────────────────────────────────────────────────────
+// Classes, subjects, teacher assignments, attendance, timetable, schemes of work and analytics.
+// Everything academic belongs to a term (termId); a student's class always comes from the Enrollment of that
+// term. Migration 20261101000000_academics_module adds these tables, with row-level security, the audit trigger and
+// the rules the database can keep by itself (clash indexes, checks).
+
+enum SubjectExamBoard {
+  ZIMSEC
+  CAMBRIDGE
+  SCHOOL
+}
+
+enum StudentSubjectSource {
+  CORE
+  CHOSEN
+  COMBINATION
+}
+
+// An assignment that was replaced or stopped mid-term is ENDED; its marks and registers keep its teacher.
+enum AssignmentStatus {
+  ACTIVE
+  ENDED
+}
+
+// The state of the whole set of teacher assignments of a term.
+enum SetStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  RETURNED
+}
+
+enum PeriodType {
+  LESSON
+  BREAK
+  ASSEMBLY
+  SPORTS
+}
+
+enum RoomType {
+  CLASSROOM
+  LABORATORY
+  COMPUTER_LAB
+  WORKSHOP
+  HALL
+  FIELD
+}
+
+enum TimetableStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  SUPERSEDED
+}
+
+enum RegisterSession {
+  AM
+  PM
+  LESSON
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  EXCUSED
+  SUSPENDED
+  EXEAT
+}
+
+enum ExcuseReason {
+  SICK
+  FAMILY
+  SCHOOL_ACTIVITY
+  OTHER
+}
+
+enum SchemeStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  RETURNED
+}
+
+enum OutboxStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+enum SubjectChangeKind {
+  CREATE
+  UPDATE
+  DEACTIVATE
+  REACTIVATE
+}
+
+// Settings of the Academics module, one row per school (created the first time they are read).
+model AcademicsSettings {
+  id                     String   @id @default(cuid())
+  schoolId               String   @unique
+  // Afternoon register as well as the morning one.
+  afternoonRegister      Boolean  @default(false)
+  // A register for each lesson, opened from the timetable.
+  perLessonAttendance    Boolean  @default(false)
+  lessonPlans            Boolean  @default(false)
+  // Subjects a student takes: O Level (Forms 1-4) and A Level (Forms 5-6).
+  minSubjectsOLevel      Int      @default(8)
+  maxSubjectsOLevel      Int      @default(10)
+  minSubjectsALevel      Int      @default(3)
+  maxSubjectsALevel      Int      @default(4)
+  // The most periods a teacher should teach in a week.
+  maxPeriodsPerWeek      Int      @default(36)
+  // SMS to the primary guardian when a student is absent without a reason (needs the Communication module).
+  absentSmsAlert         Boolean  @default(true)
+  // Notice to the class teacher and Deputy about chronic absence.
+  chronicAbsenceAlert    Boolean  @default(true)
+  consecutiveAbsentDays  Int      @default(3)
+  attendanceThresholdPct Int      @default(90)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @default(now()) @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+}
+
+// One class teacher per class per term (the CLASS_TEACHER role, scoped to the class, is kept in step with it).
+model ClassTeacher {
+  id        String   @id @default(cuid())
+  schoolId  String
+  classId   String
+  termId    String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school School       @relation(fields: [schoolId], references: [id])
+  class  SchoolClass  @relation(fields: [classId], references: [id])
+  term   AcademicTerm @relation(fields: [termId], references: [id])
+  user   User         @relation(fields: [userId], references: [id])
+
+  @@unique([classId, termId])
+  @@index([schoolId])
+  @@index([userId, termId])
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  hodUserId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school   School    @relation(fields: [schoolId], references: [id])
+  hod      User?     @relation("DepartmentHod", fields: [hodUserId], references: [id])
+  subjects Subject[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+// Which forms offer a subject, and whether it is core (every student) or an elective (chosen) there.
+model SubjectLevel {
+  id        String      @id @default(cuid())
+  schoolId  String
+  subjectId String
+  levelId   String
+  type      SubjectType @default(CORE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @default(now()) @updatedAt
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+  level   Level   @relation(fields: [levelId], references: [id])
+
+  @@unique([subjectId, levelId])
+  @@index([schoolId])
+  @@index([levelId])
+}
+
+// A change to the subject list waits here for Head approval (academics.subjects.approve).
+model SubjectChange {
+  id            String            @id @default(cuid())
+  schoolId      String
+  kind          SubjectChangeKind
+  subjectId     String?
+  // The subject as it should be after the change (the same shape the form sends).
+  payload       Json
+  status        ApprovalState     @default(PENDING)
+  requestedById String
+  decidedById   String?
+  decidedAt     DateTime?
+  decisionNote  String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @default(now()) @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId, status])
+}
+
+model SubjectCombination {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  levelId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school  School                    @relation(fields: [schoolId], references: [id])
+  level   Level                     @relation(fields: [levelId], references: [id])
+  items   SubjectCombinationItem[]
+  classes SubjectCombinationClass[]
+
+  @@unique([schoolId, levelId, name])
+  @@index([schoolId])
+}
+
+model SubjectCombinationItem {
+  id            String   @id @default(cuid())
+  schoolId      String
+  combinationId String
+  subjectId     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  school      School             @relation(fields: [schoolId], references: [id])
+  combination SubjectCombination @relation(fields: [combinationId], references: [id], onDelete: Cascade)
+  subject     Subject            @relation(fields: [subjectId], references: [id])
+
+  @@unique([combinationId, subjectId])
+  @@index([schoolId])
+}
+
+model SubjectCombinationClass {
+  id            String   @id @default(cuid())
+  schoolId      String
+  combinationId String
+  classId       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  school      School             @relation(fields: [schoolId], references: [id])
+  combination SubjectCombination @relation(fields: [combinationId], references: [id], onDelete: Cascade)
+  class       SchoolClass        @relation(fields: [classId], references: [id])
+
+  @@unique([combinationId, classId])
+  @@index([schoolId])
+}
+
+// Exactly which subjects a student takes in a term. Exams, report cards and per-lesson attendance read this.
+model StudentSubject {
+  id        String               @id @default(cuid())
+  schoolId  String
+  studentId String
+  subjectId String
+  termId    String
+  source    StudentSubjectSource @default(CHOSEN)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @default(now()) @updatedAt
+
+  school  School       @relation(fields: [schoolId], references: [id])
+  student Student      @relation(fields: [studentId], references: [id])
+  subject Subject      @relation(fields: [subjectId], references: [id])
+  term    AcademicTerm @relation(fields: [termId], references: [id])
+
+  @@unique([studentId, subjectId, termId])
+  @@index([schoolId])
+  @@index([termId, subjectId])
+}
+
+// An elective taught across classes ("Form 3 Accounts"): its students come from StudentSubject.
+model TeachingGroup {
+  id        String   @id @default(cuid())
+  schoolId  String
+  termId    String
+  name      String
+  subjectId String
+  levelId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school      School                 @relation(fields: [schoolId], references: [id])
+  term        AcademicTerm           @relation(fields: [termId], references: [id])
+  subject     Subject                @relation(fields: [subjectId], references: [id])
+  level       Level                  @relation(fields: [levelId], references: [id])
+  students    TeachingGroupStudent[]
+  assignments TeacherAssignment[]
+
+  @@unique([schoolId, termId, name])
+  @@index([schoolId])
+  @@index([termId, subjectId])
+}
+
+model TeachingGroupStudent {
+  id        String   @id @default(cuid())
+  schoolId  String
+  groupId   String
+  studentId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school  School        @relation(fields: [schoolId], references: [id])
+  group   TeachingGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  student Student       @relation(fields: [studentId], references: [id])
+
+  @@unique([groupId, studentId])
+  @@index([schoolId])
+  @@index([studentId])
+}
+
+// One teacher teaches one subject to one class (or teaching group) in one term. Timetable, attendance, schemes
+// and marks hang off it. Changing the teacher mid-term ENDS this row and starts another, so what was recorded
+// keeps its teacher. Partial unique indexes (migration) keep one ACTIVE row per term, subject and class/group.
+model TeacherAssignment {
+  id             String           @id @default(cuid())
+  schoolId       String
+  termId         String
+  teacherId      String
+  coTeacherId    String?
+  subjectId      String
+  classId        String?
+  groupId        String?
+  periodsPerWeek Int              @default(4)
+  doublesPerWeek Int              @default(0)
+  startDate      DateTime         @db.Date
+  endDate        DateTime?        @db.Date
+  status         AssignmentStatus @default(ACTIVE)
+  approvedById   String?
+  approvedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now()) @updatedAt
+
+  school    School          @relation(fields: [schoolId], references: [id])
+  term      AcademicTerm    @relation(fields: [termId], references: [id])
+  teacher   User            @relation("AssignmentTeacher", fields: [teacherId], references: [id])
+  coTeacher User?           @relation("AssignmentCoTeacher", fields: [coTeacherId], references: [id])
+  subject   Subject         @relation(fields: [subjectId], references: [id])
+  class     SchoolClass?    @relation(fields: [classId], references: [id])
+  group     TeachingGroup?  @relation(fields: [groupId], references: [id])
+  slots     TimetableSlot[]
+  schemes   SchemeOfWork[]
+
+  @@index([schoolId])
+  @@index([termId, teacherId])
+  @@index([termId, classId])
+}
+
+// The whole set of a term's teacher assignments goes to the Head for approval as one (one row per term).
+model AssignmentSet {
+  id            String    @id @default(cuid())
+  schoolId      String
+  termId        String
+  status        SetStatus @default(DRAFT)
+  submittedById String?
+  submittedAt   DateTime?
+  approvedById  String?
+  approvedAt    DateTime?
+  note          String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  school School       @relation(fields: [schoolId], references: [id])
+  term   AcademicTerm @relation(fields: [termId], references: [id])
+
+  @@unique([termId])
+  @@index([schoolId])
+}
+
+// The bell schedule. termId empty = applies to every term; a schedule with a term replaces it for that term.
+model BellSchedule {
+  id        String   @id @default(cuid())
+  schoolId  String
+  termId    String?
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school  School        @relation(fields: [schoolId], references: [id])
+  term    AcademicTerm? @relation(fields: [termId], references: [id])
+  periods Period[]
+
+  @@index([schoolId])
+}
+
+// One row per period per weekday (dayOfWeek 1 = Monday ... 6 = Saturday). Times are school-local "HH:MM".
+model Period {
+  id         String     @id @default(cuid())
+  schoolId   String
+  scheduleId String
+  periodNo   Int
+  dayOfWeek  Int
+  label      String?
+  start      String
+  end        String
+  type       PeriodType @default(LESSON)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @default(now()) @updatedAt
+
+  school      School                @relation(fields: [schoolId], references: [id])
+  schedule    BellSchedule          @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  slots       TimetableSlot[]
+  unavailable TeacherAvailability[]
+
+  @@unique([scheduleId, dayOfWeek, periodNo])
+  @@index([schoolId])
+}
+
+model Room {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  type      RoomType @default(CLASSROOM)
+  capacity  Int      @default(45)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school School          @relation(fields: [schoolId], references: [id])
+  slots  TimetableSlot[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+model Timetable {
+  id            String          @id @default(cuid())
+  schoolId      String
+  termId        String
+  version       Int
+  status        TimetableStatus @default(DRAFT)
+  effectiveFrom DateTime?       @db.Date
+  submittedById String?
+  approvedById  String?
+  publishedAt   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+
+  school School          @relation(fields: [schoolId], references: [id])
+  term   AcademicTerm    @relation(fields: [termId], references: [id])
+  slots  TimetableSlot[]
+
+  @@unique([termId, version])
+  @@index([schoolId])
+}
+
+// A lesson in a period. teacherId and classId are copied from the assignment so the database itself can refuse a
+// teacher, class or room in two places at once (partial unique indexes per timetable version). A double period is
+// two rows (consecutive periods) that share pairId.
+model TimetableSlot {
+  id           String   @id @default(cuid())
+  schoolId     String
+  timetableId  String
+  assignmentId String
+  periodId     String
+  roomId       String?
+  teacherId    String
+  classId      String?
+  isDouble     Boolean  @default(false)
+  pairId       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  school      School               @relation(fields: [schoolId], references: [id])
+  timetable   Timetable            @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  assignment  TeacherAssignment    @relation(fields: [assignmentId], references: [id])
+  period      Period               @relation(fields: [periodId], references: [id])
+  room        Room?                @relation(fields: [roomId], references: [id])
+  teacher     User                 @relation("SlotTeacher", fields: [teacherId], references: [id])
+  covers      CoverLesson[]
+  registers   AttendanceRegister[]
+  lessonPlans LessonPlan[]
+
+  @@index([schoolId])
+  @@index([timetableId, assignmentId])
+  @@index([periodId])
+}
+
+// Periods a teacher cannot teach (set per teacher).
+model TeacherAvailability {
+  id        String   @id @default(cuid())
+  schoolId  String
+  userId    String
+  periodId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  period Period @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, periodId])
+  @@index([schoolId])
+}
+
+// A relief lesson: someone covers a lesson of an absent teacher on one date.
+model CoverLesson {
+  id              String   @id @default(cuid())
+  schoolId        String
+  date            DateTime @db.Date
+  slotId          String
+  absentTeacherId String
+  coverTeacherId  String
+  assignedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  school        School        @relation(fields: [schoolId], references: [id])
+  slot          TimetableSlot @relation(fields: [slotId], references: [id])
+  absentTeacher User          @relation("CoverAbsent", fields: [absentTeacherId], references: [id])
+  coverTeacher  User          @relation("CoverTeacher", fields: [coverTeacherId], references: [id])
+
+  @@unique([date, slotId])
+  @@index([schoolId, date])
+  @@index([coverTeacherId, date])
+}
+
+// The daily register of a class (session AM / PM) or the register of one lesson (session LESSON, with slotId).
+// changedAt is when the marks were last changed on the device that saved them: when two devices changed the same
+// register the later changedAt wins, and both versions are kept in the audit log.
+model AttendanceRegister {
+  id         String          @id @default(cuid())
+  schoolId   String
+  termId     String
+  classId    String?
+  slotId     String?
+  date       DateTime        @db.Date
+  session    RegisterSession @default(AM)
+  markedById String
+  markedAt   DateTime        @default(now())
+  syncedAt   DateTime        @default(now())
+  changedAt  DateTime        @default(now())
+  deviceId   String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @default(now()) @updatedAt
+
+  school  School            @relation(fields: [schoolId], references: [id])
+  term    AcademicTerm      @relation(fields: [termId], references: [id])
+  class   SchoolClass?      @relation(fields: [classId], references: [id])
+  slot    TimetableSlot?    @relation(fields: [slotId], references: [id])
+  entries AttendanceEntry[]
+
+  @@index([schoolId, date])
+  @@index([termId, classId])
+}
+
+model AttendanceEntry {
+  id          String           @id @default(cuid())
+  schoolId    String
+  registerId  String
+  studentId   String
+  status      AttendanceStatus @default(PRESENT)
+  reason      ExcuseReason?
+  reasonNote  String?
+  arrivalTime String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @default(now()) @updatedAt
+
+  school   School             @relation(fields: [schoolId], references: [id])
+  register AttendanceRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  student  Student            @relation(fields: [studentId], references: [id])
+
+  @@unique([registerId, studentId])
+  @@index([schoolId])
+  @@index([studentId])
+}
+
+// Messages waiting for the Communication module's gateway (SMS to guardians about absences).
+model MessageOutbox {
+  id         String       @id @default(cuid())
+  schoolId   String
+  channel    String       @default("SMS")
+  toPhone    String
+  body       String
+  studentId  String?
+  guardianId String?
+  dedupeKey  String?
+  status     OutboxStatus @default(QUEUED)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @default(now()) @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, dedupeKey])
+  @@index([schoolId, status])
+}
+
+// The tree of topics of a subject at a level: Mathematics Form 2 > Algebra > Simultaneous equations.
+model SyllabusTopic {
+  id         String   @id @default(cuid())
+  schoolId   String
+  subjectId  String
+  levelId    String
+  parentId   String?
+  title      String
+  objectives String?
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  school   School          @relation(fields: [schoolId], references: [id])
+  subject  Subject         @relation(fields: [subjectId], references: [id])
+  level    Level           @relation(fields: [levelId], references: [id])
+  parent   SyllabusTopic?  @relation("TopicTree", fields: [parentId], references: [id])
+  children SyllabusTopic[] @relation("TopicTree")
+
+  @@index([schoolId, subjectId, levelId])
+}
+
+// A syllabus one school shares for the others to start from. It holds topics only, no school data, so it has no
+// schoolId and is not row-level secured.
+model SyllabusTemplate {
+  id             String   @id @default(cuid())
+  name           String
+  subjectName    String
+  levelOrder     Int
+  topics         Json
+  sharedBySchool String
+  createdAt      DateTime @default(now())
+
+  @@index([subjectName, levelOrder])
+}
+
+model SchemeOfWork {
+  id            String       @id @default(cuid())
+  schoolId      String
+  termId        String
+  assignmentId  String
+  status        SchemeStatus @default(DRAFT)
+  submittedAt   DateTime?
+  approvedById  String?
+  approvedAt    DateTime?
+  returnComment String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+
+  school     School            @relation(fields: [schoolId], references: [id])
+  term       AcademicTerm      @relation(fields: [termId], references: [id])
+  assignment TeacherAssignment @relation(fields: [assignmentId], references: [id])
+  weeks      SchemeWeek[]
+
+  @@unique([assignmentId])
+  @@index([schoolId, termId])
+}
+
+model SchemeWeek {
+  id         String   @id @default(cuid())
+  schoolId   String
+  schemeId   String
+  weekNo     Int
+  startDate  DateTime @db.Date
+  topicIds   String[] @default([])
+  objectives String?
+  activities String?
+  resources  String?
+  assessment String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  school      School        @relation(fields: [schoolId], references: [id])
+  scheme      SchemeOfWork  @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  record      RecordOfWork?
+  lessonPlans LessonPlan[]
+
+  @@unique([schemeId, weekNo])
+  @@index([schoolId])
+}
+
+model RecordOfWork {
+  id              String   @id @default(cuid())
+  schoolId        String
+  schemeWeekId    String   @unique
+  coveredTopicIds String[] @default([])
+  extraNotes      String?
+  problems        String?
+  recordedById    String
+  recordedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  school School     @relation(fields: [schoolId], references: [id])
+  week   SchemeWeek @relation(fields: [schemeWeekId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+}
+
+model LessonPlan {
+  id           String   @id @default(cuid())
+  schoolId     String
+  slotId       String
+  date         DateTime @db.Date
+  schemeWeekId String?
+  teacherId    String
+  content      Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  school School        @relation(fields: [schoolId], references: [id])
+  slot   TimetableSlot @relation(fields: [slotId], references: [id])
+  week   SchemeWeek?   @relation(fields: [schemeWeekId], references: [id])
+
+  @@unique([slotId, date])
+  @@index([schoolId])
 }

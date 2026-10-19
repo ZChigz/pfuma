@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, parseBody, withApi } from '@/lib/api';
 import { canManageSubjects } from '@/lib/permissions';
+import { completeLegacySubject } from '@/lib/academics/subjects';
 import { CreateSubjectSchema } from '@/lib/validations/results';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
@@ -46,6 +47,9 @@ async function _POST(req: NextRequest) {
       ...(type !== undefined ? { type } : {}),
     },
   });
+
+  // The Academics module needs a department and the forms that offer it.
+  await completeLegacySubject({ id: user.id, schoolId: user.schoolId }, subject.id);
 
   return apiSuccess({ subject }, 201);
 }

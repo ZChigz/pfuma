@@ -81,7 +81,7 @@ describe('roles and permissions as data', () => {
     const keys = (await prisma.permission.findMany()).map((p) => p.key);
     for (const k of SYSTEM_PERMISSIONS) expect(keys, k).toContain(k);
     expect(keys).toContain('*');
-    for (const k of keys.filter((x) => x !== '*')) expect(k).toMatch(/^[a-z]+\.[a-z]+\.[a-z_]+$|^[a-z]+\.[a-z]+$/);
+    for (const k of keys.filter((x) => x !== '*')) expect(k).toMatch(/^[a-z]+\.[a-z_]+\.[a-z_]+$|^[a-z]+\.[a-z]+$/);
     expect((await prisma.permission.findMany({ where: { key: { in: SYSTEM_PERMISSIONS } } })).every((p) => p.module === 'system')).toBe(true);
   });
 
@@ -90,7 +90,15 @@ describe('roles and permissions as data', () => {
     for (const r of roles) {
       const keys = r.permissions.map((p) => p.permissionKey).sort();
       if (r.key === 'OWNER' || r.key === 'ADMINISTRATOR') expect(keys, r.key).toEqual(['*', 'system.calendar.view', 'system.dashboard.view']);
-      else expect(keys, r.key).toEqual(['system.calendar.view', 'system.dashboard.view']);
+      else {
+        // Teachers and class teachers also hold the own-class keys of Academics (the code narrows them to their own classes).
+        const own = r.key === 'TEACHER'
+          ? ['academics.assignments.view', 'academics.attendance.mark', 'academics.classes.view', 'academics.schemes.edit', 'academics.schemes.view', 'academics.subjects.view', 'academics.timetable.view']
+          : r.key === 'CLASS_TEACHER'
+            ? ['academics.attendance.mark', 'academics.attendance.view', 'academics.classes.view', 'academics.subjects.view', 'academics.timetable.view']
+            : [];
+        expect(keys, r.key).toEqual([...own, 'system.calendar.view', 'system.dashboard.view'].sort());
+      }
     }
   });
 

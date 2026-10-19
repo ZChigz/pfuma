@@ -17,5 +17,7 @@ export function studentScope(user: AccessUser, termId?: string | null): Prisma.S
   if (termId) taught.push({ assignments: { some: { teacherId: user.id, termId } } });
   const or: Prisma.StudentWhereInput[] = [{ currentClass: { OR: taught } }];
   if (termId) or.push({ enrollments: { some: { termId, class: { OR: taught } } } });
+  // A teacher of a teaching group (an elective taught across classes) reaches the students in the group.
+  if (termId) or.push({ teachingGroups: { some: { group: { termId, assignments: { some: { status: 'ACTIVE', OR: [{ teacherId: user.id }, { coTeacherId: user.id }] } } } } } });
   return { schoolId: user.schoolId, OR: or };
 }

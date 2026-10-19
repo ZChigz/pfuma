@@ -4,6 +4,7 @@ import { apiSuccess, apiUnauthorized, apiError, apiNotFound, parseBody, withApi 
 import { canManageSubjects } from '@/lib/permissions';
 import { CreateAssignmentSchema } from '@/lib/validations/results';
 import { requireTerm } from '@/lib/academic/terms';
+import { createAssignment, endAssignment, removeAssignment } from '@/lib/academics/assignments';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -70,8 +71,10 @@ async function _POST(req: NextRequest) {
     );
   }
 
-  const assignment = await db.subjectAssignment.create({
-    data: { schoolId: user.schoolId, teacherId, subjectId, classId, termId },
+  // The Academics module owns teacher assignments; the marks pages' own row (SubjectAssignment) is made by it.
+  await createAssignment({ id: user.id, schoolId: user.schoolId, role: user.role }, { teacherId, subjectId, classId, termId, periodsPerWeek: 4 });
+  const assignment = await db.subjectAssignment.findUniqueOrThrow({
+    where: { subjectId_classId_termId: { subjectId, classId, termId } },
     include: {
       subject: { select: { id: true, name: true, code: true, maxMark: true } },
       class:   { select: { id: true, name: true } },
@@ -100,7 +103,13 @@ async function _DELETE(req: NextRequest) {
   const existing = await db.subjectAssignment.findUnique({ where: { id } });
   if (!existing || existing.schoolId !== user.schoolId) return apiNotFound('Assignment');
 
-  await db.subjectAssignment.delete({ where: { id } });
+  // Remove the teacher assignment in the Academics module (or end it, once it has lessons or a scheme), then the marks row.
+  const actor = { id: user.id, schoolId: user.schoolId, role: user.role };
+  const live = await db.teacherAssignment.findFirst({ where: { termId: existing.termId, subjectId: existing.subjectId, classId: existing.classId, status: 'ACTIVE' }, select: { id: true } });
+  if (live) {
+    try { await removeAssignment(actor, live.id); } catch { await endAssignment(actor, live.id, {}); }
+  }
+  await db.subjectAssignment.deleteMany({ where: { id } });
 
   return apiSuccess({ deleted: true });
 }

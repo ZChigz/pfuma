@@ -9,6 +9,7 @@ import { ClassSizeChart } from '@/components/system/charts/ClassSizeChart';
 import { EnrolmentChart } from '@/components/system/charts/EnrolmentChart';
 import { RecentActivity, UpcomingEvents } from '@/components/system/lists/Lists';
 import { QuickActions } from '@/components/system/QuickActions';
+import { AcademicsDashboardCards } from '@/components/academics/DashboardCards';
 import { getAccess } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { getViewTerm } from '@/lib/system/view-term';
@@ -53,6 +54,8 @@ export default async function DashboardPage() {
         description={term ? `Showing ${termLabel(term.name)}${term.status === 'OPEN' ? ' (the open term)' : ''}` : 'No term has been set up yet'}
         breadcrumbs={[{ label: 'Dashboard & System' }, { label: 'Dashboard' }]}
       />
+
+      <AcademicsDashboardCards user={user} />
 
       <QuickActions user={user} />
 
