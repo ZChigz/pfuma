@@ -36,6 +36,9 @@ export async function classLists(user: AccessUser, classIds: string[], opts: { t
       : await tx.academicTerm.findFirst({ where: { schoolId: user.schoolId, status: 'OPEN' } });
     if (!term) throw new ServiceError(opts.termId ? 'Term not found' : 'No term is open', opts.termId ? 404 : 409);
     const classes = await tx.schoolClass.findMany({ where: { id: { in: ids }, schoolId: user.schoolId }, include: { classTeacher: { select: { fullName: true } } } });
+    // The class teacher of the term (Academics); the older column is the fallback for terms from before it.
+    const teachers = await tx.classTeacher.findMany({ where: { termId: term.id, classId: { in: ids } }, select: { classId: true, user: { select: { fullName: true } } } });
+    const teacherOf = new Map(teachers.map((t) => [t.classId, t.user.fullName]));
     if (classes.length !== ids.length) throw new ServiceError('Class not found', 404);
     classes.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
     const enrollments = await tx.enrollment.findMany({
@@ -53,7 +56,7 @@ export async function classLists(user: AccessUser, classIds: string[], opts: { t
         return { title: s.title, students: s.students.map((x) => ({ n: ++n, admissionNumber: x.admissionNumber, fullName: `${x.surname.toUpperCase()}, ${x.firstName}` })) };
       });
       return {
-        className: c.name, classTeacher: c.classTeacher?.fullName ?? null, termName: term.name, sections, total: students.length,
+        className: c.name, classTeacher: teacherOf.get(c.id) ?? c.classTeacher?.fullName ?? null, termName: term.name, sections, total: students.length,
         boys: students.filter((s) => s.gender === 'M').length, girls: students.filter((s) => s.gender === 'F').length,
       };
     });

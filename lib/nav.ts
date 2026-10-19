@@ -7,6 +7,8 @@ import { can, type AccessUser, type ModuleKey, type PermissionKey } from '@/lib/
 export interface NavItemDef {
   label: string;
   permission: PermissionKey;
+  /** The item also shows for anyone holding one of these. */
+  or?: PermissionKey[];
   icon: string;
   /** Missing = the page does not exist yet. */
   href?: string;
@@ -49,10 +51,16 @@ export const NAV_GROUPS: NavGroupDef[] = [
     module: 'academics',
     label: 'Academics',
     items: [
-      { label: 'Classes & Streams',  permission: 'academics.classes.view',    icon: 'classes' },
-      { label: 'Subjects',           permission: 'academics.subjects.view',   icon: 'subjects' },
-      { label: 'Timetable',          permission: 'academics.timetable.view',  icon: 'calendar' },
-      { label: 'Teacher Allocation', permission: 'academics.allocation.view', icon: 'users' },
+      { label: 'Classes',            href: '/academics/classes',          permission: 'academics.classes.view',     icon: 'classes' },
+      { label: 'Subjects',           href: '/academics/subjects',         permission: 'academics.subjects.view',    icon: 'subjects' },
+      { label: 'Student subjects',   href: '/academics/student-subjects', permission: 'academics.classes.view',     icon: 'students' },
+      { label: 'Teacher assignments', href: '/academics/assignments',     permission: 'academics.assignments.view', icon: 'users' },
+      { label: 'Attendance',         href: '/academics/attendance',       permission: 'academics.attendance.mark',  or: ['academics.attendance.view'], icon: 'calendar' },
+      { label: 'Timetable',          href: '/academics/timetable',        permission: 'academics.timetable.view',   icon: 'calendar' },
+      { label: 'Schemes of work',    href: '/academics/schemes',          permission: 'academics.schemes.view',     icon: 'marks' },
+      { label: 'Syllabus',           href: '/academics/syllabus',         permission: 'academics.syllabus.manage',  or: ['academics.schemes.view'], icon: 'subjects' },
+      { label: 'Academics settings', href: '/academics/settings',         permission: 'academics.classes.view',     icon: 'settings' },
+      { label: 'Analytics',          href: '/academics/analytics',        permission: 'academics.analytics.view',   icon: 'results' },
     ],
   },
   {
@@ -124,7 +132,7 @@ export function buildNav(user: AccessUser): NavGroup[] {
   return NAV_GROUPS.flatMap((g) => {
     if (user.disabledModules?.includes(g.module) && g.module !== 'system') return [];
     const items = g.items
-      .filter((i) => can(user, i.permission))
+      .filter((i) => can(user, i.permission) || (i.or ?? []).some((p) => can(user, p)))
       .map((i) => ({ label: i.label, icon: i.icon, href: i.href ?? null, comingSoon: !i.href }));
     return items.length ? [{ module: g.module, label: g.label, items }] : [];
   });

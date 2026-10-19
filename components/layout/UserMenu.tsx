@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { signOut } from 'next-auth/react';
+import { clearOfflineData, pendingCount, waitingText } from '@/lib/academics/offline';
 
 interface UserMenuProps {
   fullName: string;
@@ -48,7 +49,12 @@ export function UserMenu({ fullName, roleLabel, canViewProfile, canChangePasswor
           </div>
           {canViewProfile && <Link role="menuitem" href="/system/profile" onClick={() => setOpen(false)} className={itemClass}>My profile</Link>}
           {canChangePassword && <Link role="menuitem" href="/change-password" onClick={() => setOpen(false)} className={itemClass}>Change password</Link>}
-          <button role="menuitem" type="button" onClick={() => signOut({ callbackUrl: '/login' })} className={itemClass}>Log out</button>
+          <button role="menuitem" type="button" onClick={async () => {
+            const n = await pendingCount();
+            if (n > 0 && !window.confirm(`${waitingText(n)}. If you log out now they will be lost. Log out anyway?`)) return;
+            await clearOfflineData();
+            await signOut({ callbackUrl: '/login' });
+          }} className={itemClass}>Log out</button>
         </div>
       )}
     </div>

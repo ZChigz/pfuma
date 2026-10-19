@@ -1,0 +1,55 @@
+import Link from 'next/link';
+import { getAccess } from '@/lib/access';
+import { getScopedDb } from '@/lib/scoped-db';
+import { isFull, reachableClassIds } from '@/lib/academics/common';
+import { timetableState } from '@/lib/academics/timetable';
+import { getViewTerm } from '@/lib/system/view-term';
+import { AccessDenied } from '@/components/ui/AccessDenied';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { TimetableClient } from '@/components/academics/TimetableClient';
+import { linkButton } from '@/components/academics/shared';
+
+export const metadata = { title: 'Timetable · Pfuma' };
+
+export default async function TimetablePage() {
+  const { user, can } = await getAccess();
+  if (!can('academics.timetable.view')) return <AccessDenied />;
+  const db = getScopedDb(user.schoolId, user.id);
+  const { term } = await getViewTerm(user.schoolId, db);
+  const edit = can('academics.timetable.edit');
+  const approve = can('academics.timetable.approve');
+  const seesAll = isFull(user) || edit || approve;
+  const header = (
+    <PageHeader
+      title="Timetable" description="Build the week from the teacher assignments. The system refuses clashes, so a published timetable can always be taught."
+      breadcrumbs={[{ label: 'Academics' }, { label: 'Timetable' }]}
+      actions={
+        <>
+          <Link href="/academics/timetable/my-day" className={linkButton}>My day</Link>
+          {can('academics.timetable.cover') && <Link href="/academics/timetable/cover" className={linkButton}>Cover lessons</Link>}
+          {edit && <Link href="/academics/timetable/setup" className={linkButton}>Periods and rooms</Link>}
+        </>
+      }
+    />
+  );
+  if (!term) return <div className="flex flex-col gap-4">{header}<EmptyState title="No term yet" description="Set up an academic year and its terms in School Settings first." cta={{ label: 'School Settings', href: '/system/settings' }} /></div>;
+
+  const reach = await db.$tx((tx) => reachableClassIds(tx, user, term.id));
+  const [state, classes, teachers, rooms] = await Promise.all([
+    timetableState(user, term.id),
+    db.schoolClass.findMany({ where: { active: true, level: { active: true }, ...(reach === 'all' ? {} : { id: { in: reach } }) }, orderBy: [{ level: { order: 'asc' } }, { stream: 'asc' }], select: { id: true, name: true } }),
+    seesAll ? db.user.findMany({ where: { active: true, isSupport: false, userRoles: { some: { role: { key: 'TEACHER' } } } }, orderBy: { fullName: 'asc' }, select: { id: true, fullName: true } }) : Promise.resolve([{ id: user.id, fullName: user.fullName }]),
+    seesAll ? db.room.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }) : Promise.resolve([]),
+  ]);
+  const kind = seesAll ? 'class' : 'teacher';
+  return (
+    <div className="flex flex-col gap-4 pb-8">
+      {header}
+      <TimetableClient
+        termId={term.id} state={state} classes={classes} teachers={teachers} rooms={rooms} myId={user.id}
+        initialKind={kind} initialId={kind === 'class' ? classes[0]?.id ?? null : user.id} flags={{ edit, approve, seesAll }}
+      />
+    </div>
+  );
+}

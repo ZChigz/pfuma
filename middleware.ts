@@ -80,8 +80,8 @@ const ROLE_ALLOWED: Record<UserRole, (pathname: string) => boolean> = {
 
 // Reachable by any signed-in user, whatever their role.
 // /system and /api/system: every signed-in user reaches them, and can() (lib/access.ts) decides what they may do.
-// /students and /api/students (Student Information) work the same way: every route and page asks can().
-const ANY_ROLE = ['/change-password', '/api/account', '/system', '/api/system', '/students', '/api/students'];
+// /students and /api/students (Student Information) and /academics and /api/academics work the same way: every route and page asks can().
+const ANY_ROLE = ['/change-password', '/api/account', '/system', '/api/system', '/students', '/api/students', '/academics', '/api/academics', '/print'];
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 
@@ -136,6 +136,8 @@ export default auth(async (req: NextRequest & { auth: { user?: { id?: string; ro
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/upload') ||
     pathname.startsWith('/api/health') ||
+    // The register's service worker script (it holds no data; the pages it caches stay behind sign-in).
+    pathname === '/sw.js' ||
     // The Pfuma console has its own sign-in (lib/platform/session.ts); it checks the cookie itself.
     pathname === '/platform' ||
     pathname.startsWith('/platform/') ||

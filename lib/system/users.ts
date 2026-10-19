@@ -115,8 +115,23 @@ async function assertRequiredRolesRemain(tx: Db, schoolId: string, target: { id:
   }
 }
 
-/** Replaces the person's roles (whole school). */
+/**
+ * Replaces the person's roles (whole school). A role held for one class or department (class teacher, head of
+ * department; set in Academics) is kept while it is still wanted, and is not turned into a school-wide role.
+ */
 async function setRoles(tx: Db, schoolId: string, userId: string, keys: readonly string[], cache?: Map<string, string>) {
+  const scoped = await tx.userRole.findMany({ where: { userId, scopeType: { not: 'SCHOOL' } }, select: { id: true, role: { select: { key: true } } } });
+  if (scoped.length) {
+    const keep = new Set(keys);
+    await tx.userRole.deleteMany({ where: { id: { in: scoped.filter((s) => !keep.has(s.role.key)).map((s) => s.id) } } });
+    const scopedKeys = new Set(scoped.filter((s) => keep.has(s.role.key)).map((s) => s.role.key));
+    await setSchoolRoles(tx, schoolId, userId, keys.filter((k) => !scopedKeys.has(k)), cache);
+    return;
+  }
+  await setSchoolRoles(tx, schoolId, userId, keys, cache);
+}
+
+async function setSchoolRoles(tx: Db, schoolId: string, userId: string, keys: readonly string[], cache?: Map<string, string>) {
   const wanted = Array.from(new Set(keys));
   const missing = wanted.filter((k) => !cache?.has(k));
   if (missing.length) {
@@ -124,12 +139,12 @@ async function setRoles(tx: Db, schoolId: string, userId: string, keys: readonly
     for (const d of defs) cache?.set(d.key, d.id);
     if (defs.length !== missing.length) throw new ServiceError('One of the roles was not found for this school', 500);
     if (!cache) {
-      await tx.userRole.deleteMany({ where: { userId } });
+      await tx.userRole.deleteMany({ where: { userId, scopeType: 'SCHOOL' } });
       await tx.userRole.createMany({ data: defs.map((d) => ({ schoolId, userId, roleId: d.id })) });
       return;
     }
   }
-  await tx.userRole.deleteMany({ where: { userId } });
+  await tx.userRole.deleteMany({ where: { userId, scopeType: 'SCHOOL' } });
   await tx.userRole.createMany({ data: wanted.map((k) => ({ schoolId, userId, roleId: cache!.get(k)! })) });
 }
 

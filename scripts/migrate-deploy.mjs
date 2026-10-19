@@ -20,6 +20,7 @@ const RETRYABLE = [
   '20261017000200_security_rls_audit',
   '20261031000100_students_module_backfill',
   '20261031000200_students_module_constraints',
+  '20261101000100_academics_module_backfill',
 ];
 
 async function failedRetryableMigrations() {

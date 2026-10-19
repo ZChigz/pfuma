@@ -33,6 +33,7 @@ let bNotificationId = '';
 let bInvoiceId = '';
 let bStreamId = '';
 let bStrings: string[] = [];
+const bx: Record<string, string> = {};
 
 const TABLES = [
   'User', 'SchoolClass', 'Level', 'AcademicYear', 'AcademicTerm', 'Enrollment', 'Student', 'Guardian', 'FeeStructure',
@@ -40,6 +41,10 @@ const TABLES = [
   'GradeBoundary', 'AssetCategory', 'Asset', 'AssetMaintenance', 'AssetDisposal', 'Book', 'BookCopy', 'LibraryMember',
   'Borrowing', 'ExchangeRate', 'PortalAccessLog', 'PasswordResetToken', 'AssetTransfer', 'Income', 'MarkChange',
   'Subscription', 'SchoolModule', 'RolePermission', 'Notification', 'CalendarEvent', 'Stream', 'RoleDefinition', 'UserRole', 'SubscriptionInvoice',
+  // Academics
+  'AcademicsSettings', 'ClassTeacher', 'Department', 'SubjectLevel', 'SubjectChange', 'SubjectCombination', 'SubjectCombinationItem', 'SubjectCombinationClass',
+  'StudentSubject', 'TeachingGroup', 'TeachingGroupStudent', 'TeacherAssignment', 'AssignmentSet', 'BellSchedule', 'Period', 'Room', 'Timetable', 'TimetableSlot',
+  'TeacherAvailability', 'CoverLesson', 'AttendanceRegister', 'AttendanceEntry', 'MessageOutbox', 'SyllabusTopic', 'SchemeOfWork', 'SchemeWeek', 'RecordOfWork', 'LessonPlan',
 ];
 
 /** Every row of school B (and its child rows), as stable JSON. */
@@ -77,6 +82,41 @@ beforeAll(async () => {
   bInvoiceId = (await prisma.subscriptionInvoice.create({ data: { schoolId: B.schoolId, number: 'INV-B-0001', issuedOn: new Date('2026-09-01'), amount: 120, description: 'Standard plan', createdByAdminId: 'platform' } })).id;
   await prisma.schoolModule.create({ data: { schoolId: B.schoolId, module: 'hr', enabled: false } });
   await grantPermission(prisma, B.schoolId, 'HEAD', 'system.users.view');
+  // School B's academics data: every kind of row the Academics routes can reach.
+  {
+    const sid = B.schoolId;
+    // School A's seeded subject is offered in its form, so A's own cases get as far as the rule under test.
+    await prisma.subjectLevel.create({ data: { schoolId: A.schoolId, subjectId: A.subjectId, levelId: A.levelId, type: 'CORE' } });
+    bx.dept = (await prisma.department.create({ data: { schoolId: sid, name: 'B Sciences', hodUserId: B.users.TEACHER.id } })).id;
+    await prisma.subject.update({ where: { id: B.subjectId }, data: { departmentId: bx.dept, shortName: 'BMaths' } });
+    await prisma.subjectLevel.create({ data: { schoolId: sid, subjectId: B.subjectId, levelId: B.levelId, type: 'CORE' } });
+    bx.change = (await prisma.subjectChange.create({ data: { schoolId: sid, kind: 'CREATE', payload: { name: 'BX' }, requestedById: B.users.HEAD.id } })).id;
+    bx.combo = (await prisma.subjectCombination.create({ data: { schoolId: sid, name: 'B Combo', levelId: B.levelId } })).id;
+    await prisma.subjectCombinationItem.create({ data: { schoolId: sid, combinationId: bx.combo, subjectId: B.subjectId } });
+    await prisma.subjectCombinationClass.create({ data: { schoolId: sid, combinationId: bx.combo, classId: B.classId } });
+    await prisma.studentSubject.create({ data: { schoolId: sid, studentId: B.studentId, subjectId: B.subjectId, termId: B.termId, source: 'CORE' } });
+    bx.group = (await prisma.teachingGroup.create({ data: { schoolId: sid, termId: B.termId, name: 'B Group', subjectId: B.subjectId, levelId: B.levelId } })).id;
+    await prisma.teachingGroupStudent.create({ data: { schoolId: sid, groupId: bx.group, studentId: B.studentId } });
+    await prisma.classTeacher.create({ data: { schoolId: sid, classId: B.classId, termId: B.termId, userId: B.users.TEACHER.id } });
+    bx.assignment = (await prisma.teacherAssignment.create({ data: { schoolId: sid, termId: B.termId, teacherId: B.users.TEACHER.id, subjectId: B.subjectId, classId: B.classId, periodsPerWeek: 4, startDate: new Date('2026-01-10') } })).id;
+    await prisma.assignmentSet.create({ data: { schoolId: sid, termId: B.termId } });
+    const sched = await prisma.bellSchedule.create({ data: { schoolId: sid, name: 'B bell' } });
+    bx.period = (await prisma.period.create({ data: { schoolId: sid, scheduleId: sched.id, periodNo: 1, dayOfWeek: 1, start: '07:30', end: '08:05', type: 'LESSON' } })).id;
+    bx.room = (await prisma.room.create({ data: { schoolId: sid, name: 'B Room', type: 'CLASSROOM', capacity: 40 } })).id;
+    const tt = await prisma.timetable.create({ data: { schoolId: sid, termId: B.termId, version: 1, status: 'DRAFT' } });
+    bx.slot = (await prisma.timetableSlot.create({ data: { schoolId: sid, timetableId: tt.id, assignmentId: bx.assignment, periodId: bx.period, teacherId: B.users.TEACHER.id, classId: B.classId, roomId: bx.room } })).id;
+    await prisma.teacherAvailability.create({ data: { schoolId: sid, userId: B.users.TEACHER.id, periodId: bx.period } });
+    bx.cover = (await prisma.coverLesson.create({ data: { schoolId: sid, date: new Date('2026-10-15'), slotId: bx.slot, absentTeacherId: B.users.TEACHER.id, coverTeacherId: B.users.HEAD.id, assignedById: B.users.ADMIN.id } })).id;
+    const reg = await prisma.attendanceRegister.create({ data: { schoolId: sid, termId: B.termId, classId: B.classId, date: new Date('2026-10-14'), session: 'AM', markedById: B.users.TEACHER.id } });
+    await prisma.attendanceEntry.create({ data: { schoolId: sid, registerId: reg.id, studentId: B.studentId, status: 'ABSENT' } });
+    await prisma.messageOutbox.create({ data: { schoolId: sid, toPhone: '+263771234567', body: 'B message', studentId: B.studentId, dedupeKey: 'b:1' } });
+    bx.topic = (await prisma.syllabusTopic.create({ data: { schoolId: sid, subjectId: B.subjectId, levelId: B.levelId, title: 'B topic' } })).id;
+    const scheme = await prisma.schemeOfWork.create({ data: { schoolId: sid, termId: B.termId, assignmentId: bx.assignment } });
+    bx.week = (await prisma.schemeWeek.create({ data: { schoolId: sid, schemeId: scheme.id, weekNo: 1, startDate: new Date('2026-01-12'), topicIds: [bx.topic] } })).id;
+    await prisma.recordOfWork.create({ data: { schoolId: sid, schemeWeekId: bx.week, coveredTopicIds: [], recordedById: B.users.TEACHER.id } });
+    await prisma.lessonPlan.create({ data: { schoolId: sid, slotId: bx.slot, date: new Date('2026-10-14'), teacherId: B.users.TEACHER.id, content: {} } });
+    await prisma.academicsSettings.create({ data: { schoolId: sid, maxPeriodsPerWeek: 33 } });
+  }
   const snap = await snapshotB();
   before = snap.json;
   bIds = snap.ids;
@@ -355,7 +395,142 @@ const ATTACKS: Attack[] = [
   { name: "system mark B's notification read", file: 'system/notifications', method: 'POST', as: 'HEAD', body: () => ({ id: bNotificationId }), expect: 404 },
   { name: 'system switch to a B term', file: 'system/view-term', method: 'POST', as: 'ADMIN', body: () => ({ termId: b().termId }), expect: 404 },
   { name: 'system profile change (own)', file: 'system/profile', method: 'PATCH', as: 'TEACHER', body: () => ({ fullName: 'Own Name Only' }), expect: 'ok' },
+
+  // ── Academics: school A's administrator against school B's classes, assignments, registers, timetable, schemes ──
+  ...academicsAttacks(),
 ];
+
+function academicsAttacks(): Attack[] {
+  type O = Partial<Pick<Attack, 'url' | 'params' | 'body'>>;
+  const ac = (name: string, file: string, method: Attack['method'], expected: Status, o: O = {}): Attack => ({ name, file: `academics/${file}`, method, as: 'ADMIN', expect: expected, ...o });
+  const q = (s: () => string) => ({ url: s });
+  const p = (id: () => string) => ({ params: () => ({ id: id() }) });
+  const day = { dayOfWeek: 1, periods: [{ periodNo: 1, start: '07:30', end: '08:05', type: 'LESSON' }] };
+  const entry = () => [{ studentId: b().studentId, status: 'ABSENT' }];
+  return [
+    ac('settings (read own)', 'settings', 'GET', 'ok'),
+    ac('settings (change own)', 'settings', 'PUT', 'ok', { body: () => ({ maxPeriodsPerWeek: 36 }) }),
+    ac('classes (list)', 'classes', 'GET', 'ok'),
+    ac('classes of a B term', 'classes', 'GET', 404, q(() => `?termId=${b().termId}`)),
+    ac('copy into a B term', 'classes/copy', 'POST', 404, { body: () => ({ termId: b().termId }) }),
+    ac("B's class", 'classes/[id]', 'GET', 404, p(() => b().classId)),
+    ac("B's class list", 'classes/[id]/students', 'GET', 404, p(() => b().classId)),
+    ac("B's class subjects", 'classes/[id]/subjects', 'GET', 404, p(() => b().classId)),
+    ac("B's class attendance", 'classes/[id]/attendance', 'GET', 404, p(() => b().classId)),
+    ac("B's class timetable", 'classes/[id]/timetable', 'GET', 404, p(() => b().classId)),
+    ac("B's class teacher", 'classes/[id]/class-teacher', 'PUT', 404, { ...p(() => b().classId), body: () => ({ userId: a().users.TEACHER.id }) }),
+    ac('a B person as class teacher', 'classes/[id]/class-teacher', 'PUT', 404, { ...p(() => a().classId), body: () => ({ userId: b().users.TEACHER.id }) }),
+    ac('departments (list)', 'departments', 'GET', 'ok'),
+    ac('department with a B head', 'departments', 'POST', 404, { body: () => ({ name: 'Mine', hodUserId: b().users.TEACHER.id }) }),
+    ac("edit B's department", 'departments/[id]', 'PATCH', 404, { ...p(() => bx.dept!), body: () => ({ name: 'Hacked' }) }),
+    ac("delete B's department", 'departments/[id]', 'DELETE', 404, p(() => bx.dept!)),
+    ac('subjects (list)', 'subjects', 'GET', 'ok'),
+    ac('subject in a B department', 'subjects', 'POST', 404, { body: () => ({ name: 'Mine', shortName: 'Mine', code: 'MINE', departmentId: bx.dept, examBoard: 'ZIMSEC', levels: [{ levelId: a().levelId, type: 'CORE' }] }) }),
+    ac("edit B's subject", 'subjects/[id]', 'PATCH', 404, { ...p(() => b().subjectId), body: () => ({ name: 'Hacked', shortName: 'Hack', code: 'HACK', departmentId: bx.dept, examBoard: 'ZIMSEC', levels: [{ levelId: b().levelId, type: 'CORE' }] }) }),
+    ac("deactivate B's subject", 'subjects/[id]/active', 'POST', 404, { ...p(() => b().subjectId), body: () => ({ active: false }) }),
+    ac('starter list', 'subjects/starter', 'GET', 'ok'),
+    ac('load the starter list (own school)', 'subjects/starter', 'POST', 'ok', { body: () => ({ subjects: [{ name: 'Starter One', shortName: 'Start1', code: 'STONE', department: 'Starter dept', examBoard: 'ZIMSEC', isPractical: false, colour: '#112233', levels: { 1: 'CORE' } }] }) }),
+    ac('subject changes (list)', 'subjects/changes', 'GET', 'ok'),
+    ac("decide B's subject change", 'subjects/changes/[id]', 'POST', 404, { ...p(() => bx.change!), body: () => ({ decision: 'APPROVE' }) }),
+    ac('combinations (list)', 'combinations', 'GET', 'ok'),
+    ac('combination of B subjects', 'combinations', 'POST', 422, { body: () => ({ name: 'Mine', levelId: a().levelId, subjectIds: [b().subjectId] }) }),
+    ac('combination in a B form', 'combinations', 'POST', 404, { body: () => ({ name: 'Mine', levelId: b().levelId, subjectIds: [a().subjectId] }) }),
+    ac("edit B's combination", 'combinations/[id]', 'PATCH', 404, { ...p(() => bx.combo!), body: () => ({ name: 'Hacked', levelId: a().levelId, subjectIds: [a().subjectId] }) }),
+    ac("delete B's combination", 'combinations/[id]', 'DELETE', 404, p(() => bx.combo!)),
+    ac("B class's student subjects", 'student-subjects', 'GET', 404, q(() => `?classId=${b().classId}`)),
+    ac("change B students' subjects", 'student-subjects', 'PUT', 404, { body: () => ({ classId: b().classId, changes: [{ studentId: b().studentId, subjectIds: [] }] }) }),
+    ac('core subjects in a B term', 'student-subjects/sync-core', 'POST', 404, { body: () => ({ termId: b().termId }) }),
+    ac("apply B's combination", 'student-subjects/apply-combination', 'POST', 404, { body: () => ({ classId: a().classId, combinationId: bx.combo, studentIds: [a().studentId] }) }),
+    ac('teaching groups (list)', 'teaching-groups', 'GET', 'ok'),
+    ac('group of a B subject', 'teaching-groups', 'POST', 404, { body: () => ({ name: 'Mine', subjectId: b().subjectId, levelId: a().levelId }) }),
+    ac("edit B's group", 'teaching-groups/[id]', 'PATCH', 404, { ...p(() => bx.group!), body: () => ({ name: 'Hacked', subjectId: a().subjectId, levelId: a().levelId }) }),
+    ac("delete B's group", 'teaching-groups/[id]', 'DELETE', 404, p(() => bx.group!)),
+    ac("refresh B's group", 'teaching-groups/[id]/sync', 'POST', 404, p(() => bx.group!)),
+    ac('assignments (list)', 'assignments', 'GET', 'ok'),
+    ac('assignments grid', 'assignments', 'GET', 'ok', q(() => '?view=grid')),
+    ac('assignments by teacher', 'assignments', 'GET', 'ok', q(() => '?view=teachers')),
+    ac('assignments gaps', 'assignments', 'GET', 'ok', q(() => '?view=gaps')),
+    ac('assign a B teacher', 'assignments', 'POST', 404, { body: () => ({ teacherId: b().users.TEACHER.id, subjectId: a().subjectId, classId: a().classId, periodsPerWeek: 3 }) }),
+    ac('assign a B subject', 'assignments', 'POST', 404, { body: () => ({ teacherId: a().users.TEACHER.id, subjectId: b().subjectId, classId: a().classId, periodsPerWeek: 3 }) }),
+    ac('assign to a B class', 'assignments', 'POST', 404, { body: () => ({ teacherId: a().users.TEACHER.id, subjectId: a().subjectId, classId: b().classId, periodsPerWeek: 3 }) }),
+    ac("edit B's assignment", 'assignments/[id]', 'PATCH', 404, { ...p(() => bx.assignment!), body: () => ({ periodsPerWeek: 1 }) }),
+    ac("remove B's assignment", 'assignments/[id]', 'DELETE', 404, p(() => bx.assignment!)),
+    ac("replace B's teacher", 'assignments/[id]/replace', 'POST', 404, { ...p(() => bx.assignment!), body: () => ({ teacherId: a().users.TEACHER.id, effectiveDate: '2026-10-25' }) }),
+    ac("end B's assignment", 'assignments/[id]/end', 'POST', 404, { ...p(() => bx.assignment!), body: () => ({}) }),
+    ac('assignment set (read)', 'assignments/set', 'GET', 'ok'),
+    ac("B term's assignment set", 'assignments/set', 'GET', 404, q(() => `?termId=${b().termId}`)),
+    ac('send the assignments (none yet)', 'assignments/set', 'POST', 409, { body: () => ({}) }),
+    ac('decide the assignments (none waiting)', 'assignments/set/decide', 'POST', 409, { body: () => ({ decision: 'APPROVE' }) }),
+    ac("B's register", 'attendance/register', 'GET', 404, q(() => `?classId=${b().classId}&date=2026-10-14`)),
+    ac("mark B's register", 'attendance/register', 'PUT', 404, { body: () => ({ classId: b().classId, date: '2026-10-14', session: 'AM', entries: entry() }) }),
+    ac("correct B's register", 'attendance/correct', 'PUT', 404, { body: () => ({ classId: b().classId, date: '2026-10-14', session: 'AM', entries: entry(), correctionReason: 'Another school' }) }),
+    ac("view B's register", 'attendance/view', 'GET', 404, q(() => `?classId=${b().classId}&date=2026-10-14`)),
+    ac("sync B's registers", 'attendance/sync', 'POST', 'ok', { body: () => ({ registers: [{ ref: 'x', classId: b().classId, date: '2026-10-14', session: 'AM', entries: entry() }] }) }),
+    ac("B's lesson register", 'attendance/lesson', 'GET', 409, q(() => `?slotId=${bx.slot}&date=2026-10-12`)),
+    ac("mark B's lesson register", 'attendance/lesson', 'PUT', 409, { body: () => ({ slotId: bx.slot, date: '2026-10-12', entries: entry() }) }),
+    ac('lessons to register', 'attendance/lessons', 'GET', 'ok'),
+    ac('registers due', 'attendance/due', 'GET', 'ok'),
+    ac('daily summary', 'attendance/summary', 'GET', 'ok'),
+    ac('truancy', 'attendance/truancy', 'GET', 'ok'),
+    ac('remind a B class', 'attendance/remind', 'POST', 'ok', { body: () => ({ classIds: [b().classId] }) }),
+    ac('bell schedule (read)', 'bell', 'GET', 'ok'),
+    ac("B term's bell schedule", 'bell', 'GET', 404, q(() => `?termId=${b().termId}`)),
+    ac('bell schedule (save, own school)', 'bell', 'PUT', 'ok', { body: () => ({ days: [day] }) }),
+    ac('bell schedule for a B term', 'bell', 'PUT', 404, { body: () => ({ termId: b().termId, days: [day] }) }),
+    ac("remove a B term's bell schedule", 'bell', 'DELETE', 404, q(() => `?termId=${b().termId}`)),
+    ac('rooms (list)', 'rooms', 'GET', 'ok'),
+    ac('room (own school)', 'rooms', 'POST', 'ok', { body: () => ({ name: 'A Hall', type: 'HALL', capacity: 300 }) }),
+    ac("edit B's room", 'rooms/[id]', 'PATCH', 404, { ...p(() => bx.room!), body: () => ({ name: 'Hacked', type: 'HALL', capacity: 1 }) }),
+    ac("delete B's room", 'rooms/[id]', 'DELETE', 404, p(() => bx.room!)),
+    ac("B teacher's availability", 'availability/[id]', 'GET', 404, p(() => b().users.TEACHER.id)),
+    ac("set a B teacher's availability", 'availability/[id]', 'PUT', 404, { ...p(() => b().users.TEACHER.id), body: () => ({ unavailable: [] }) }),
+    ac('timetable state', 'timetable', 'GET', 'ok'),
+    ac("B term's timetable", 'timetable', 'GET', 404, q(() => `?termId=${b().termId}`)),
+    ac("B's class week", 'timetable/view', 'GET', 404, q(() => `?view=class&id=${b().classId}`)),
+    ac("B's room week", 'timetable/view', 'GET', 404, q(() => `?view=room&id=${bx.room}&version=working`)),
+    ac("place B's assignment", 'timetable/place', 'POST', 404, { body: () => ({ assignmentId: bx.assignment, periodId: bx.period }) }),
+    ac('suggest slots for B', 'timetable/suggest', 'POST', 404, { body: () => ({ assignmentId: bx.assignment }) }),
+    ac("remove B's lesson", 'timetable/slots/[id]', 'DELETE', 404, p(() => bx.slot!)),
+    ac("change B's lesson room", 'timetable/slots/[id]', 'PATCH', 404, { ...p(() => bx.slot!), body: () => ({ roomId: null }) }),
+    ac('send the timetable (none drafted)', 'timetable/submit', 'POST', 409, { body: () => ({}) }),
+    ac('send the timetable of a B term', 'timetable/submit', 'POST', 404, { body: () => ({ termId: b().termId }) }),
+    ac('decide the timetable (none waiting)', 'timetable/decide', 'POST', 409, { body: () => ({ decision: 'APPROVE' }) }),
+    ac('new version in a B term', 'timetable/new-version', 'POST', 404, { body: () => ({ termId: b().termId }) }),
+    ac('my day', 'timetable/my-day', 'GET', 'ok'),
+    ac("a B teacher's day", 'timetable/my-day', 'GET', 'ok', q(() => `?userId=${b().users.TEACHER.id}&date=2026-10-14`)),
+    ac('cover for a B teacher (no timetable in force)', 'timetable/cover', 'GET', 409, q(() => `?date=2026-10-14&teacherId=${b().users.TEACHER.id}`)),
+    ac("cover B's lesson", 'timetable/cover', 'POST', 404, { body: () => ({ date: '2026-12-01', slotId: bx.slot, coverTeacherId: a().users.TEACHER.id }) }),
+    ac("cancel B's cover", 'timetable/cover/[id]', 'DELETE', 404, p(() => bx.cover!)),
+    ac('cover list', 'timetable/cover-list', 'GET', 'ok', q(() => '?date=2026-10-15')),
+    ac("B's syllabus", 'syllabus', 'GET', 404, q(() => `?subjectId=${b().subjectId}&levelId=${a().levelId}`)),
+    ac('syllabus index', 'syllabus', 'GET', 'ok'),
+    ac('topic of a B subject', 'syllabus', 'POST', 404, { body: () => ({ subjectId: b().subjectId, levelId: a().levelId, title: 'Mine' }) }),
+    ac("edit B's topic", 'syllabus/[id]', 'PATCH', 404, { ...p(() => bx.topic!), body: () => ({ subjectId: a().subjectId, levelId: a().levelId, title: 'Hacked' }) }),
+    ac("delete B's topic", 'syllabus/[id]', 'DELETE', 404, p(() => bx.topic!)),
+    ac('import topics naming B subjects', 'syllabus/import', 'POST', 'ok', { body: () => ({ csv: 'subject,level,topic\nB Maths,Form 1,Hacked' }) }),
+    ac("share B's syllabus", 'syllabus/share', 'POST', 404, { body: () => ({ subjectId: b().subjectId, levelId: b().levelId }) }),
+    ac('templates (list)', 'syllabus/templates', 'GET', 'ok'),
+    ac('import a template into a B subject', 'syllabus/templates', 'POST', 404, { body: () => ({ templateId: 'none', subjectId: b().subjectId, levelId: a().levelId }) }),
+    ac('schemes (list)', 'schemes', 'GET', 'ok'),
+    ac("B term's schemes", 'schemes', 'GET', 404, q(() => `?termId=${b().termId}`)),
+    ac('scheme due date for a B term', 'schemes/due-date', 'POST', 404, { body: () => ({ termId: b().termId, dueDate: '2026-02-01' }) }),
+    ac("B's scheme", 'schemes/[id]', 'GET', 404, p(() => bx.assignment!)),
+    ac("start B's scheme", 'schemes/[id]', 'POST', 404, p(() => bx.assignment!)),
+    ac("edit B's scheme", 'schemes/[id]', 'PUT', 404, { ...p(() => bx.assignment!), body: () => ({ weeks: [{ weekNo: 1, topicIds: [] }] }) }),
+    ac("copy into B's scheme", 'schemes/[id]/copy', 'POST', 404, { ...p(() => bx.assignment!), body: () => ({}) }),
+    ac("submit B's scheme", 'schemes/[id]/submit', 'POST', 404, p(() => bx.assignment!)),
+    ac("approve B's scheme", 'schemes/[id]/decide', 'POST', 404, { ...p(() => bx.assignment!), body: () => ({ decision: 'APPROVE' }) }),
+    ac("record B's week", 'schemes/records/[id]', 'PUT', 404, { ...p(() => bx.week!), body: () => ({ coveredTopicIds: [] }) }),
+    ac("B's lesson plan", 'lesson-plans', 'GET', 404, q(() => `?slotId=${bx.slot}&date=2026-10-14`)),
+    ac("write B's lesson plan", 'lesson-plans', 'PUT', 409, { body: () => ({ slotId: bx.slot, date: '2026-10-14', content: {} }) }),
+    ac('analytics', 'analytics', 'GET', 'ok'),
+    ac("B term's analytics", 'analytics', 'GET', 404, q(() => `?termId=${b().termId}`)),
+    ac('analytics export', 'analytics/export', 'GET', 'ok', q(() => '?panel=load')),
+    ac("B term's analytics export", 'analytics/export', 'GET', 404, q(() => `?panel=load&termId=${b().termId}`)),
+    // Last: this one starts a draft in school A, which would change what the "send the timetable" cases above find.
+    ac('new timetable version (own school)', 'timetable/new-version', 'POST', 'ok', { body: () => ({}) }),
+  ];
+}
 
 // Routes that take no school-owned data from the caller and are covered elsewhere.
 const EXEMPT: Record<string, string> = {
