@@ -92,10 +92,10 @@ describe('sidebar', () => {
     expect(NAV_GROUPS[0].items.map((i) => i.label)).toEqual(['Dashboard', 'Calendar', 'School Settings', 'Users', 'Roles & Permissions', 'Audit Log', 'Subscription']);
   });
 
-  it('makes Dashboard & System and Student Information live; every other item is "coming soon"', () => {
+  it('makes Dashboard & System, Student Information and Academics live; every other item is "coming soon"', () => {
     const nav = buildNav(user('ADMIN', { grants: ALL }));
     expect(nav.map((g) => g.module)).toEqual(MODULES.map((m) => m.key));
-    for (const g of nav) for (const i of g.items) expect(i.comingSoon, `${g.label} / ${i.label}`).toBe(!['system', 'students'].includes(g.module) || (g.module === 'students' && i.label === 'Attendance'));
+    for (const g of nav) for (const i of g.items) expect(i.comingSoon, `${g.label} / ${i.label}`).toBe(!['system', 'students', 'academics'].includes(g.module) || (g.module === 'students' && i.label === 'Attendance'));
     for (const i of nav[0].items) expect(i.href).toMatch(/^\/system\//);
   });
 
