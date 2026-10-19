@@ -70,6 +70,7 @@ export const ROLE_NAV: Record<UserRole, RoleNav> = {
       {
         title: 'Finance',
         items: [
+          { href: '/head',          label: 'Dashboard',        icon: 'dashboard' },
           { href: '/head/fees',     label: 'Fee Management',   icon: 'payments' },
           { href: '/head/payments', label: 'Payments',         icon: 'payments' },
           { href: '/head/expenses', label: 'Expenses',         icon: 'expenses' },

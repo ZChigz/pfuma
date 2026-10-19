@@ -1,10 +1,10 @@
 'use client';
 
+import { CrumbLabel } from '@/components/layout/Breadcrumbs';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -210,14 +210,7 @@ export function AssetDetailClient({ asset: initialAsset, categories, userRole }:
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-muted">
-        <Link href="/assets" className="hover:text-ink hover:underline">
-          Assets
-        </Link>
-        <span>/</span>
-        <span className="text-ink">{asset.name}</span>
-      </div>
+      <CrumbLabel label={asset.name} />
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
