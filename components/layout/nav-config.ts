@@ -67,6 +67,7 @@ export const ROLE_NAV: Record<UserRole, RoleNav> = {
       {
         title: 'Finance',
         items: [
+          { href: '/head',          label: 'Dashboard',        icon: 'dashboard' },
           { href: '/head/fees',     label: 'Fee Management',   icon: 'payments' },
           { href: '/head/payments', label: 'Payments',         icon: 'payments' },
           { href: '/head/expenses', label: 'Expenses',         icon: 'expenses' },
@@ -145,4 +146,4 @@ export function flatNav(role: UserRole | undefined): NavItem[] {
 
 // Routes that have nested sub-pages need exact matching on their root
 // so the parent link isn't highlighted while viewing a child page.
-export const EXACT_MATCH_ROUTES = new Set(['/admin', '/director', '/library']);
+export const EXACT_MATCH_ROUTES = new Set(['/admin', '/head', '/director', '/library']);

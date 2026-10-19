@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { Breadcrumbs } from './Breadcrumbs';
 import type { ReactNode } from 'react';
 
 export async function DashboardShell({ children }: { children: ReactNode }) {
@@ -23,6 +24,7 @@ export async function DashboardShell({ children }: { children: ReactNode }) {
             currentTerm={school?.currentTerm ?? undefined}
             role={session?.user?.role}
           />
+          <Breadcrumbs />
           <main className="min-h-0 flex-1 md:overflow-y-auto md:pr-1">{children}</main>
         </div>
       </div>

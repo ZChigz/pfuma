@@ -1,7 +1,7 @@
 'use client';
 
+import { CrumbLabel } from '@/components/layout/Breadcrumbs';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
@@ -170,12 +170,7 @@ export function MarkEntryGrid({ assignmentId, classId, className, subjectId, sub
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link
-          href="/teacher/marks"
-          className="mb-2 inline-block text-sm font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/40"
-        >
-          ← Back to my assignments
-        </Link>
+        <CrumbLabel label={`${subjectName}, ${className}`} />
         <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ink">Subject: {subjectName} | Class: {className} | Max: {maxMark}</h1>
         <p className="mt-1 text-sm text-muted">{term}</p>
       </div>

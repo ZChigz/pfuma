@@ -1,3 +1,4 @@
+import { CrumbLabel } from '@/components/layout/Breadcrumbs';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect, notFound } from 'next/navigation';
@@ -40,11 +41,7 @@ export default async function AdminClassDetailPage({ params }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <Link href="/admin/classes" className="text-sm text-primary hover:underline">
-          ← Back to Classes
-        </Link>
-      </div>
+      <CrumbLabel label={schoolClass.name} />
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
