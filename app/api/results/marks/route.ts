@@ -10,6 +10,7 @@ import { EnterMarkSchema } from '@/lib/validations/results';
 import { boundariesFor, gradeFor } from '@/lib/results';
 import { requireTerm } from '@/lib/academic/terms';
 import { classRoster } from '@/lib/academic/roster';
+import { LEGACY_MESSAGE, newExamsActive } from '@/lib/exams/legacy-guard';
 import type { SessionUser } from '@/types';
 
 async function _GET(req: NextRequest): Promise<Response> {
@@ -93,6 +94,9 @@ async function _POST(req: NextRequest) {
 
   const student = await db.student.findFirst({ where: { id: studentId, schoolId: user.schoolId } });
   if (!student) return apiNotFound('Student');
+
+  const levelOf = await db.schoolClass.findFirst({ where: { id: classId, schoolId: user.schoolId }, select: { levelId: true } });
+  if (levelOf && (await newExamsActive(db, user.schoolId, levelOf.levelId, term.id))) return apiError(LEGACY_MESSAGE, 409);
 
   // The student must have been in this class for this term.
   const enrollment = await db.enrollment.findUnique({ where: { studentId_termId: { studentId, termId: term.id } } });

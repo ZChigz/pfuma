@@ -48,6 +48,8 @@ export interface AlumnusRow {
   destination: string | null;
   /** Latest published result, when Exams is on. */
   finalResult: { term: string; percentage: number; grade: string | null } | null;
+  /** The latest released board results (ZIMSEC or Cambridge), when there are any: "ZIMSEC November 2026: 7 grades". */
+  boardSummary: string | null;
 }
 
 export async function listAlumni(user: AccessUser, rawFilters: z.input<typeof AlumniQuerySchema>) {
@@ -68,6 +70,16 @@ export async function listAlumni(user: AccessUser, rawFilters: z.input<typeof Al
     : await db.termResult.findMany({ where: { studentId: { in: rows.map((r) => r.studentId) }, published: true }, orderBy: { term: { startDate: 'desc' } }, include: { term: { select: { name: true } } } });
   const latest = new Map<string, (typeof results)[number]>();
   for (const r of results) if (!latest.has(r.studentId)) latest.set(r.studentId, r);
+  // Released board results attach to the alumni record through the student.
+  const board = off || rows.length === 0
+    ? []
+    : await db.boardResult.findMany({ where: { studentId: { in: rows.map((r) => r.studentId) } }, select: { studentId: true, sessionId: true, session: { select: { board: true, session: true, createdAt: true } } }, orderBy: { session: { createdAt: 'desc' } } });
+  const boardOf = new Map<string, { label: string; sessionId: string; n: number }>();
+  for (const b of board) {
+    const cur = boardOf.get(b.studentId!);
+    if (!cur) boardOf.set(b.studentId!, { label: `${b.session.board} ${b.session.session}`, sessionId: b.sessionId, n: 1 });
+    else if (cur.sessionId === b.sessionId) cur.n++;
+  }
   return {
     total, years: years.map((y) => y.yearLeft), pageSize: ALUMNI_PAGE_SIZE,
     rows: rows.map<AlumnusRow>((a) => {
@@ -76,6 +88,7 @@ export async function listAlumni(user: AccessUser, rawFilters: z.input<typeof Al
         id: a.id, studentId: a.studentId, fullName: a.student.fullName, admissionNumber: a.student.admissionNumber, yearLeft: a.yearLeft, lastClass: a.lastClass,
         phone: a.phone, email: a.email, destination: a.destination,
         finalResult: r ? { term: r.term.name, percentage: r.percentage.toNumber(), grade: r.letterGrade } : null,
+        boardSummary: boardOf.has(a.studentId) ? `${boardOf.get(a.studentId)!.label}: ${boardOf.get(a.studentId)!.n} grade${boardOf.get(a.studentId)!.n === 1 ? '' : 's'}` : null,
       };
     }),
   };

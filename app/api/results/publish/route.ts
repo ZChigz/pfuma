@@ -8,6 +8,7 @@ import { PublishResultsSchema } from '@/lib/validations/results';
 import { assignPositions, boundariesFor, getLetterGrade, gradeFor, passThreshold, summariseStudent, type OfferedSubject } from '@/lib/results';
 import { requireTerm } from '@/lib/academic/terms';
 import { classRoster } from '@/lib/academic/roster';
+import { LEGACY_MESSAGE, newExamsActive } from '@/lib/exams/legacy-guard';
 import type { SessionUser } from '@/types';
 
 async function _POST(req: NextRequest) {
@@ -31,6 +32,8 @@ async function _POST(req: NextRequest) {
   const termRow = await requireTerm(user.schoolId, termId, db);
   const term = termRow.name;
   if (termRow.status === 'CLOSED') return apiError(`${termRow.name} is closed, so its results are locked. The Director can reopen the term.`, 409);
+
+  if (await newExamsActive(db, user.schoolId, schoolClass.levelId, termId)) return apiError(LEGACY_MESSAGE, 409);
 
   const assignments = await db.subjectAssignment.findMany({
     where: { schoolId: user.schoolId, classId, termId },

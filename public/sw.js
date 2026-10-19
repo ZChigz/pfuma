@@ -1,6 +1,6 @@
-// Pfuma service worker: lets the attendance register open and be marked without signal.
-// It keeps only what the register needs: the app's own scripts, the register pages and the register data.
-// Marks themselves are saved on the phone (IndexedDB) by the page, and sent when the signal returns.
+// Pfuma service worker: lets the attendance register and the mark entry grid open and be filled in without signal.
+// It keeps only what they need: the app's own scripts, those pages and their data.
+// Marks and registers themselves are saved on the phone (IndexedDB) by the page, and sent when the signal returns.
 const CACHE = 'pfuma-register-v1';
 
 self.addEventListener('install', () => self.skipWaiting());
@@ -17,7 +17,7 @@ self.addEventListener('message', (event) => {
 });
 
 const isRegisterRoute = (p) =>
-  p.startsWith('/academics/attendance') ||
+  p.startsWith('/academics/attendance') || p === '/exams/marks' || p.startsWith('/exams/marks/') ||
   p === '/api/academics/attendance/register' || p === '/api/academics/attendance/lesson' || p === '/api/academics/attendance/due' || p === '/api/academics/attendance/lessons';
 
 async function networkFirst(request) {

@@ -97,7 +97,16 @@ describe('roles and permissions as data', () => {
           : r.key === 'CLASS_TEACHER'
             ? ['academics.attendance.mark', 'academics.attendance.view', 'academics.classes.view', 'academics.subjects.view', 'academics.timetable.view']
             : [];
-        expect(keys, r.key).toEqual([...own, 'system.calendar.view', 'system.dashboard.view'].sort());
+        // Examinations keys each role starts with (exams_role_keys in the migration).
+        const exams: Record<string, string[]> = {
+          TEACHER: ['exams.analytics.view', 'exams.assessments.create', 'exams.comments.subject', 'exams.marks.enter', 'exams.marks.submit'],
+          CLASS_TEACHER: ['exams.analytics.view', 'exams.comments.class', 'exams.results.view'],
+          HOD: ['exams.analytics.view', 'exams.marks.verify', 'exams.marks.view', 'exams.results.view'],
+          HEAD: ['exams.analytics.view', 'exams.comments.head', 'exams.marks.unlock', 'exams.marks.view', 'exams.projects.manage', 'exams.reportcards.settings', 'exams.results.publish', 'exams.results.unpublish', 'exams.results.view', 'exams.setup.manage', 'exams.zimsec.approve'],
+          DEPUTY_HEAD: ['exams.analytics.view', 'exams.marks.view', 'exams.results.view', 'exams.timetable.approve'],
+          EXAMS_OFFICER: ['exams.analytics.view', 'exams.invigilation.manage', 'exams.marks.view', 'exams.projects.manage', 'exams.results.view', 'exams.setup.manage', 'exams.timetable.manage', 'exams.zimsec.manage', 'exams.zimsec.results_import'],
+        };
+        expect(keys, r.key).toEqual([...own, ...(exams[r.key] ?? []),'system.calendar.view', 'system.dashboard.view'].sort());
       }
     }
   });

@@ -6,6 +6,7 @@ import { canVerifyMarks } from '@/lib/permissions';
 import { logAudit } from '@/lib/audit';
 import { VerifyMarksSchema } from '@/lib/validations/results';
 import { classRoster } from '@/lib/academic/roster';
+import { LEGACY_MESSAGE, newExamsActive } from '@/lib/exams/legacy-guard';
 import type { SessionUser } from '@/types';
 
 async function _POST(req: NextRequest) {
@@ -32,6 +33,9 @@ async function _POST(req: NextRequest) {
   if (user.role === 'TEACHER' && assignment.teacherId !== user.id) {
     return apiForbidden();
   }
+
+  const levelOf = await db.schoolClass.findFirst({ where: { id: assignment.classId, schoolId: user.schoolId }, select: { levelId: true } });
+  if (levelOf && (await newExamsActive(db, user.schoolId, levelOf.levelId, assignment.termId))) return apiError(LEGACY_MESSAGE, 409);
 
   if (assignment.marksStatus !== 'IN_PROGRESS' && assignment.marksStatus !== 'NOT_STARTED') {
     return apiSuccess({ verified: false, message: 'Marks have already been verified for this assignment' });

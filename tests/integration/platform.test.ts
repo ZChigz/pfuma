@@ -168,7 +168,7 @@ describe('creating a school', () => {
     const roles = await prisma.roleDefinition.findMany({ where: { schoolId: school.id }, include: { permissions: true } });
     expect(roles).toHaveLength(13);
     for (const key of ['OWNER', 'ADMINISTRATOR']) expect(roles.find((x) => x.key === key)!.permissions.map((p) => p.permissionKey), key).toContain('*');
-    expect(roles.find((x) => x.key === 'TEACHER')!.permissions.map((p) => p.permissionKey).sort()).toEqual(['system.calendar.view', 'system.dashboard.view']);
+    expect(roles.find((x) => x.key === 'TEACHER')!.permissions.map((p) => p.permissionKey).sort()).toEqual(['academics.assignments.view', 'academics.attendance.mark', 'academics.classes.view', 'academics.schemes.edit', 'academics.schemes.view', 'academics.subjects.view', 'academics.timetable.view', 'exams.analytics.view', 'exams.assessments.create', 'exams.comments.subject', 'exams.marks.enter', 'exams.marks.submit', 'system.calendar.view', 'system.dashboard.view']);
 
     const users = await prisma.user.findMany({ where: { schoolId: school.id }, include: { userRoles: { include: { role: true } } } });
     expect(users).toHaveLength(2);
