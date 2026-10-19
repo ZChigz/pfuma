@@ -8,7 +8,7 @@
 // Every loader checks that the student is in the user's school and is one the user may reach.
 import type { Prisma } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
-import type { AccessUser } from '@/lib/access-core';
+import { can, type AccessUser } from '@/lib/access-core';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { medicalAlerts } from '@/lib/students/medical';
 import { ageOn, todayInHarare } from '@/lib/students/registration';
@@ -117,6 +117,8 @@ export interface ProfileOverview {
   specialNeedsNote: string | null;
   primaryGuardian: { fullName: string; phone: string } | null;
   siblings: { id: string; fullName: string; className: string | null; status: string }[];
+  /** Exam candidate numbers and released board grades (Examinations), for a user who may see results. */
+  examinations: { candidateNumbers: { session: string; number: string }[]; boardResults: { board: string; session: string; results: { code: string; subject: string; grade: string }[] }[] } | null;
 }
 
 export async function profileOverview(user: AccessUser, studentId: string): Promise<ProfileOverview> {
@@ -137,6 +139,16 @@ export async function profileOverview(user: AccessUser, studentId: string): Prom
       })
     : [];
   const primary = access.guardians ? s.guardians.find((g) => g.isPrimary)?.guardian ?? null : null;
+  let examinations: ProfileOverview['examinations'] = null;
+  if (can(user, 'exams.results.view') || can(user, 'exams.zimsec.manage')) {
+    const [cands, board] = await Promise.all([
+      db.candidate.findMany({ where: { studentId, candidateNumber: { not: null } }, select: { candidateNumber: true, session: { select: { board: true, session: true } } }, orderBy: { createdAt: 'desc' } }),
+      db.boardResult.findMany({ where: { studentId }, include: { code: { select: { code: true, name: true } }, session: { select: { board: true, session: true } } }, orderBy: [{ session: { createdAt: 'desc' } }, { code: { code: 'asc' } }] }),
+    ]);
+    const groups = new Map<string, NonNullable<ProfileOverview['examinations']>['boardResults'][number]>();
+    for (const r of board) (groups.get(r.sessionId) ?? groups.set(r.sessionId, { board: r.session.board, session: r.session.session, results: [] }).get(r.sessionId)!).results.push({ code: r.code.code, subject: r.code.name, grade: r.grade });
+    if (cands.length || board.length) examinations = { candidateNumbers: cands.map((c) => ({ session: `${c.session.board} ${c.session.session}`, number: c.candidateNumber! })), boardResults: Array.from(groups.values()) };
+  }
   return {
     firstName: s.firstName, surname: s.surname, preferredName: s.preferredName, gender: s.gender, dateOfBirth: day(s.dateOfBirth),
     age: s.dateOfBirth ? ageOn(day(s.dateOfBirth)!, todayInHarare()) : null,
@@ -148,6 +160,7 @@ export async function profileOverview(user: AccessUser, studentId: string): Prom
     specialNeedsNote: access.medical ? s.specialNeedsNote : null,
     primaryGuardian: primary ? { fullName: primary.fullName, phone: primary.phone } : null,
     siblings: siblings.map((x) => ({ id: x.id, fullName: x.fullName, className: x.currentClass?.name ?? null, status: x.status })),
+    examinations,
   };
 }
 

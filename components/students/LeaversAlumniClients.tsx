@@ -50,7 +50,7 @@ export function LeaversClient({ rows, total, page, pageSize, years, classes }: {
   );
 }
 
-export interface AlumnusRowData { id: string; studentId: string; fullName: string; admissionNumber: string; yearLeft: number; lastClass: string | null; phone: string | null; email: string | null; destination: string | null; finalResult: { term: string; percentage: number; grade: string | null } | null }
+export interface AlumnusRowData { id: string; studentId: string; fullName: string; admissionNumber: string; yearLeft: number; lastClass: string | null; phone: string | null; email: string | null; destination: string | null; finalResult: { term: string; percentage: number; grade: string | null } | null; boardSummary?: string | null }
 
 export function AlumniClient({ rows, total, page, pageSize, years, canEdit, canExport }: { rows: AlumnusRowData[]; total: number; page: number; pageSize: number; years: number[]; canEdit: boolean; canExport: boolean }) {
   const { params, go } = useFilters();
@@ -75,7 +75,7 @@ export function AlumniClient({ rows, total, page, pageSize, years, canEdit, canE
                 <Link href={`/students/${a.studentId}`} className="font-semibold text-primary hover:underline">{a.fullName}</Link>
                 <span className="flex items-center gap-2"><Badge variant="info" label={`Left ${a.yearLeft}`} />{canEdit && <Button size="sm" variant="ghost" onClick={() => setEditing(a)}>Update</Button>}</span>
               </div>
-              <p className="mt-1 text-sm text-muted">{a.lastClass ?? 'Last class not recorded'}{a.finalResult ? ` · final result ${a.finalResult.percentage}%${a.finalResult.grade ? ` (${a.finalResult.grade})` : ''}` : ''}</p>
+              <p className="mt-1 text-sm text-muted">{a.lastClass ?? 'Last class not recorded'}{a.finalResult ? ` · final result ${a.finalResult.percentage}%${a.finalResult.grade ? ` (${a.finalResult.grade})` : ''}` : ''}{a.boardSummary ? ` · ${a.boardSummary}` : ''}</p>
               <p className="mt-0.5 text-sm text-ink">{[a.phone, a.email].filter(Boolean).join(' · ') || 'No contact details yet'}{a.destination ? ` · ${a.destination}` : ''}</p>
             </li>
           ))}

@@ -110,10 +110,33 @@ export const PERMISSIONS = {
   'academics.syllabus.manage':  'Manage the syllabus topics',
   'academics.analytics.view':   'View academic analytics',
 
+  // Examinations: the same keys are rows in the Permission table (migration 20261102000000). Owner and Administrator hold them
+  // through '*'; teachers, HODs, the Head and the Exams Officer hold the scoped keys, which the code narrows to their own
+  // assignments, department or class.
   'exams.marks.view':           'View mark entry',
   'exams.results.view':         'View results',
   'exams.reports.view':         'View report cards',
   'exams.grading.view':         'View grade boundaries',
+  'exams.setup.manage':         'Set the assessment types, weighting plans and end-of-term exams',
+  'exams.projects.manage':      'Manage school-based project templates',
+  'exams.assessments.create':   'Create tests and assignments for own classes',
+  'exams.marks.enter':          'Enter marks for own classes',
+  'exams.marks.submit':         'Submit own mark sheets for verification',
+  'exams.marks.verify':         'Verify or return the mark sheets of own department',
+  'exams.marks.unlock':         'Unlock verified mark sheets, excuse absences',
+  'exams.comments.subject':     'Write subject comments for own classes',
+  'exams.comments.class':       'Write class teacher comments for own class',
+  'exams.comments.head':        'Write the Head\'s remarks',
+  'exams.results.publish':      'Publish results and report cards',
+  'exams.results.unpublish':    'Unpublish results for a correction',
+  'exams.reportcards.settings': 'Change the report card settings',
+  'exams.timetable.manage':     'Schedule exam periods and papers',
+  'exams.timetable.approve':    'Approve the exam timetable',
+  'exams.invigilation.manage':  'Assign invigilators and seating',
+  'exams.zimsec.manage':        'Manage ZIMSEC and Cambridge entries',
+  'exams.zimsec.approve':       'Approve the entry list',
+  'exams.zimsec.results_import': 'Load released board results',
+  'exams.analytics.view':       'View examination analytics',
 
   'finance.fees.view':          'View fees',
   'finance.payments.view':      'View payments',

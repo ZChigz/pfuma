@@ -80,8 +80,8 @@ const ROLE_ALLOWED: Record<UserRole, (pathname: string) => boolean> = {
 
 // Reachable by any signed-in user, whatever their role.
 // /system and /api/system: every signed-in user reaches them, and can() (lib/access.ts) decides what they may do.
-// /students and /api/students (Student Information) and /academics and /api/academics work the same way: every route and page asks can().
-const ANY_ROLE = ['/change-password', '/api/account', '/system', '/api/system', '/students', '/api/students', '/academics', '/api/academics', '/print'];
+// /students and /api/students (Student Information), /academics and /api/academics, and /exams and /api/exams (Examinations) work the same way: every route and page asks can().
+const ANY_ROLE = ['/change-password', '/api/account', '/system', '/api/system', '/students', '/api/students', '/academics', '/api/academics', '/exams', '/api/exams', '/print'];
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 
@@ -101,7 +101,7 @@ export default auth(async (req: NextRequest & { auth: { user?: { id?: string; ro
   const limiters = getLimiters();
 
   // Parent portal: 30 requests a minute per IP.
-  if (pathname.startsWith('/portal') || pathname.startsWith('/api/portal/') || pathname.startsWith('/reset-password') || pathname.startsWith('/api/password-reset')) {
+  if (pathname.startsWith('/portal') || pathname.startsWith('/verify') || pathname.startsWith('/api/portal/') || pathname.startsWith('/reset-password') || pathname.startsWith('/api/password-reset')) {
     const r = await limiters.portal.check(ip);
     if (!r.allowed) return tooManyRequests(r.retryAfter);
   }
@@ -130,6 +130,8 @@ export default auth(async (req: NextRequest & { auth: { user?: { id?: string; ro
   const isPublic =
     pathname.startsWith('/login') ||
     pathname.startsWith('/portal') ||
+    // Anyone can check a report card's verification code.
+    pathname.startsWith('/verify') ||
     pathname.startsWith('/api/portal/') ||
     pathname.startsWith('/reset-password') ||
     pathname.startsWith('/api/password-reset') ||

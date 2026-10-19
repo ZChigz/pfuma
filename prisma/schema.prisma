@@ -516,6 +516,47 @@ enum AuditAction {
   UPDATE_ACADEMICS_SETTINGS
   SET_SCHEME_DUE_DATE
   EXPORT_ACADEMICS
+  SAVE_ASSESSMENT_TYPE
+  SAVE_WEIGHTING_PLAN
+  COPY_WEIGHTING_PLAN
+  CREATE_ASSESSMENT
+  UPDATE_ASSESSMENT
+  COPY_ASSESSMENT
+  SAVE_PROJECT
+  COPY_PROJECT
+  ENTER_MARKS
+  IMPORT_MARKS
+  CORRECT_MARK
+  SUBMIT_MARK_SHEET
+  VERIFY_MARK_SHEET
+  RETURN_MARK_SHEET
+  UNLOCK_MARK_SHEET
+  CALCULATE_RESULTS
+  PUBLISH_CLASS_RESULTS
+  UNPUBLISH_CLASS_RESULTS
+  SAVE_REPORT_COMMENT
+  SAVE_EXAM_SETTINGS
+  SET_EXAM_DEADLINES
+  REMIND_MARK_SHEETS
+  SET_DEPARTMENT_VERIFIER
+  ADD_MARK_EVIDENCE
+  SAVE_COMMENT_BANK
+  SAVE_EXAM_PERIOD
+  SAVE_EXAM_PAPER
+  SUBMIT_EXAM_TIMETABLE
+  APPROVE_EXAM_TIMETABLE
+  RETURN_EXAM_TIMETABLE
+  ASSIGN_INVIGILATOR
+  MARK_EXAM_ATTENDANCE
+  REPORT_EXAM_INCIDENT
+  SAVE_BOARD_SESSION
+  SAVE_CANDIDATE
+  CREATE_EXAM_FEES
+  APPROVE_ENTRY_LIST
+  EXPORT_ENTRY_LIST
+  IMPORT_CANDIDATE_NUMBERS
+  IMPORT_BOARD_RESULTS
+  RECORD_AMENDMENT
 }
 
 enum SchoolType {
@@ -773,6 +814,43 @@ model School {
   schemeWeeks               SchemeWeek[]
   recordsOfWork             RecordOfWork[]
   lessonPlans               LessonPlan[]
+  assessmentTypes           AssessmentType[]
+  weightingPlans            WeightingPlan[]
+  weightingPlanItems        WeightingPlanItem[]
+  weightingPlanItemTypes    WeightingPlanItemType[]
+  projectTemplates          ProjectTemplate[]
+  projectStages             ProjectStage[]
+  rubrics                   Rubric[]
+  rubricCriteria            RubricCriterion[]
+  rubricLevels              RubricLevel[]
+  assessments               Assessment[]
+  assessmentTopics          AssessmentTopic[]
+  assessmentMarks           AssessmentMark[]
+  rubricScores              RubricScore[]
+  markEvidence              MarkEvidence[]
+  assessmentMarkChanges     AssessmentMarkChange[]
+  markSheets                MarkSheet[]
+  markSheetEvents           MarkSheetEvent[]
+  sheetStudentComments      SheetStudentComment[]
+  subjectResults            SubjectResult[]
+  reportComments            ReportComment[]
+  commentBank               CommentBankItem[]
+  examSettings              ExamSettings?
+  examDeadlines             ExamDeadline[]
+  examDepartmentVerifiers   ExamDepartmentVerifier[]
+  examPeriods               ExamPeriod[]
+  examPeriodLevels          ExamPeriodLevel[]
+  examPapers                ExamPaper[]
+  examPaperRooms            ExamPaperRoom[]
+  invigilations             Invigilation[]
+  examAttendance            ExamAttendance[]
+  examIncidents             ExamIncident[]
+  boardSessions             BoardSession[]
+  boardSubjectCodes         BoardSubjectCode[]
+  candidates                Candidate[]
+  candidateEntries          CandidateEntry[]
+  boardResults              BoardResult[]
+  boardAmendments           BoardAmendment[]
 }
 
 model User {
@@ -878,6 +956,9 @@ model SchoolClass {
   teacherAssignments TeacherAssignment[]
   combinationLinks   SubjectCombinationClass[]
   registers          AttendanceRegister[]
+  subjectResults     SubjectResult[]
+  reportComments     ReportComment[]
+  termResultRows     TermResult[]
 
   @@unique([schoolId, name])
   @@unique([schoolId, levelId, stream])
@@ -895,15 +976,20 @@ model Level {
   // Switched off when the school does not have this form (e.g. no A Level). Off forms offer no classes.
   active   Boolean       @default(true)
 
-  school          School               @relation(fields: [schoolId], references: [id])
-  classes         SchoolClass[]
-  feeStructures   FeeStructure[]
-  gradeBoundaries GradeBoundary[]
-  intakes         Intake[]
-  subjectLevels   SubjectLevel[]
-  combinations    SubjectCombination[]
-  teachingGroups  TeachingGroup[]
-  syllabusTopics  SyllabusTopic[]
+  school           School               @relation(fields: [schoolId], references: [id])
+  classes          SchoolClass[]
+  feeStructures    FeeStructure[]
+  gradeBoundaries  GradeBoundary[]
+  intakes          Intake[]
+  subjectLevels    SubjectLevel[]
+  combinations     SubjectCombination[]
+  teachingGroups   TeachingGroup[]
+  syllabusTopics   SyllabusTopic[]
+  weightingPlans   WeightingPlan[]
+  projectTemplates ProjectTemplate[]
+  assessments      Assessment[]
+  examPeriodLevels ExamPeriodLevel[]
+  examPapers       ExamPaper[]
 
   @@unique([schoolId, name])
   @@unique([schoolId, order])
@@ -964,6 +1050,13 @@ model AcademicTerm {
   timetables         Timetable[]
   registers          AttendanceRegister[]
   schemesOfWork      SchemeOfWork[]
+  weightingPlans     WeightingPlan[]
+  assessments        Assessment[]
+  markSheets         MarkSheet[]
+  subjectResults     SubjectResult[]
+  reportComments     ReportComment[]
+  examDeadline       ExamDeadline?
+  examPeriods        ExamPeriod[]
 
   @@unique([academicYearId, termNumber])
   @@index([schoolId])
@@ -1071,6 +1164,14 @@ model Student {
   subjectChoices    StudentSubject[]
   teachingGroups    TeachingGroupStudent[]
   attendance        AttendanceEntry[]
+  assessmentMarks   AssessmentMark[]
+  sheetComments     SheetStudentComment[]
+  subjectResults    SubjectResult[]
+  reportComments    ReportComment[]
+  examAttendance    ExamAttendance[]
+  examIncidents     ExamIncident[]
+  candidacies       Candidate[]
+  boardResults      BoardResult[]
 
   @@unique([schoolId, admissionNumber])
   @@unique([schoolId, birthCertificateNumber])
@@ -1356,6 +1457,12 @@ model Subject {
   teachingGroups     TeachingGroup[]
   teacherAssignments TeacherAssignment[]
   syllabusTopics     SyllabusTopic[]
+  weightingPlans     WeightingPlan[]
+  projectTemplates   ProjectTemplate[]
+  assessments        Assessment[]
+  subjectResults     SubjectResult[]
+  examPapers         ExamPaper[]
+  boardCodes         BoardSubjectCode[]
 
   @@unique([schoolId, code])
   @@index([schoolId])
@@ -1475,9 +1582,23 @@ model TermResult {
   published          Boolean   @default(false)
   publishedAt        DateTime?
 
-  school  School       @relation(fields: [schoolId], references: [id])
-  student Student      @relation(fields: [studentId], references: [id])
-  term    AcademicTerm @relation(fields: [termId], references: [id])
+  school             School       @relation(fields: [schoolId], references: [id])
+  student            Student      @relation(fields: [studentId], references: [id])
+  term               AcademicTerm @relation(fields: [termId], references: [id])
+  classId            String?
+  formPosition       Int?
+  formSize           Int?
+  fivePassesEngMaths Boolean?
+  aLevelPoints       Int?
+  previousAverage    Decimal?     @db.Decimal(7, 2)
+  timesLate          Int?
+  schoolDays         Int?
+  conductGrade       String?
+  incidentCount      Int?
+  reportCardFileKey  String?
+  verificationCode   String?      @unique
+  calculatedAt       DateTime?
+  class              SchoolClass? @relation(fields: [classId], references: [id])
 
   @@unique([studentId, termId])
   @@index([termId])
@@ -2541,9 +2662,10 @@ model Department {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  school   School    @relation(fields: [schoolId], references: [id])
-  hod      User?     @relation("DepartmentHod", fields: [hodUserId], references: [id])
-  subjects Subject[]
+  school       School                  @relation(fields: [schoolId], references: [id])
+  hod          User?                   @relation("DepartmentHod", fields: [hodUserId], references: [id])
+  subjects     Subject[]
+  examVerifier ExamDepartmentVerifier?
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -2721,15 +2843,18 @@ model TeacherAssignment {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @default(now()) @updatedAt
 
-  school    School          @relation(fields: [schoolId], references: [id])
-  term      AcademicTerm    @relation(fields: [termId], references: [id])
-  teacher   User            @relation("AssignmentTeacher", fields: [teacherId], references: [id])
-  coTeacher User?           @relation("AssignmentCoTeacher", fields: [coTeacherId], references: [id])
-  subject   Subject         @relation(fields: [subjectId], references: [id])
-  class     SchoolClass?    @relation(fields: [classId], references: [id])
-  group     TeachingGroup?  @relation(fields: [groupId], references: [id])
-  slots     TimetableSlot[]
-  schemes   SchemeOfWork[]
+  school          School           @relation(fields: [schoolId], references: [id])
+  term            AcademicTerm     @relation(fields: [termId], references: [id])
+  teacher         User             @relation("AssignmentTeacher", fields: [teacherId], references: [id])
+  coTeacher       User?            @relation("AssignmentCoTeacher", fields: [coTeacherId], references: [id])
+  subject         Subject          @relation(fields: [subjectId], references: [id])
+  class           SchoolClass?     @relation(fields: [classId], references: [id])
+  group           TeachingGroup?   @relation(fields: [groupId], references: [id])
+  slots           TimetableSlot[]
+  schemes         SchemeOfWork[]
+  assessments     Assessment[]
+  assessmentMarks AssessmentMark[]
+  markSheets      MarkSheet[]
 
   @@index([schoolId])
   @@index([termId, teacherId])
@@ -2806,8 +2931,10 @@ model Room {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  school School          @relation(fields: [schoolId], references: [id])
-  slots  TimetableSlot[]
+  school         School          @relation(fields: [schoolId], references: [id])
+  slots          TimetableSlot[]
+  examPaperRooms ExamPaperRoom[]
+  invigilations  Invigilation[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -2988,11 +3115,12 @@ model SyllabusTopic {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 
-  school   School          @relation(fields: [schoolId], references: [id])
-  subject  Subject         @relation(fields: [subjectId], references: [id])
-  level    Level           @relation(fields: [levelId], references: [id])
-  parent   SyllabusTopic?  @relation("TopicTree", fields: [parentId], references: [id])
-  children SyllabusTopic[] @relation("TopicTree")
+  school           School            @relation(fields: [schoolId], references: [id])
+  subject          Subject           @relation(fields: [subjectId], references: [id])
+  level            Level             @relation(fields: [levelId], references: [id])
+  parent           SyllabusTopic?    @relation("TopicTree", fields: [parentId], references: [id])
+  children         SyllabusTopic[]   @relation("TopicTree")
+  assessmentTopics AssessmentTopic[]
 
   @@index([schoolId, subjectId, levelId])
 }
@@ -3091,4 +3219,938 @@ model LessonPlan {
 
   @@unique([slotId, date])
   @@index([schoolId])
+}
+
+// ─── Examinations: assessment setup, marks, mark sheets, results ─────────────
+//
+// Marks belong to a student, an assessment and a teacher assignment. They are never deleted (database trigger), and
+// every change after the sheet was first submitted is kept in AssessmentMarkChange. Results are calculated by
+// lib/results and copied onto SubjectResult / TermResult, so changing the grading scale later never changes a
+// published grade. (The older Mark / MarkChange tables belong to the first results screens and stay until those are retired.)
+// Columns named ...ById that point at a User are plain text: the database checks them (check_same_school) without a foreign key.
+
+enum MarkCode {
+  AB
+  EX
+  NS
+  AB_EXCUSED
+}
+
+enum CombineRule {
+  AVERAGE
+  BEST_N
+  BY_MAX
+}
+
+enum MarkSheetStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  VERIFIED
+  PUBLISHED
+  RETURNED
+  UNLOCKED
+}
+
+enum SheetAction {
+  SUBMIT
+  VERIFY
+  RETURN
+  UNLOCK
+  PUBLISH
+  UNPUBLISH
+}
+
+enum CommentCategory {
+  SUBJECT
+  CLASS_TEACHER
+  HEAD
+}
+
+// The school's editable list: Class test, Assignment, Practical, Mid-term test, End-of-term exam, Mock exam, School-based project, Other.
+model AssessmentType {
+  id         String   @id @default(cuid())
+  schoolId   String
+  name       String
+  isProject  Boolean  @default(false)
+  // Set once by the Exams Officer for every class of a subject at a level (end-of-term exam, mocks), never by one teacher.
+  commonExam Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  school      School                  @relation(fields: [schoolId], references: [id])
+  planTypes   WeightingPlanItemType[]
+  assessments Assessment[]
+  examPeriods ExamPeriod[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+// What counts towards a subject's term mark: one plan per term and level, optionally overridden for one subject.
+// Partial unique indexes (migration) keep one level plan and one subject plan per term and level.
+model WeightingPlan {
+  id          String   @id @default(cuid())
+  schoolId    String
+  termId      String
+  levelId     String
+  subjectId   String?
+  name        String
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  school  School              @relation(fields: [schoolId], references: [id])
+  term    AcademicTerm        @relation(fields: [termId], references: [id])
+  level   Level               @relation(fields: [levelId], references: [id])
+  subject Subject?            @relation(fields: [subjectId], references: [id])
+  items   WeightingPlanItem[]
+
+  @@index([schoolId])
+  @@index([termId, levelId])
+}
+
+// One line of a plan ("Class tests and assignments, 20%, average of all"). It can cover several assessment types.
+model WeightingPlanItem {
+  id          String      @id @default(cuid())
+  schoolId    String
+  planId      String
+  label       String
+  weight      Decimal     @db.Decimal(5, 2)
+  combineRule CombineRule @default(AVERAGE)
+  bestN       Int?
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @default(now()) @updatedAt
+
+  school School                  @relation(fields: [schoolId], references: [id])
+  plan   WeightingPlan           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  types  WeightingPlanItemType[]
+
+  @@index([schoolId])
+  @@index([planId])
+}
+
+model WeightingPlanItemType {
+  id        String   @id @default(cuid())
+  schoolId  String
+  itemId    String
+  typeId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school School            @relation(fields: [schoolId], references: [id])
+  item   WeightingPlanItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  type   AssessmentType    @relation(fields: [typeId], references: [id])
+
+  @@unique([itemId, typeId])
+  @@index([schoolId])
+}
+
+// A school-based project that can be reused in later terms: stages, each with a maximum mark or a rubric.
+model ProjectTemplate {
+  id            String    @id @default(cuid())
+  schoolId      String
+  title         String
+  subjectId     String
+  levelId       String
+  startDate     DateTime? @db.Date
+  dueDate       DateTime? @db.Date
+  briefFileKey  String?
+  briefFileName String?
+  active        Boolean   @default(true)
+  copiedFromId  String?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  school      School         @relation(fields: [schoolId], references: [id])
+  subject     Subject        @relation(fields: [subjectId], references: [id])
+  level       Level          @relation(fields: [levelId], references: [id])
+  stages      ProjectStage[]
+  assessments Assessment[]
+
+  @@index([schoolId])
+  @@index([schoolId, subjectId, levelId])
+}
+
+model ProjectStage {
+  id         String   @id @default(cuid())
+  schoolId   String
+  templateId String
+  name       String
+  sortOrder  Int      @default(0)
+  maxMark    Decimal  @db.Decimal(8, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  school   School           @relation(fields: [schoolId], references: [id])
+  template ProjectTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  rubric   Rubric?
+  marks    AssessmentMark[]
+
+  @@index([schoolId])
+  @@index([templateId])
+}
+
+model Rubric {
+  id        String   @id @default(cuid())
+  schoolId  String
+  stageId   String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school   School            @relation(fields: [schoolId], references: [id])
+  stage    ProjectStage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  criteria RubricCriterion[]
+
+  @@index([schoolId])
+}
+
+model RubricCriterion {
+  id        String   @id @default(cuid())
+  schoolId  String
+  rubricId  String
+  name      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school School        @relation(fields: [schoolId], references: [id])
+  rubric Rubric        @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+  levels RubricLevel[]
+  scores RubricScore[]
+
+  @@index([schoolId])
+  @@index([rubricId])
+}
+
+model RubricLevel {
+  id          String   @id @default(cuid())
+  schoolId    String
+  criterionId String
+  label       String
+  descriptor  String?
+  marks       Decimal  @db.Decimal(8, 2)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  school    School          @relation(fields: [schoolId], references: [id])
+  criterion RubricCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  scores    RubricScore[]
+
+  @@index([schoolId])
+  @@index([criterionId])
+}
+
+// One test, assignment, exam or project. Private to one teacher assignment (assignmentId set), or common to every class
+// of a subject at a level (assignmentId null: the end-of-term exam and mocks the Exams Officer sets once for everyone).
+// The maximum mark is fixed once a mark exists (database trigger).
+model Assessment {
+  id           String    @id @default(cuid())
+  schoolId     String
+  termId       String
+  assignmentId String?
+  levelId      String
+  subjectId    String
+  typeId       String
+  projectId    String?
+  title        String
+  date         DateTime? @db.Date
+  maxMark      Decimal   @db.Decimal(8, 2)
+  countsToTerm Boolean   @default(true)
+  copiedFromId String?
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  school      School             @relation(fields: [schoolId], references: [id])
+  term        AcademicTerm       @relation(fields: [termId], references: [id])
+  assignment  TeacherAssignment? @relation(fields: [assignmentId], references: [id])
+  level       Level              @relation(fields: [levelId], references: [id])
+  subject     Subject            @relation(fields: [subjectId], references: [id])
+  type        AssessmentType     @relation(fields: [typeId], references: [id])
+  project     ProjectTemplate?   @relation(fields: [projectId], references: [id])
+  topics      AssessmentTopic[]
+  marks       AssessmentMark[]
+  examPaperId String?            @unique
+  examPaper   ExamPaper?         @relation(fields: [examPaperId], references: [id])
+
+  @@index([schoolId])
+  @@index([termId, subjectId, levelId])
+  @@index([assignmentId])
+}
+
+model AssessmentTopic {
+  id           String   @id @default(cuid())
+  schoolId     String
+  assessmentId String
+  topicId      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  school     School        @relation(fields: [schoolId], references: [id])
+  assessment Assessment    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  topic      SyllabusTopic @relation(fields: [topicId], references: [id])
+
+  @@unique([assessmentId, topicId])
+  @@index([schoolId])
+}
+
+// A student's mark in an assessment (or in one stage of a project), entered under a teacher assignment.
+// value is null when a code (AB, EX, NS, AB_EXCUSED) stands instead, or when nothing has been entered yet.
+// Never deleted. Unique per (assessment, student, stage): two partial indexes in the migration (stage null or not).
+model AssessmentMark {
+  id              String    @id @default(cuid())
+  schoolId        String
+  assessmentId    String
+  assignmentId    String
+  studentId       String
+  stageId         String?
+  value           Decimal?  @db.Decimal(8, 2)
+  code            MarkCode?
+  enteredById     String
+  // When the teacher typed it on their device; the later of two offline versions wins.
+  clientChangedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  school       School                 @relation(fields: [schoolId], references: [id])
+  assessment   Assessment             @relation(fields: [assessmentId], references: [id])
+  assignment   TeacherAssignment      @relation(fields: [assignmentId], references: [id])
+  student      Student                @relation(fields: [studentId], references: [id])
+  stage        ProjectStage?          @relation(fields: [stageId], references: [id])
+  changes      AssessmentMarkChange[]
+  rubricScores RubricScore[]
+  evidence     MarkEvidence[]
+
+  @@index([schoolId])
+  @@index([assessmentId])
+  @@index([assignmentId])
+  @@index([studentId])
+}
+
+// The level a teacher clicked for one criterion of a rubric.
+model RubricScore {
+  id          String   @id @default(cuid())
+  schoolId    String
+  markId      String
+  criterionId String
+  levelId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  school    School          @relation(fields: [schoolId], references: [id])
+  mark      AssessmentMark  @relation(fields: [markId], references: [id])
+  criterion RubricCriterion @relation(fields: [criterionId], references: [id])
+  level     RubricLevel     @relation(fields: [levelId], references: [id])
+
+  @@unique([markId, criterionId])
+  @@index([schoolId])
+}
+
+// A photo or file showing a student's project work, for moderation.
+model MarkEvidence {
+  id           String   @id @default(cuid())
+  schoolId     String
+  markId       String
+  fileKey      String
+  fileName     String?
+  contentType  String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  school School         @relation(fields: [schoolId], references: [id])
+  mark   AssessmentMark @relation(fields: [markId], references: [id])
+
+  @@index([schoolId])
+  @@index([markId])
+}
+
+// Append-only (database trigger): every change to a mark after its sheet was first submitted.
+model AssessmentMarkChange {
+  id          String    @id @default(cuid())
+  schoolId    String
+  markId      String
+  sheetId     String?
+  oldValue    Decimal?  @db.Decimal(8, 2)
+  oldCode     MarkCode?
+  newValue    Decimal?  @db.Decimal(8, 2)
+  newCode     MarkCode?
+  changedById String
+  reason      String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  school School         @relation(fields: [schoolId], references: [id])
+  mark   AssessmentMark @relation(fields: [markId], references: [id])
+  sheet  MarkSheet?     @relation(fields: [sheetId], references: [id])
+
+  @@index([schoolId])
+  @@index([markId])
+  @@index([sheetId])
+}
+
+// One teacher assignment's marks for the term: the unit that is submitted, verified, published and unlocked.
+model MarkSheet {
+  id               String          @id @default(cuid())
+  schoolId         String
+  assignmentId     String
+  termId           String
+  status           MarkSheetStatus @default(NOT_STARTED)
+  firstSubmittedAt DateTime?
+  submittedAt      DateTime?
+  submittedById    String?
+  verifiedById     String?
+  verifiedAt       DateTime?
+  returnedComment  String?
+  returnedById     String?
+  returnedAt       DateTime?
+  unlockedById     String?
+  unlockedAt       DateTime?
+  unlockReason     String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now()) @updatedAt
+
+  school     School                 @relation(fields: [schoolId], references: [id])
+  assignment TeacherAssignment      @relation(fields: [assignmentId], references: [id])
+  term       AcademicTerm           @relation(fields: [termId], references: [id])
+  events     MarkSheetEvent[]
+  comments   SheetStudentComment[]
+  changes    AssessmentMarkChange[]
+
+  @@unique([assignmentId, termId])
+  @@index([schoolId])
+  @@index([termId, status])
+}
+
+// Who moved a sheet, when and why: the record behind "each way back is a named action by a named person".
+model MarkSheetEvent {
+  id         String          @id @default(cuid())
+  schoolId   String
+  sheetId    String
+  action     SheetAction
+  fromStatus MarkSheetStatus
+  toStatus   MarkSheetStatus
+  actorId    String
+  comment    String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @default(now()) @updatedAt
+
+  school School    @relation(fields: [schoolId], references: [id])
+  sheet  MarkSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([sheetId])
+}
+
+// The subject teacher's short comment on a student, written on the mark sheet and copied onto the result.
+model SheetStudentComment {
+  id        String   @id @default(cuid())
+  schoolId  String
+  sheetId   String
+  studentId String
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school  School    @relation(fields: [schoolId], references: [id])
+  sheet   MarkSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  student Student   @relation(fields: [studentId], references: [id])
+
+  @@unique([sheetId, studentId])
+  @@index([schoolId])
+}
+
+// Calculated by lib/results from verified mark sheets; frozen (published) when the Head publishes the class.
+model SubjectResult {
+  id              String    @id @default(cuid())
+  schoolId        String
+  studentId       String
+  subjectId       String
+  termId          String
+  classId         String
+  levelId         String
+  assignmentId    String?
+  termMark        Decimal   @db.Decimal(7, 2)
+  roundedMark     Int
+  grade           String?
+  points          Int?
+  remark          String?
+  classPosition   Int?
+  classSize       Int?
+  formPosition    Int?
+  formSize        Int?
+  teacherComment  String?
+  teacherInitials String?
+  // [{ label, score, weight }] for each line of the plan, for the report card.
+  typeScores      Json?
+  published       Boolean   @default(false)
+  publishedAt     DateTime?
+  calculatedAt    DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  school  School       @relation(fields: [schoolId], references: [id])
+  student Student      @relation(fields: [studentId], references: [id])
+  subject Subject      @relation(fields: [subjectId], references: [id])
+  term    AcademicTerm @relation(fields: [termId], references: [id])
+  class   SchoolClass  @relation(fields: [classId], references: [id])
+
+  @@unique([studentId, subjectId, termId])
+  @@index([schoolId])
+  @@index([termId, classId])
+  @@index([termId, levelId, subjectId])
+}
+
+// The class teacher's overall comment and the Head's remark, written before the results are published
+// (published TermResult rows copy them).
+model ReportComment {
+  id                  String   @id @default(cuid())
+  schoolId            String
+  studentId           String
+  termId              String
+  classId             String
+  classTeacherComment String?
+  classTeacherById    String?
+  headRemark          String?
+  headRemarkById      String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @default(now()) @updatedAt
+
+  school  School       @relation(fields: [schoolId], references: [id])
+  student Student      @relation(fields: [studentId], references: [id])
+  term    AcademicTerm @relation(fields: [termId], references: [id])
+  class   SchoolClass  @relation(fields: [classId], references: [id])
+
+  @@unique([studentId, termId])
+  @@index([schoolId])
+  @@index([termId, classId])
+}
+
+model CommentBankItem {
+  id        String          @id @default(cuid())
+  schoolId  String
+  category  CommentCategory
+  text      String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @default(now()) @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId, category])
+}
+
+// Examinations settings, one row per school (made the first time they are read).
+model ExamSettings {
+  id                     String   @id @default(cuid())
+  schoolId               String   @unique
+  englishSubjectId       String?
+  mathsSubjectId         String?
+  // Passes needed (including English and Mathematics) for the O Level flag.
+  passesRequired         Int      @default(5)
+  // Standard deviations from the class mean that raise a warning in the mark grid.
+  outlierSd              Decimal  @default(3) @db.Decimal(4, 2)
+  subjectCommentsEnabled Boolean  @default(true)
+  // Report card parts and layout.
+  showSubjectPositions   Boolean  @default(true)
+  showClassPosition      Boolean  @default(true)
+  showFormPosition       Boolean  @default(true)
+  showTypeScores         Boolean  @default(true)
+  showAttendance         Boolean  @default(true)
+  showConduct            Boolean  @default(false)
+  showPreviousAverage    Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @default(now()) @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+}
+
+// The dates the Exams Officer sets each term for entering, submitting and verifying marks.
+model ExamDeadline {
+  id        String    @id @default(cuid())
+  schoolId  String
+  termId    String
+  entryDue  DateTime? @db.Date
+  submitDue DateTime? @db.Date
+  verifyDue DateTime? @db.Date
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+
+  school School       @relation(fields: [schoolId], references: [id])
+  term   AcademicTerm @relation(fields: [termId], references: [id])
+
+  @@unique([termId])
+  @@index([schoolId])
+}
+
+// Who verifies a department's mark sheets when its Head of Department is the teacher (another HOD or the Deputy).
+model ExamDepartmentVerifier {
+  id           String   @id @default(cuid())
+  schoolId     String
+  departmentId String   @unique
+  userId       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  school     School     @relation(fields: [schoolId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
+
+  @@index([schoolId])
+}
+
+// ─── Examinations: exam timetable, invigilation, seating ─────────────────────
+
+enum ExamPeriodStatus {
+  DRAFT
+  PENDING
+  APPROVED
+}
+
+enum ExamSession {
+  MORNING
+  AFTERNOON
+}
+
+enum ExamAttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+enum ExamIncidentType {
+  MALPRACTICE
+  ILLNESS
+  DISRUPTION
+  OTHER
+}
+
+// A named run of papers: "Term 3 end-of-term exams 2026", "Form 4 mocks". Normal lessons are suspended for the levels that sit it.
+model ExamPeriod {
+  id            String           @id @default(cuid())
+  schoolId      String
+  termId        String
+  name          String
+  startDate     DateTime         @db.Date
+  endDate       DateTime         @db.Date
+  // The kind of assessment its papers feed (End-of-term exam, Mock exam): each paper makes the assessment its marks land in.
+  typeId        String
+  status        ExamPeriodStatus @default(DRAFT)
+  submittedById String?
+  submittedAt   DateTime?
+  approvedById  String?
+  approvedAt    DateTime?
+  createdById   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @default(now()) @updatedAt
+
+  school School            @relation(fields: [schoolId], references: [id])
+  term   AcademicTerm      @relation(fields: [termId], references: [id])
+  type   AssessmentType    @relation(fields: [typeId], references: [id])
+  levels ExamPeriodLevel[]
+  papers ExamPaper[]
+
+  @@index([schoolId])
+  @@index([termId, status])
+}
+
+model ExamPeriodLevel {
+  id        String   @id @default(cuid())
+  schoolId  String
+  periodId  String
+  levelId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school School     @relation(fields: [schoolId], references: [id])
+  period ExamPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  level  Level      @relation(fields: [levelId], references: [id])
+
+  @@unique([periodId, levelId])
+  @@index([schoolId])
+}
+
+model ExamPaper {
+  id              String      @id @default(cuid())
+  schoolId        String
+  periodId        String
+  subjectId       String
+  levelId         String
+  paperNumber     Int         @default(1)
+  name            String
+  durationMinutes Int
+  date            DateTime    @db.Date
+  session         ExamSession
+  startTime       String
+  maxMark         Decimal     @db.Decimal(8, 2)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @default(now()) @updatedAt
+
+  school        School           @relation(fields: [schoolId], references: [id])
+  period        ExamPeriod       @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  subject       Subject          @relation(fields: [subjectId], references: [id])
+  level         Level            @relation(fields: [levelId], references: [id])
+  rooms         ExamPaperRoom[]
+  invigilations Invigilation[]
+  attendance    ExamAttendance[]
+  incidents     ExamIncident[]
+  assessment    Assessment?
+
+  @@unique([periodId, subjectId, levelId, paperNumber])
+  @@index([schoolId])
+  @@index([periodId, date, session])
+}
+
+// A room used for a paper, and how many candidates it can seat for an exam (fewer than a lesson, to keep desks apart).
+model ExamPaperRoom {
+  id           String   @id @default(cuid())
+  schoolId     String
+  paperId      String
+  roomId       String
+  examCapacity Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  school School    @relation(fields: [schoolId], references: [id])
+  paper  ExamPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  room   Room      @relation(fields: [roomId], references: [id])
+
+  @@unique([paperId, roomId])
+  @@index([schoolId])
+}
+
+model Invigilation {
+  id        String   @id @default(cuid())
+  schoolId  String
+  paperId   String
+  roomId    String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school School    @relation(fields: [schoolId], references: [id])
+  paper  ExamPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  room   Room      @relation(fields: [roomId], references: [id])
+
+  @@unique([paperId, roomId, userId])
+  @@index([schoolId])
+  @@index([userId])
+}
+
+model ExamAttendance {
+  id          String               @id @default(cuid())
+  schoolId    String
+  paperId     String
+  studentId   String
+  roomId      String?
+  status      ExamAttendanceStatus
+  arrivalTime String?
+  markedById  String
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @default(now()) @updatedAt
+
+  school  School    @relation(fields: [schoolId], references: [id])
+  paper   ExamPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  student Student   @relation(fields: [studentId], references: [id])
+
+  @@unique([paperId, studentId])
+  @@index([schoolId])
+}
+
+model ExamIncident {
+  id                   String           @id @default(cuid())
+  schoolId             String
+  paperId              String
+  roomId               String?
+  studentId            String?
+  type                 ExamIncidentType
+  description          String
+  reportedById         String
+  occurredAt           DateTime         @default(now())
+  // Suspected malpractice is also recorded in Discipline (category Exam dishonesty).
+  disciplineIncidentId String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @default(now()) @updatedAt
+
+  school  School    @relation(fields: [schoolId], references: [id])
+  paper   ExamPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  student Student?  @relation(fields: [studentId], references: [id])
+
+  @@index([schoolId])
+  @@index([paperId])
+}
+
+// ─── Examinations: ZIMSEC and Cambridge registration and results ─────────────
+
+enum ExamBoard {
+  ZIMSEC
+  CAMBRIDGE
+}
+
+enum BoardSessionStatus {
+  OPEN
+  APPROVED
+}
+
+enum AmendmentKind {
+  CANDIDATE_ADDED
+  CANDIDATE_REMOVED
+  SUBJECT_ADDED
+  SUBJECT_REMOVED
+  DETAILS_CHANGED
+}
+
+// One sitting with a board: "ZIMSEC November 2027, O Level". Fees, dates, subject codes and the export layout are entered by the
+// Exams Officer each session because the board changes them; nothing here is hard-coded.
+model BoardSession {
+  id                 String             @id @default(cuid())
+  schoolId           String
+  board              ExamBoard
+  category           LevelCategory
+  session            String
+  centreNumber       String
+  registrationOpens  DateTime?          @db.Date
+  registrationCloses DateTime?          @db.Date
+  feePerSubject      Decimal            @db.Decimal(10, 2)
+  fixedFee           Decimal            @default(0) @db.Decimal(10, 2)
+  currency           Currency           @default(USD)
+  photoRequired      Boolean            @default(true)
+  // Grades that count as a pass, best first ("A,B,C" for O Level), and points for A Level ({"A":5,"B":4 ...}).
+  passGrades         String[]
+  gradePoints        Json?
+  // Columns of the export, in order (see lib/exams/board-export.ts).
+  exportColumns      String[]
+  // One row per candidate (subjects in columns), or one row per candidate and subject.
+  exportLayout       String             @default("CANDIDATE")
+  status             BoardSessionStatus @default(OPEN)
+  approvedById       String?
+  approvedAt         DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @default(now()) @updatedAt
+
+  school     School             @relation(fields: [schoolId], references: [id])
+  codes      BoardSubjectCode[]
+  candidates Candidate[]
+  results    BoardResult[]
+  amendments BoardAmendment[]
+
+  @@unique([schoolId, board, category, session])
+  @@index([schoolId])
+}
+
+model BoardSubjectCode {
+  id        String   @id @default(cuid())
+  schoolId  String
+  sessionId String
+  code      String
+  name      String
+  subjectId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school  School           @relation(fields: [schoolId], references: [id])
+  session BoardSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  subject Subject?         @relation(fields: [subjectId], references: [id])
+  entries CandidateEntry[]
+  results BoardResult[]
+
+  @@unique([sessionId, code])
+  @@index([schoolId])
+}
+
+// A candidate: a student of the school, or a private candidate (a re-sitter registering at the school as a centre).
+model Candidate {
+  id              String    @id @default(cuid())
+  schoolId        String
+  sessionId       String
+  studentId       String?
+  // Private candidates only: the details a student record would hold.
+  fullName        String?
+  gender          Gender?
+  dateOfBirth     DateTime? @db.Date
+  idNumber        String?
+  phone           String?
+  // The name exactly as on the birth certificate, when it differs from the student record.
+  certificateName String?
+  candidateNumber String?
+  // The Exams Officer has checked the name against the birth certificate.
+  nameChecked     Boolean   @default(false)
+  // Ticked by hand when Finance is off (or the payment was made another way).
+  feePaidManual   Boolean   @default(false)
+  createdById     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  school  School           @relation(fields: [schoolId], references: [id])
+  session BoardSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student Student?         @relation(fields: [studentId], references: [id])
+  entries CandidateEntry[]
+  results BoardResult[]
+
+  @@index([schoolId])
+  @@index([sessionId])
+  @@index([studentId])
+}
+
+model CandidateEntry {
+  id          String   @id @default(cuid())
+  schoolId    String
+  candidateId String
+  codeId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  school    School           @relation(fields: [schoolId], references: [id])
+  candidate Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  code      BoardSubjectCode @relation(fields: [codeId], references: [id])
+
+  @@unique([candidateId, codeId])
+  @@index([schoolId])
+}
+
+// A released grade. Attached to the student record (and so the alumni record) when the candidate is a student of the school.
+model BoardResult {
+  id              String   @id @default(cuid())
+  schoolId        String
+  sessionId       String
+  candidateId     String?
+  studentId       String?
+  candidateNumber String
+  codeId          String
+  grade           String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  school    School           @relation(fields: [schoolId], references: [id])
+  session   BoardSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  candidate Candidate?       @relation(fields: [candidateId], references: [id])
+  student   Student?         @relation(fields: [studentId], references: [id])
+  code      BoardSubjectCode @relation(fields: [codeId], references: [id])
+
+  @@unique([sessionId, candidateNumber, codeId])
+  @@index([schoolId])
+  @@index([studentId])
+}
+
+// After the Head approves the entry list, every change is logged here as an amendment.
+model BoardAmendment {
+  id          String        @id @default(cuid())
+  schoolId    String
+  sessionId   String
+  candidateId String?
+  kind        AmendmentKind
+  detail      String
+  madeById    String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
+
+  school  School       @relation(fields: [schoolId], references: [id])
+  session BoardSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([sessionId])
 }

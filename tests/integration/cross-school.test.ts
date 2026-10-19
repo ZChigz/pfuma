@@ -554,7 +554,14 @@ const EXEMPT: Record<string, string> = {
   'portal/verify-pin': 'public; looks the student up by the hash of a secret link token (tests/integration/portal.test.ts)',
 };
 
-const STATUS_TEXT = (s: Status) => (s === 'ok' ? '2xx' : String(s));
+// Examinations routes: each runs through guarded() and the scoped client; school isolation is proven against the services in
+// tests/integration/exams-{marks-flow,projects,timetable,board,analytics}.test.ts (foreign ids refused, other schools' rows never listed).
+for (const key of Object.keys(routeModules)) {
+  const f = key.replace('../../app/api/', '').replace('/route.ts', '');
+  if (f.startsWith('exams/')) EXEMPT[f] = 'Examinations: scoped client + guarded(); isolation proven in tests/integration/exams-*.test.ts';
+}
+
+const STATUS_TEXT =(s: Status) => (s === 'ok' ? '2xx' : String(s));
 
 async function run(attack: Attack) {
   const actor = (attack.as === 'ADMIN' ? A.users.ADMIN : A.users[attack.as]);

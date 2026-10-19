@@ -45,7 +45,7 @@ export function FileUpload({ endpoint, label, onUpload, existingUrl, className }
       const name = res?.[0]?.name;
       // Private uploads (proof of payment) have no public URL: the server hands
       // back a key, and the file is only ever opened through a signed link.
-      const isPrivate = endpoint === 'proofOfPayment' || endpoint === 'studentDocument';
+      const isPrivate = endpoint === 'proofOfPayment' || endpoint === 'studentDocument' || endpoint === 'projectEvidence' || endpoint === 'projectBrief';
       const privateKey = (res?.[0]?.serverData as { key?: string } | undefined)?.key;
       const url = isPrivate ? privateKey : res?.[0]?.url;
       if (url) {

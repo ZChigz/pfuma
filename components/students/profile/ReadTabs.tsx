@@ -36,6 +36,17 @@ export function OverviewTab({ o }: { o: ProfileOverview }) {
           ['Special educational needs', o.specialNeeds ? `Yes${o.specialNeedsNote ? `: ${o.specialNeedsNote}` : ''}` : null],
         ]} />
       </Section>
+      {o.examinations && (
+        <Section title="Examinations">
+          {o.examinations.candidateNumbers.length > 0 && <Facts rows={o.examinations.candidateNumbers.map((c) => [`Candidate number, ${c.session}`, c.number])} />}
+          {o.examinations.boardResults.map((b) => (
+            <div key={`${b.board}${b.session}`} className="mt-3">
+              <h3 className="text-sm font-semibold text-ink">{b.board} {b.session}: released results</h3>
+              <p className="mt-1 flex flex-wrap gap-2 text-sm">{b.results.map((r) => <span key={r.code} className="rounded-full bg-tint px-3 py-1">{r.subject} <strong>{r.grade}</strong></span>)}</p>
+            </div>
+          ))}
+        </Section>
+      )}
       <Section title="Siblings at the school">
         {o.siblings.length === 0 ? <p className="text-sm text-muted">No siblings at the school.</p> : (
           <ul className="flex flex-col divide-y divide-line">

@@ -7,6 +7,7 @@ import { requirePermission } from '@/lib/access';
 import { POP_ALLOWED_TYPES, POP_MAX_BYTES, newProofKey } from '@/lib/proof-of-payment';
 import { randomUUID } from 'node:crypto';
 import { DOCUMENT_MIME_TYPES, MAX_DOCUMENT_BYTES, newDocumentKey } from '@/lib/students/documents';
+import { EVIDENCE_TYPES, MAX_EVIDENCE_BYTES, newBriefKey, newEvidenceKey } from '@/lib/exams/keys';
 
 const f = createUploadthing();
 
@@ -79,6 +80,42 @@ export const fileRouter = {
         schoolId: user.schoolId,
         [UTFiles]: files.map((file) => ({ ...file, customId: newDocumentKey(user.schoolId, randomUUID()) })),
       };
+    })
+    .onUploadComplete(({ file }) => ({ key: file.customId ?? file.key })),
+
+  // School-based project evidence (photos of the work, or a PDF) per student and stage, and the project brief: private, under a key
+  // that starts with the school id, opened only through links that expire after 10 minutes. The type and size are checked here as
+  // well as in the route config because a client can lie about both.
+  projectEvidence: f({
+    'image/jpeg':      { maxFileSize: '8MB', maxFileCount: 1, acl: 'private' },
+    'image/png':       { maxFileSize: '8MB', maxFileCount: 1, acl: 'private' },
+    'image/webp':      { maxFileSize: '8MB', maxFileCount: 1, acl: 'private' },
+    'application/pdf': { maxFileSize: '8MB', maxFileCount: 1, acl: 'private' },
+  })
+    .middleware(async ({ files }) => {
+      let user;
+      try { user = await requirePermission('exams.marks.enter'); } catch { throw new UploadThingError('You cannot add project evidence'); }
+      for (const file of files) {
+        if (!(EVIDENCE_TYPES as readonly string[]).includes(file.type)) throw new UploadThingError('Only JPG, PNG, WebP or PDF files are allowed');
+        if (file.size > MAX_EVIDENCE_BYTES) throw new UploadThingError('The file must be 8 MB or smaller');
+      }
+      return { userId: user.id, schoolId: user.schoolId, [UTFiles]: files.map((file) => ({ ...file, customId: newEvidenceKey(user.schoolId, randomUUID()) })) };
+    })
+    .onUploadComplete(({ file }) => ({ key: file.customId ?? file.key })),
+
+  projectBrief: f({
+    'application/pdf': { maxFileSize: '8MB', maxFileCount: 1, acl: 'private' },
+    'image/jpeg':      { maxFileSize: '8MB', maxFileCount: 1, acl: 'private' },
+    'image/png':       { maxFileSize: '8MB', maxFileCount: 1, acl: 'private' },
+  })
+    .middleware(async ({ files }) => {
+      let user;
+      try { user = await requirePermission('exams.projects.manage'); } catch { throw new UploadThingError('You cannot upload a project brief'); }
+      for (const file of files) {
+        if (!(DOCUMENT_MIME_TYPES as readonly string[]).includes(file.type)) throw new UploadThingError('Only PDF, JPG or PNG files are allowed');
+        if (file.size > MAX_EVIDENCE_BYTES) throw new UploadThingError('The file must be 8 MB or smaller');
+      }
+      return { userId: user.id, schoolId: user.schoolId, [UTFiles]: files.map((file) => ({ ...file, customId: newBriefKey(user.schoolId, randomUUID()) })) };
     })
     .onUploadComplete(({ file }) => ({ key: file.customId ?? file.key })),
 

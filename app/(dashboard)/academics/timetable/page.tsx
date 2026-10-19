@@ -3,6 +3,7 @@ import { getAccess } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { isFull, reachableClassIds } from '@/lib/academics/common';
 import { timetableState } from '@/lib/academics/timetable';
+import { lessonSuspensions } from '@/lib/exams/timetable';
 import { getViewTerm } from '@/lib/system/view-term';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -43,9 +44,17 @@ export default async function TimetablePage() {
     seesAll ? db.room.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }) : Promise.resolve([]),
   ]);
   const kind = seesAll ? 'class' : 'teacher';
+  // Normal lessons are suspended for the forms that sit an approved exam period, on its days (Examinations).
+  const suspended = await db.$tx((tx) => lessonSuspensions(tx, user.schoolId, term.id));
+  const levelNames = new Map((await db.level.findMany({ select: { id: true, name: true } })).map((l) => [l.id, l.name]));
   return (
     <div className="flex flex-col gap-4 pb-8">
       {header}
+      {suspended.map((p) => (
+        <div key={p.name} role="status" className="rounded-xl border border-warn-line bg-warn-bg px-4 py-3 text-sm text-warn">
+          <strong>{p.name}:</strong> lessons are suspended for {p.levelIds.map((id) => levelNames.get(id) ?? '').filter(Boolean).join(', ')} from {p.startDate} to {p.endDate}{p.days.length ? ` (exam days: ${p.days.join(', ')})` : ''}.
+        </div>
+      ))}
       <TimetableClient
         termId={term.id} state={state} classes={classes} teachers={teachers} rooms={rooms} myId={user.id}
         initialKind={kind} initialId={kind === 'class' ? classes[0]?.id ?? null : user.id} flags={{ edit, approve, seesAll }}
