@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { StatCard } from '@/components/ui/StatCard';
 import { getDaysOverdue } from '@/lib/utils';
 import { getOpenTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
