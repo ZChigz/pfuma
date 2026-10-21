@@ -65,6 +65,7 @@ function propsFor(file: string) {
   const params: Record<string, string> = {};
   if (file.includes('/classes/[id]')) params.id = A.classId;
   else if (file.includes('/accounting/students/[id]')) params.id = A.studentId;
+  else if (file.includes('/finance/accounts/[studentId]')) params.studentId = A.studentId;
   else if (file.includes('/assets/[id]')) params.id = A.assetId;
   else if (file.includes('/students/[id]')) params.id = A.studentId;
   else if (file.includes('/admissions/[intakeId]')) params.intakeId = intakeId;

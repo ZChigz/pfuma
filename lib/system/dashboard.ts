@@ -1,6 +1,6 @@
 // Numbers for the dashboard, for the term being VIEWED (which may not be the open one).
-import type { Currency } from '@prisma/client';
 import type { ScopedDb } from '@/lib/scoped-db';
+import { termMoney } from '@/lib/finance/external';
 
 const DAY = 864e5;
 export interface ViewTerm { id: string; name: string; startDate: Date; endDate: Date; status: string }
@@ -36,16 +36,13 @@ export async function getDashboardData(
 
   const verifiedWindow = term ? { gte: term.startDate, lt: new Date(term.endDate.getTime() + DAY) } : undefined;
 
-  const [enrolled, classes, staff, upcoming, billed, collected, pendingPayments, recent] = await Promise.all([
+  const [enrolled, classes, staff, upcoming, money, recent] = await Promise.all([
     term ? db.enrollment.count({ where: { schoolId, termId: term.id } }) : Promise.resolve(0),
     db.schoolClass.count({ where: { schoolId, active: true } }),
     db.user.count({ where: { schoolId, active: true, isSupport: false } }),
     db.calendarEvent.findMany({ where: { schoolId, endDate: { gte: today } }, orderBy: [{ startDate: 'asc' }, { title: 'asc' }], take: 5 }),
-    opts.finance && term ? db.charge.groupBy({ by: ['currency'], where: { schoolId, termId: term.id }, _sum: { amount: true } }) : Promise.resolve([]),
-    opts.finance && verifiedWindow
-      ? db.payment.groupBy({ by: ['currency'], where: { schoolId, status: 'VERIFIED', verifiedAt: verifiedWindow }, _sum: { amount: true } })
-      : Promise.resolve([]),
-    opts.finance ? db.payment.count({ where: { schoolId, status: 'PENDING' } }) : Promise.resolve(0),
+    // From the Finance module for a school that runs its money there, else the first accounting tables.
+    opts.finance ? db.$tx((tx) => termMoney(tx, schoolId, term, verifiedWindow)) : Promise.resolve(null),
     opts.audit
       ? db.auditLog.findMany({
           where: { schoolId, action: { notIn: ['DATA_CREATE', 'DATA_UPDATE', 'DATA_DELETE'] } },
@@ -56,20 +53,14 @@ export async function getDashboardData(
       : Promise.resolve([]),
   ]);
 
-  const sum = (rows: { currency: Currency; _sum: { amount: unknown } }[]): MoneyByCurrency => {
-    const out = emptyMoney();
-    for (const r of rows) out[r.currency] = Number(r._sum.amount ?? 0);
-    return out;
-  };
-
   return {
     enrolled,
     classes,
     staff,
     upcoming,
-    billed: sum(billed as never),
-    collected: sum(collected as never),
-    pendingPayments,
+    billed: money?.billed ?? emptyMoney(),
+    collected: money?.collected ?? emptyMoney(),
+    pendingPayments: money?.pending ?? 0,
     recent,
     progress: term ? termProgress(term, now) : null,
   };

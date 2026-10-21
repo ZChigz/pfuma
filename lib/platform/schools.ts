@@ -102,6 +102,9 @@ export async function createSchool(admin: Admin, input: CreateInput) {
       },
     });
 
+    // A school created now keeps its money in the Finance module from the start; the older accounting screens stay read-only.
+    await tx.finSettings.create({ data: { schoolId: school.id, legacyRetired: true } });
+
     const modules = presetModules(input.preset);
     await tx.schoolModule.createMany({
       data: MODULE_KEYS.filter((k) => !ALWAYS_ON_MODULES.includes(k) || modules[k]).map((module) => ({

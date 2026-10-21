@@ -8,6 +8,7 @@ import { logAudit } from '@/lib/audit';
 import { getScopedDb } from '@/lib/scoped-db';
 import { dateOnly } from '@/lib/academic/terms';
 import { idSchema, loadReachable } from '@/lib/students/common';
+import { adjustForBoardingChange } from '@/lib/finance/billing';
 import { isoDateField, optionalText, personName } from '@/lib/students/registration';
 import { isValidBirthCert, normaliseBirthCert } from '@/lib/students/rules';
 import { ORPHAN_STATUSES } from '@/lib/students/admit';
@@ -92,6 +93,10 @@ export async function updateStudent(user: AccessUser, studentId: string, rawInpu
     }
     if (changed.length === 0) return { changed: [] as string[] };
     const updated = await tx.student.update({ where: { id: studentId }, data });
+    // Day to boarder (or back): the boarding charge is added or reversed from today, if the term has been billed.
+    if (changed.includes('boarding') && updated.status === 'ACTIVE') {
+      await adjustForBoardingChange(tx, user, studentId, updated.boarding as 'DAY' | 'BOARDER', new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`));
+    }
     await logAudit(
       { schoolId, actorId: user.id, action: 'UPDATE_STUDENT', entityType: 'Student', entityId: studentId, detail: `${updated.fullName}: ${changed.join(', ')}`, before: was as Prisma.InputJsonValue, after: now as Prisma.InputJsonValue },
       tx,

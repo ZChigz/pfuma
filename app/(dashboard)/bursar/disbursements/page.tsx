@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { formatUSD, formatZiG, formatDate } from '@/lib/utils';
@@ -15,6 +16,7 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 };
 
 export default async function BursarDisbursementsPage() {
+  await sendToFinance('/finance/requests?status=APPROVED');
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;

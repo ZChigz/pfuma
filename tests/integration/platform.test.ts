@@ -168,7 +168,7 @@ describe('creating a school', () => {
     const roles = await prisma.roleDefinition.findMany({ where: { schoolId: school.id }, include: { permissions: true } });
     expect(roles).toHaveLength(13);
     for (const key of ['OWNER', 'ADMINISTRATOR']) expect(roles.find((x) => x.key === key)!.permissions.map((p) => p.permissionKey), key).toContain('*');
-    expect(roles.find((x) => x.key === 'TEACHER')!.permissions.map((p) => p.permissionKey).sort()).toEqual(['academics.assignments.view', 'academics.attendance.mark', 'academics.classes.view', 'academics.schemes.edit', 'academics.schemes.view', 'academics.subjects.view', 'academics.timetable.view', 'exams.analytics.view', 'exams.assessments.create', 'exams.comments.subject', 'exams.marks.enter', 'exams.marks.submit', 'system.calendar.view', 'system.dashboard.view']);
+    expect(roles.find((x) => x.key === 'TEACHER')!.permissions.map((p) => p.permissionKey).sort()).toEqual(['academics.assignments.view', 'academics.attendance.mark', 'academics.classes.view', 'academics.schemes.edit', 'academics.schemes.view', 'academics.subjects.view', 'academics.timetable.view', 'exams.analytics.view', 'exams.assessments.create', 'exams.comments.subject', 'exams.marks.enter', 'exams.marks.submit', 'finance.requests.create', 'system.calendar.view', 'system.dashboard.view']);
 
     const users = await prisma.user.findMany({ where: { schoolId: school.id }, include: { userRoles: { include: { role: true } } } });
     expect(users).toHaveLength(2);
@@ -499,7 +499,8 @@ describe('the console never edits a school\'s own records', () => {
         return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]));
       })(path.join(root, 'app/api/platform')),
     ];
-    const allowed = new Set(['school', 'schoolModule', 'subscriptionInvoice', 'plan', 'user', 'passwordResetToken', 'notification', 'platformAdmin', 'platformAuditLog', 'auditLog']);
+    // finSettings: a new school starts with its Finance controls row, which keeps the older accounting screens read-only from day one.
+    const allowed = new Set(['school', 'schoolModule', 'subscriptionInvoice', 'plan', 'user', 'passwordResetToken', 'notification', 'platformAdmin', 'platformAuditLog', 'auditLog', 'finSettings']);
     const used = new Set<string>();
     for (const f of files) {
       for (const m of Array.from(fs.readFileSync(f, 'utf8').matchAll(/\b(?:prisma|tx|db)\.([a-z][A-Za-z]+)\.(create|createMany|update|updateMany|upsert|delete|deleteMany)\b/g))) used.add(m[1]);

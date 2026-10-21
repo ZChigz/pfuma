@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
@@ -15,6 +16,7 @@ export default async function HeadRequestsPage({
 }: {
   searchParams: { tab?: string };
 }) {
+  await sendToFinance('/finance/requests');
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;

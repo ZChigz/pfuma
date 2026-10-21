@@ -106,7 +106,19 @@ describe('roles and permissions as data', () => {
           DEPUTY_HEAD: ['exams.analytics.view', 'exams.marks.view', 'exams.results.view', 'exams.timetable.approve'],
           EXAMS_OFFICER: ['exams.analytics.view', 'exams.invigilation.manage', 'exams.marks.view', 'exams.projects.manage', 'exams.results.view', 'exams.setup.manage', 'exams.timetable.manage', 'exams.zimsec.manage', 'exams.zimsec.results_import'],
         };
-        expect(keys, r.key).toEqual([...own, ...(exams[r.key] ?? []),'system.calendar.view', 'system.dashboard.view'].sort());
+        // Finance keys each role starts with (finance_role_keys in the migration): everyone who can ask for spending, and the finance people.
+        const raise = ['finance.requests.create'];
+        const finance: Record<string, string[]> = {
+          TEACHER: raise, CLASS_TEACHER: raise, HOD: raise, EXAMS_OFFICER: raise, LIBRARIAN: raise, HR_OFFICER: raise, BOARDING_MASTER: raise,
+          DEPUTY_HEAD: ['finance.fees.view', 'finance.requests.create'],
+          ACCOUNTS_CLERK: ['finance.accounts.view', 'finance.fees.view', 'finance.payments.record', 'finance.payments.view', 'finance.requests.create', 'finance.requests.view'],
+          HEAD: ['finance.accounts.view', 'finance.adjustments.approve', 'finance.expenses.view', 'finance.fees.view', 'finance.funds.manage', 'finance.payments.verify', 'finance.payments.view', 'finance.rates.view',
+            'finance.refunds.approve', 'finance.reports.export', 'finance.reports.view', 'finance.requests.approve', 'finance.requests.create', 'finance.requests.view'],
+          BURSAR: ['finance.accounts.view', 'finance.adjustments.create', 'finance.charges.create', 'finance.expenses.record', 'finance.expenses.view', 'finance.fees.manage', 'finance.fees.view', 'finance.payments.record',
+            'finance.payments.verify', 'finance.payments.view', 'finance.rates.view', 'finance.refunds.pay', 'finance.refunds.request', 'finance.reports.export', 'finance.reports.view', 'finance.requests.create',
+            'finance.requests.disburse', 'finance.requests.view'],
+        };
+        expect(keys, r.key).toEqual([...own, ...(exams[r.key] ?? []), ...(finance[r.key] ?? []), 'system.calendar.view', 'system.dashboard.view'].sort());
       }
     }
   });

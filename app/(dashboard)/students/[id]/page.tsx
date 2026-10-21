@@ -12,6 +12,7 @@ import { studentAccess, visibleStudentTabs } from '@/lib/students/rules';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { cn } from '@/lib/utils';
 import { studentTabContent } from '@/components/students/tab-registry';
+import '@/lib/finance/student-tab';
 import { HeaderClient } from '@/components/students/profile/HeaderClient';
 import { ActivityTab, EnrolmentTab, OverviewTab } from '@/components/students/profile/ReadTabs';
 import { GuardiansTab } from '@/components/students/profile/GuardiansTab';

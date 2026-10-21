@@ -147,6 +147,8 @@ export interface StudentTabDef {
   key: string;
   label: string;
   permission: PermissionKey;
+  /** Other permissions that also open the tab (the tab then decides how much to show). */
+  alsoFor?: PermissionKey[];
 }
 
 const CORE_TABS: StudentTabDef[] = [
@@ -170,7 +172,7 @@ export function registerStudentTab(tab: StudentTabDef) {
 
 /** The tabs this user may open, in order (the core tabs, then modules' tabs). */
 export function visibleStudentTabs(user: AccessUser | null | undefined): StudentTabDef[] {
-  return [...CORE_TABS, ...registered].filter((t) => can(user, t.permission));
+  return [...CORE_TABS, ...registered].filter((t) => can(user, t.permission) || (t.alsoFor ?? []).some((k) => can(user, k)));
 }
 
 // ─── Exports ─────────────────────────────────────────────────────────────────

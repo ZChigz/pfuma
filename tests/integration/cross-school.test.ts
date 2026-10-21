@@ -559,6 +559,10 @@ const EXEMPT: Record<string, string> = {
 for (const key of Object.keys(routeModules)) {
   const f = key.replace('../../app/api/', '').replace('/route.ts', '');
   if (f.startsWith('exams/')) EXEMPT[f] = 'Examinations: scoped client + guarded(); isolation proven in tests/integration/exams-*.test.ts';
+  // Finance routes run through guarded() and the scoped client. Other schools' payments, charges, requests and accounts are refused (404)
+  // by the services (tests/integration/finance-flows.test.ts, "one school never sees another"), and the database refuses a row that
+  // points into another school (tests/integration/finance-database.test.ts).
+  if (f.startsWith('finance/')) EXEMPT[f] = 'Finance: scoped client + guarded(); isolation proven in tests/integration/finance-flows.test.ts and finance-database.test.ts';
 }
 
 const STATUS_TEXT =(s: Status) => (s === 'ok' ? '2xx' : String(s));
