@@ -1,11 +1,12 @@
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
-import { StatCard } from '@/components/ui/StatCard';
 import Link from 'next/link';
 import { getDaysOverdue } from '@/lib/utils';
 import { getOpenTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
+
+const METHOD_LABEL = (m: string) => m.charAt(0) + m.slice(1).toLowerCase().replace(/_/g, ' ');
 
 export default async function HeadDashboard() {
   const session = await auth();
@@ -33,7 +34,8 @@ export default async function HeadDashboard() {
       where: { schoolId, status: 'ACTIVE' },
       select: {
         id: true,
-        charges:  { select: { currency: true, amount: true, issuedAt: true } },
+        grade: true,
+        charges: { select: { currency: true, amount: true, issuedAt: true } },
         payments: { where: { status: 'VERIFIED' }, select: { currency: true, amount: true } },
       },
     }),
@@ -42,16 +44,16 @@ export default async function HeadDashboard() {
   const unpublishedClasses = unpublishedAssignments.length;
 
   let overdueCount = 0;
+  const owingByGrade = new Map<string, number>();
   for (const s of students) {
-    const cUSD = s.charges.filter((c) => c.currency === 'USD').reduce((n, c) => n + c.amount.toNumber(), 0);
-    const pUSD = s.payments.filter((p) => p.currency === 'USD').reduce((n, p) => n + p.amount.toNumber(), 0);
-    const cZiG = s.charges.filter((c) => c.currency === 'ZIG').reduce((n, c) => n + c.amount.toNumber(), 0);
-    const pZiG = s.payments.filter((p) => p.currency === 'ZIG').reduce((n, p) => n + p.amount.toNumber(), 0);
-
-    const balUSD = Math.max(0, cUSD - pUSD);
-    const balZiG = Math.max(0, cZiG - pZiG);
+    const sum = (rows: { currency: string; amount: { toNumber(): number } }[], cur: string) =>
+      rows.filter((r) => r.currency === cur).reduce((n, r) => n + r.amount.toNumber(), 0);
+    const balUSD = Math.max(0, sum(s.charges, 'USD') - sum(s.payments, 'USD'));
+    const balZiG = Math.max(0, sum(s.charges, 'ZIG') - sum(s.payments, 'ZIG'));
     if (balUSD <= 0 && balZiG <= 0) continue;
     if (s.charges.length === 0) continue;
+
+    owingByGrade.set(s.grade, (owingByGrade.get(s.grade) ?? 0) + 1);
 
     const oldestMs = Math.min(...s.charges.map((c) => new Date(c.issuedAt).getTime()));
     if (getDaysOverdue(new Date(oldestMs)) >= 60) overdueCount++;

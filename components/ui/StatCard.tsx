@@ -41,14 +41,14 @@ export function StatCard({ label, value, note, href, hero, tone = 'default', cla
         )}
       </div>
       <div className="relative mt-6">
-        <p className={cn('text-4xl font-semibold leading-none tabular-nums tracking-tight', !hero && toneClass[tone])}>{value}</p>
+        <p className={cn('font-semibold leading-none tabular-nums tracking-tight', String(value).length > 7 ? 'text-3xl' : 'text-5xl', !hero && toneClass[tone])}>{value}</p>
         {note && <p className={cn('mt-3 text-xs', hero ? 'text-emerald-100/90' : 'text-muted')}>{note}</p>}
       </div>
     </>
   );
 
   const classes = cn(
-    'group flex min-h-[140px] flex-col justify-between rounded-2xl p-5',
+    'group flex min-h-[148px] flex-col justify-between rounded-2xl p-5',
     hero ? 'term-card text-white' : 'bg-white text-ink',
     className,
   );

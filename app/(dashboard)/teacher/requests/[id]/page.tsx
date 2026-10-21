@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { sendToFinance } from '@/lib/finance/legacy-redirect';
+import { CrumbLabel } from '@/components/layout/Breadcrumbs';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect, notFound } from 'next/navigation';
@@ -34,11 +35,7 @@ export default async function TeacherRequestDetailPage({ params }: { params: { i
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <Link href="/teacher/requests" className="text-sm font-medium text-primary">
-          &larr; Back to requests
-        </Link>
-      </div>
+      <CrumbLabel label={request.requestNumber} />
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
