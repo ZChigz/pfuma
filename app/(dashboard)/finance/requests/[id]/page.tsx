@@ -9,7 +9,8 @@ import { AccessDenied } from '@/components/ui/AccessDenied';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { RequestForm } from '@/components/finance/RequestForm';
-import { METHOD_OPTIONS, Money, Notice, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { Notice, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { METHOD_OPTIONS, Money } from '@/components/finance/format';
 import { FormAction } from '@/components/finance/FormAction';
 import { formatMoney, plainAmount } from '@/lib/finance/money';
 

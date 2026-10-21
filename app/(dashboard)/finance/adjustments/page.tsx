@@ -3,7 +3,8 @@ import { getAccess } from '@/lib/access';
 import { KIND_LABEL, listAdjustments } from '@/lib/finance/adjustments';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Money, Pager, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { Money, Pager } from '@/components/finance/format';
 
 export const metadata = { title: 'Credit notes · Pfuma' };
 

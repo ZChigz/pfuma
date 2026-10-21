@@ -11,7 +11,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { AttendanceSummaryClient } from '@/components/academics/AttendanceSummaryClient';
 import { RegisterClient } from '@/components/academics/RegisterClient';
-import { Section, primaryLink, linkButton } from '@/components/academics/shared';
+import { Section } from '@/components/academics/shared';
+import { primaryLink, linkButton } from '@/components/academics/styles';
 
 export const metadata = { title: 'Attendance · Pfuma' };
 

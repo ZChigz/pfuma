@@ -9,23 +9,10 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { toast } from '@/components/ui/Toast';
 import { api, problem } from '@/components/exams/shared';
-import { formatMoney, formatTotals, type Cur, type Totals } from '@/lib/finance/money';
-import { CLERK_METHODS, METHOD_LABEL, type Method } from '@/lib/finance/methods';
 
-export { api, problem, Section, Notice, Th, Td, Tabs, ClosedNotice, linkButton, primaryLink, fieldClass, labelClass } from '@/components/exams/shared';
-
-export const CUR_LABEL: Record<Cur, string> = { USD: 'US dollars', ZIG: 'ZiG' };
-
-export function Money({ cents, currency, className }: { cents: number; currency: Cur; className?: string }) {
-  return <span className={`tabular-nums ${className ?? ''}`}>{formatMoney(cents, currency)}</span>;
-}
-
-/** US dollars and ZiG side by side, never added. */
-export function MoneyLine({ totals, empty = '—' }: { totals: Partial<Totals>; empty?: string }) {
-  const parts = (['USD', 'ZIG'] as const).filter((c) => (totals[c] ?? 0) !== 0);
-  if (parts.length === 0) return <span className="text-muted">{empty}</span>;
-  return <span className="tabular-nums">{formatTotals(totals)}</span>;
-}
+export { api, problem, Section, Notice, Th, Td, Tabs, ClosedNotice } from '@/components/exams/shared';
+export { CUR_LABEL, METHOD_OPTIONS, Money, MoneyLine, Pager, fieldClass, labelClass, linkButton, methodLabel, primaryLink } from '@/components/finance/format';
+import { fieldClass } from '@/components/finance/format';
 
 const STATUS: Record<string, { v: BadgeVariant; label: string }> = {
   PENDING: { v: 'warning', label: 'Waiting' }, VERIFIED: { v: 'success', label: 'Verified' }, REJECTED: { v: 'danger', label: 'Rejected' }, VOIDED: { v: 'neutral', label: 'Voided' },
@@ -122,9 +109,6 @@ export function RowAction({ label, url, method = 'POST', body = {}, reason, conf
   );
 }
 
-export const METHOD_OPTIONS = CLERK_METHODS.map((m) => ({ value: m, label: METHOD_LABEL[m] }));
-export const methodLabel = (m: string) => METHOD_LABEL[m as Method] ?? m;
-
 /** A labelled field row for the modal forms. */
 export function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
   return (
@@ -133,20 +117,6 @@ export function Field({ id, label, hint, children }: { id: string; label: string
       {children}
       {hint && <p className="text-xs text-muted">{hint}</p>}
     </div>
-  );
-}
-
-/** A small pager for the lists. */
-export function Pager({ page, pageSize, total, hrefFor }: { page: number; pageSize: number; total: number; hrefFor: (page: number) => string }) {
-  const pages = Math.max(1, Math.ceil(total / pageSize));
-  if (pages <= 1) return null;
-  const cls = 'inline-flex min-h-[40px] items-center rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-tint';
-  return (
-    <nav className="flex items-center justify-between gap-3 pt-3" aria-label="Pages">
-      {page > 1 ? <a className={cls} href={hrefFor(page - 1)}>Previous</a> : <span />}
-      <span className="text-sm text-muted">Page {page} of {pages} · {total} in all</span>
-      {page < pages ? <a className={cls} href={hrefFor(page + 1)}>Next</a> : <span />}
-    </nav>
   );
 }
 

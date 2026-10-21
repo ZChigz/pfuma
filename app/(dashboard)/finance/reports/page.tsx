@@ -9,7 +9,8 @@ import { ServiceError } from '@/lib/api';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Money, Notice, PrintButton, Section, Td, Th, fieldClass, methodLabel } from '@/components/finance/shared';
+import { Notice, PrintButton, Section, Td, Th } from '@/components/finance/shared';
+import { Money, fieldClass, methodLabel } from '@/components/finance/format';
 import { CURRENCIES, type Cur } from '@/lib/finance/money';
 
 export const metadata = { title: 'Finance reports · Pfuma' };

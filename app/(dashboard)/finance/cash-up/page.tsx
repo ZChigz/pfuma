@@ -4,7 +4,8 @@ import { todayInHarare } from '@/lib/finance/common';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { FormAction } from '@/components/finance/FormAction';
-import { MoneyLine, Notice, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { Notice, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { MoneyLine } from '@/components/finance/format';
 
 export const metadata = { title: 'Daily cash-up · Pfuma' };
 
