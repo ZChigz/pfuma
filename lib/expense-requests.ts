@@ -36,6 +36,7 @@ export const REQUEST_STATUS_BADGE: Record<RequestStatus, { label: string; varian
   APPROVED:  { label: 'Approved',           variant: 'info'    },
   REJECTED:  { label: 'Rejected',           variant: 'danger'  },
   DISBURSED: { label: 'Disbursed',          variant: 'success' },
+  CANCELLED: { label: 'Cancelled',          variant: 'neutral' },
 };
 
 type RequestWithRelations = ExpenseRequest & { items?: ExpenseRequestItem[] };
