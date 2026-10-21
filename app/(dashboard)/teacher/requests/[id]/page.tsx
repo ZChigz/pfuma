@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { CrumbLabel } from '@/components/layout/Breadcrumbs';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
@@ -9,6 +11,7 @@ import { SubmitRequestButton } from '@/components/teacher/SubmitRequestButton';
 import type { SessionUser } from '@/types';
 
 export default async function TeacherRequestDetailPage({ params }: { params: { id: string } }) {
+  await sendToFinance('/finance/requests');
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;

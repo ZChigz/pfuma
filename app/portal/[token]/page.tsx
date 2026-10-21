@@ -5,6 +5,8 @@ import { getScopedDb } from '@/lib/scoped-db';
 import { clientIp } from '@/lib/rate-limit';
 import { lookupPortalToken, pinCookieName, pinCookieValid, recordPortalView } from '@/lib/portal';
 import { PortalPinForm } from '@/components/portal/PortalPinForm';
+import { portalFees } from '@/lib/finance/portal';
+import { PortalPay } from '@/components/portal/PortalPay';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,14 +103,8 @@ export default async function PortalPage({ params }: { params: { token: string }
   await recordPortalView(student.id, student.schoolId, clientIp(h), h.get('user-agent'));
 
   // ── Compute fee balances ───────────────────────────────────────────────────
-  const chargesUSD = student.charges.filter(c => c.currency === 'USD').reduce((n, c) => n + c.amount.toNumber(), 0);
-  const chargesZiG = student.charges.filter(c => c.currency === 'ZIG').reduce((n, c) => n + c.amount.toNumber(), 0);
-  const paidUSD    = student.payments.filter(p => p.currency === 'USD').reduce((n, p) => n + p.amount.toNumber(), 0);
-  const paidZiG    = student.payments.filter(p => p.currency === 'ZIG').reduce((n, p) => n + p.amount.toNumber(), 0);
-  const balUSD     = chargesUSD - paidUSD;
-  const balZiG     = chargesZiG - paidZiG;
-
-  const recentPayments = student.payments.slice(0, 10);
+  const { chargesUSD, chargesZiG, paidUSD, paidZiG, balUSD, balZiG, recentPayments } = await portalFees(db, student.id, student.schoolId, student);
+  const payOnline = (await db.finSettings.findUnique({ where: { schoolId: student.schoolId }, select: { paynowEnabled: true, legacyRetired: true } })) ?? null;
 
   // ── Group marks by term ────────────────────────────────────────────────────
   const marksByTerm = new Map<string, typeof student.marks>();
@@ -197,6 +193,8 @@ export default async function PortalPage({ params }: { params: { token: string }
             </table>
           </div>
 
+          {payOnline?.paynowEnabled && payOnline.legacyRetired && <PortalPay token={params.token} owed={{ USD: Math.round(balUSD * 100), ZIG: Math.round(balZiG * 100) }} />}
+
           {recentPayments.length > 0 && (
             <div className="mt-4 rounded-2xl bg-white overflow-hidden">
               <p className="border-b border-line px-4 py-3 text-xs font-medium text-muted">
@@ -213,13 +211,13 @@ export default async function PortalPage({ params }: { params: { token: string }
                 <tbody className="divide-y divide-line">
                   {recentPayments.map((p, i) => (
                     <tr key={i}>
-                      <td className="px-4 py-2 text-xs text-muted">{fmtDate(p.recordedAt)}</td>
+                      <td className="px-4 py-2 text-xs text-muted">{fmtDate(p.at)}</td>
                       <td className="px-4 py-2 text-xs">{p.method}</td>
                       <td className="px-4 py-2 tabular-nums text-xs">
-                        <span>{fmt(p.amount.toNumber(), p.currency)}</span>
-                        {p.paidInZig && p.zigAmountPaid && (
+                        <span>{fmt(p.amount, p.currency)}</span>
+                        {p.zig && (
                           <p className="mt-0.5 text-[10px] text-muted">
-                            ZiG {Math.round(p.zigAmountPaid.toNumber()).toLocaleString('en-US')} @ {p.exchangeRateUsed?.toNumber().toFixed(2)}
+                            ZiG {Math.round(p.zig.amount).toLocaleString('en-US')} @ {p.zig.rate?.toFixed(2)}
                           </p>
                         )}
                       </td>

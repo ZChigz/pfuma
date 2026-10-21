@@ -1,5 +1,7 @@
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import { getScopedDb } from '@/lib/scoped-db';
+import { legacyRetired } from '@/lib/finance/legacy-guard';
 import type { SessionUser } from '@/types';
 
 export default async function DashboardPage() {
@@ -11,7 +13,8 @@ export default async function DashboardPage() {
     case 'ADMIN':     redirect('/system/dashboard');
     case 'DIRECTOR':  redirect('/director');
     case 'HEAD':      redirect('/head');
-    case 'BURSAR':    redirect('/bursar/students');
+    // A school that keeps its money in Finance sends the bursar there.
+    case 'BURSAR':    redirect((await legacyRetired(getScopedDb(user.schoolId, user.id), user.schoolId)) ? '/finance' : '/bursar/students');
     case 'TEACHER':   redirect('/teacher/marks');
     case 'LIBRARIAN': redirect('/library');
     default:          redirect('/login');

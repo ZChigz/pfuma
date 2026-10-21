@@ -1,4 +1,5 @@
 import { StatCard } from '@/components/ui/StatCard';
+import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
@@ -24,6 +25,7 @@ export default async function HeadExpensesPage({
 }: {
   searchParams: { currency?: string; category?: string; from?: string; to?: string };
 }) {
+  await sendToFinance('/finance/expenses');
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;

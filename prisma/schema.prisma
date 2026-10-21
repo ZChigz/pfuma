@@ -28,6 +28,13 @@ enum PaymentMethod {
   ECOCASH
   SWIPE
   ZIPIT
+  BANK_TRANSFER
+  CHEQUE
+  ONEMONEY
+  INNBUCKS
+  BANK_DEPOSIT
+  PAYNOW
+  CREDIT_TRANSFER
 }
 
 enum PaymentStatus {
@@ -47,6 +54,7 @@ enum RequestStatus {
   APPROVED
   REJECTED
   DISBURSED
+  CANCELLED
 }
 
 enum ExpenseRequestType {
@@ -557,6 +565,55 @@ enum AuditAction {
   IMPORT_CANDIDATE_NUMBERS
   IMPORT_BOARD_RESULTS
   RECORD_AMENDMENT
+  SAVE_FUND
+  SAVE_FEE_ITEM
+  REJECT_PAYMENT
+  ALLOCATE_PAYMENT
+  VOID_CHARGE
+  REQUEST_ADJUSTMENT
+  APPROVE_ADJUSTMENT
+  REJECT_ADJUSTMENT
+  REQUEST_REFUND
+  APPROVE_REFUND
+  REJECT_REFUND
+  PAY_REFUND
+  SAVE_FINANCE_CONTROLS
+  SAVE_FEE_CATALOG
+  SAVE_FEE_STRUCTURE
+  SUBMIT_FEE_STRUCTURE
+  APPROVE_FEE_STRUCTURE
+  RUN_BILLING
+  BILL_DIFFERENCE
+  CREATE_INVOICE
+  SAVE_DISCOUNT_RULE
+  DECIDE_DISCOUNT_RULE
+  SAVE_SPONSOR
+  SAVE_AWARD
+  DECIDE_AWARD
+  CANCEL_AWARD
+  RECORD_SPONSOR_PAYMENT
+  VERIFY_SPONSOR_PAYMENT
+  ALLOCATE_SPONSOR_PAYMENT
+  TRANSFER_CREDIT
+  SAVE_PAYMENT_PLAN
+  DECIDE_PAYMENT_PLAN
+  SUBMIT_CASH_UP
+  CONFIRM_CASH_UP
+  SIGN_OFF_CASH_UP
+  UPLOAD_BANK_STATEMENT
+  MATCH_BANK_LINE
+  SAVE_SUPPLIER
+  SAVE_EXPENSE_CATEGORY
+  SAVE_BUDGET
+  PETTY_CASH
+  APPROVE_OVERRUN
+  CANCEL_EXPENSE_REQUEST
+  PAYNOW_PAYMENT
+  SAVE_PAYROLL_RUN
+  PAY_PAYROLL
+  PAY_STATUTORY
+  SEND_FINANCE_SMS
+  SECOND_APPROVE_REQUEST
 }
 
 enum SchoolType {
@@ -1057,6 +1114,8 @@ model AcademicTerm {
   reportComments     ReportComment[]
   examDeadline       ExamDeadline?
   examPeriods        ExamPeriod[]
+  finCharges         FinCharge[]
+  finFeeItems        FinFeeItem[]
 
   @@unique([academicYearId, termNumber])
   @@index([schoolId])
@@ -1147,6 +1206,8 @@ model Student {
   guardians         StudentGuardian[]
   charges           Charge[]
   payments          Payment[]
+  finCharges        FinCharge[]
+  finPayments       FinPayment[]
   marks             Mark[]
   termResults       TermResult[]
   portalViews       PortalAccessLog[]
@@ -4153,4 +4214,1003 @@ model BoardAmendment {
 
   @@index([schoolId])
   @@index([sessionId])
+}
+
+// ─── Finance module ──────────────────────────────────────────────────────────
+// Money is whole cents (Int), never a float. Every amount carries its currency and the two currencies are never added.
+// Nothing here is edited or deleted: only the workflow columns of a payment, adjustment, refund or request move forward
+// (PENDING → VERIFIED …), a mistake is a new row (FinVoid, a credit note, a refund), and a balance is always calculated
+// from the rows (lib/finance/balances.ts), never stored. The database refuses the rest (migration 20261103000000).
+// Foreign keys to School, User and Level are written in the migration; they are plain ids here.
+
+enum FundKind {
+  TUITION
+  SDC_LEVY
+  BOARDING
+  BUILDING
+  EXAMS
+  GENERAL
+  OTHER
+}
+
+enum FinPaymentStatus {
+  PENDING
+  RECEIVED
+  VERIFIED
+  REJECTED
+}
+
+enum AdjustmentKind {
+  CREDIT_NOTE
+  DISCOUNT
+  BURSARY
+  WAIVER
+  SIBLING
+  STAFF_CHILD
+  EARLY_PAYMENT
+  HARDSHIP
+  HEAD_DISCRETION
+  CORRECTION
+  SPONSOR
+}
+
+enum FinApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum FinRefundStatus {
+  REQUESTED
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum ChargeSource {
+  FEE_ITEM
+  MANUAL
+  LIBRARY
+  EXAM_ENTRY
+  MIGRATED
+  ONE_OFF
+  ADMISSION
+  BOARDING_CHANGE
+  DIFFERENCE
+}
+
+enum FinExpenseSource {
+  REQUEST
+  DIRECT
+  MIGRATED
+}
+
+// Tuition, SDC levies and boarding fees belong to different funds; every report can be filtered by fund.
+model Fund {
+  id            String   @id @default(cuid())
+  schoolId      String
+  code          String
+  name          String
+  kind          FundKind @default(OTHER)
+  // Each fund can have its own bank account and receipt book prefix (RCP, SDC ...).
+  bankAccount   String?
+  receiptPrefix String?
+  active        Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  feeItems FinFeeItem[]
+  charges  FinCharge[]
+  payments FinPayment[]
+  requests FinExpenseRequest[]
+  expenses FinExpense[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+}
+
+// What a term costs: one line per fee, for a form (or all forms) and for day scholars, boarders or both.
+model FinFeeItem {
+  id             String        @id @default(cuid())
+  schoolId       String
+  termId         String
+  levelId        String?
+  boarding       BoardingType?
+  fundId         String
+  name           String
+  currency       Currency
+  amountCents    Int
+  active         Boolean       @default(true)
+  // The fee structure (a version for the term) this line belongs to, and the fee item of the school's list.
+  structureId    String?
+  catalogItemId  String?
+  levelIds       String[]      @default([])
+  classIds       String[]      @default([])
+  combinationIds String[]      @default([])
+  createdById    String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  term      AcademicTerm     @relation(fields: [termId], references: [id])
+  fund      Fund             @relation(fields: [fundId], references: [id])
+  structure FinFeeStructure? @relation(fields: [structureId], references: [id])
+  charges   FinCharge[]
+
+  @@index([schoolId, termId])
+}
+
+// What a student owes. Never changed or deleted: a mistake is a void (FinVoid) or a credit note (FinAdjustment).
+model FinCharge {
+  id             String       @id @default(cuid())
+  schoolId       String
+  studentId      String
+  termId         String
+  fundId         String
+  feeItemId      String?
+  description    String
+  currency       Currency
+  amountCents    Int
+  source         ChargeSource @default(MANUAL)
+  dueDate        DateTime?    @db.Date
+  catalogItemId  String?
+  billingRunId   String?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  legacyChargeId String?      @unique
+
+  student     Student                @relation(fields: [studentId], references: [id])
+  term        AcademicTerm           @relation(fields: [termId], references: [id])
+  fund        Fund                   @relation(fields: [fundId], references: [id])
+  feeItem     FinFeeItem?            @relation(fields: [feeItemId], references: [id])
+  adjustments FinAdjustment[]
+  allocations FinPaymentAllocation[]
+  refunds     FinRefund[]
+  voidRow     FinVoid?
+
+  @@unique([studentId, feeItemId])
+  @@index([schoolId, studentId])
+  @@index([schoolId, termId])
+  @@index([schoolId, fundId])
+}
+
+// Money received. It reduces a balance only once someone other than the person who recorded it has verified it.
+model FinPayment {
+  id               String           @id @default(cuid())
+  schoolId         String
+  studentId        String
+  fundId           String?
+  // The official receipt number: at once for cash, at verification for everything else. ackNumber is the slip given before that.
+  receiptNumber    String?
+  ackNumber        String           @default("")
+  // A family payment names the fee-payer guardian; studentId is then one of that guardian's children.
+  guardianId       String?
+  paidInZig        Boolean          @default(false)
+  zigAmountCents   Int?
+  exchangeRateId   String?
+  paynowRef        String?
+  verifyCode       String           @default("")
+  backdateReason   String?
+  currency         Currency
+  amountCents      Int
+  method           PaymentMethod
+  reference        String?
+  paidBy           String?
+  receivedOn       DateTime         @db.Date
+  note             String?
+  proofKey         String?
+  // The charge the payer said this money is for; it is settled first when the payment is verified (the rest goes oldest first).
+  targetChargeId   String?
+  status           FinPaymentStatus @default(PENDING)
+  recordedById     String
+  recordedAt       DateTime         @default(now())
+  verifiedById     String?
+  verifiedAt       DateTime?
+  // The verifier held the permission only through "*" (Owner or Administrator): the school had no other finance person.
+  verifierFallback Boolean          @default(false)
+  rejectedById     String?
+  rejectedAt       DateTime?
+  rejectionReason  String?
+  legacyPaymentId  String?          @unique
+
+  student     Student                @relation(fields: [studentId], references: [id])
+  fund        Fund?                  @relation(fields: [fundId], references: [id])
+  allocations FinPaymentAllocation[]
+  refunds     FinRefund[]
+  voidRow     FinVoid?
+
+  @@unique([schoolId, receiptNumber])
+  @@index([schoolId, studentId])
+  @@index([schoolId, status])
+  @@index([schoolId, receivedOn])
+}
+
+// How much of a verified payment settles which charge (same student, currency and fund). A payment can be split over charges.
+model FinPaymentAllocation {
+  id          String   @id @default(cuid())
+  schoolId    String
+  paymentId   String
+  chargeId    String
+  amountCents Int
+  createdById String
+  createdAt   DateTime @default(now())
+
+  payment FinPayment @relation(fields: [paymentId], references: [id])
+  charge  FinCharge  @relation(fields: [chargeId], references: [id])
+
+  @@index([schoolId, paymentId])
+  @@index([schoolId, chargeId])
+}
+
+// A credit note, discount, bursary or waiver against one charge. It counts only once a second person approves it.
+model FinAdjustment {
+  id           String            @id @default(cuid())
+  schoolId     String
+  chargeId     String
+  kind         AdjustmentKind
+  amountCents  Int
+  percentBps   Int?
+  ruleId       String?
+  reason       String
+  status       FinApprovalStatus @default(PENDING)
+  createdById  String
+  createdAt    DateTime          @default(now())
+  decidedById  String?
+  decidedAt    DateTime?
+  decisionNote String?
+
+  charge FinCharge @relation(fields: [chargeId], references: [id])
+
+  @@index([schoolId, chargeId])
+  @@index([schoolId, status])
+}
+
+// Money handed back. Asked for by one person, approved by a second, paid out by a third.
+// With a charge it reverses what a payment had settled (the balance rises again); without one it returns unallocated credit.
+model FinRefund {
+  id              String          @id @default(cuid())
+  schoolId        String
+  paymentId       String
+  chargeId        String?
+  amountCents     Int
+  reason          String
+  reasonKind      String          @default("OTHER")
+  method          PaymentMethod?
+  reference       String?
+  status          FinRefundStatus @default(REQUESTED)
+  requestedById   String
+  requestedAt     DateTime        @default(now())
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectedById    String?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  paidById        String?
+  paidAt          DateTime?
+
+  payment FinPayment @relation(fields: [paymentId], references: [id])
+  charge  FinCharge? @relation(fields: [chargeId], references: [id])
+
+  @@index([schoolId, paymentId])
+  @@index([schoolId, status])
+}
+
+// "This was a mistake": one row per voided payment, expense or charge. The original stays and is left out of every total.
+model FinVoid {
+  id         String   @id @default(cuid())
+  schoolId   String
+  paymentId  String?  @unique
+  expenseId  String?  @unique
+  chargeId   String?  @unique
+  reason     String
+  voidedById String
+  voidedAt   DateTime @default(now())
+
+  payment FinPayment? @relation(fields: [paymentId], references: [id])
+  expense FinExpense? @relation(fields: [expenseId], references: [id])
+  charge  FinCharge?  @relation(fields: [chargeId], references: [id])
+
+  @@index([schoolId])
+}
+
+// A request to spend: raised by one person, approved by a second, paid by a third. Only a paid request becomes an expense.
+model FinExpenseRequest {
+  id                   String             @id @default(cuid())
+  schoolId             String
+  requestNumber        String
+  title                String
+  type                 ExpenseRequestType
+  department           String
+  justification        String
+  fundId               String
+  currency             Currency
+  estimatedCents       Int
+  status               RequestStatus      @default(DRAFT)
+  requestedById        String
+  createdAt            DateTime           @default(now())
+  submittedAt          DateTime?
+  approvedById         String?
+  approvedAt           DateTime?
+  rejectedById         String?
+  rejectedAt           DateTime?
+  rejectionReason      String?
+  disbursedById        String?
+  disbursedAt          DateTime?
+  neededBy             DateTime?          @db.Date
+  supplierId           String?
+  quoteKeys            String[]           @default([])
+  // Above the Head's limit the Owner approves after the Head: the Head's approval is recorded here, the Owner's as approvedBy.
+  firstApprovedById    String?
+  firstApprovedAt      DateTime?
+  // What may be paid: the approved total, raised only by an approved overrun.
+  approvedCeilingCents Int?
+  overrunCents         Int?
+  overrunApprovedById  String?
+  cancelledById        String?
+  cancelledAt          DateTime?
+  legacyRequestId      String?            @unique
+
+  fund    Fund                    @relation(fields: [fundId], references: [id])
+  items   FinExpenseRequestItem[]
+  expense FinExpense?
+
+  @@unique([schoolId, requestNumber])
+  @@index([schoolId, status])
+  @@index([schoolId, requestedById])
+}
+
+model FinExpenseRequestItem {
+  id          String @id @default(cuid())
+  schoolId    String
+  requestId   String
+  description String
+  quantity    Int    @default(1)
+  unitCents   Int
+  totalCents  Int
+
+  request FinExpenseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+// Money that left the school: a paid request, or a direct expense the bursar recorded. Never edited; a mistake is a void.
+model FinExpense {
+  id              String           @id @default(cuid())
+  schoolId        String
+  fundId          String
+  category        String
+  description     String
+  payee           String?
+  currency        Currency
+  amountCents     Int
+  paidOn          DateTime         @db.Date
+  method          PaymentMethod
+  reference       String?
+  source          FinExpenseSource
+  supplierId      String?
+  categoryId      String?
+  receiptKey      String?
+  payrollRunId    String?
+  requestId       String?          @unique
+  recordedById    String
+  createdAt       DateTime         @default(now())
+  legacyExpenseId String?          @unique
+
+  fund    Fund               @relation(fields: [fundId], references: [id])
+  request FinExpenseRequest? @relation(fields: [requestId], references: [id])
+  voidRow FinVoid?
+
+  @@index([schoolId, paidOn])
+  @@index([schoolId, fundId])
+}
+
+// The school's money controls (one row per school, made the first time anyone needs it).
+model FinSettings {
+  id                           String   @id @default(cuid())
+  schoolId                     String   @unique
+  // The most the bursar may record as a direct expense without a request, per currency; null = no limit.
+  directLimitUsdCents          Int?
+  directLimitZigCents          Int?
+  // Non-cash payments need a reference (receipt number, transfer id).
+  requireReference             Boolean  @default(true)
+  // Sibling discount: percent off the chosen fee items for the 2nd and the 3rd-and-later child of one fee payer (set by the bursar, approved by the Head).
+  siblingPct2Bps               Int?
+  siblingPct3Bps               Int?
+  siblingItemIds               String[] @default([])
+  siblingSetById               String?
+  siblingApprovedById          String?
+  applyCreditAtBilling         Boolean  @default(true)
+  prorateAdmission             Boolean  @default(false)
+  autoBillOnAdmission          Boolean  @default(true)
+  allocationMode               String   @default("OLDEST_FUND")
+  proofAboveUsdCents           Int?
+  proofAboveZigCents           Int?
+  receiptRequiredAboveUsdCents Int?
+  receiptRequiredAboveZigCents Int?
+  quotesAboveUsdCents          Int?
+  quotesAboveZigCents          Int?
+  quotesRequired               Int      @default(3)
+  headLimitUsdCents            Int?
+  headLimitZigCents            Int?
+  overrunPercent               Int      @default(10)
+  staleRateDays                Int      @default(3)
+  cashToleranceCents           Int      @default(100)
+  reminderLeadDays             Int      @default(3)
+  paynowEnabled                Boolean  @default(false)
+  paynowId                     String?
+  paynowKey                    String?
+  arrearsSmsTemplate           String   @default("Dear {guardian}, {student} owes {amount} in school fees. Please pay at the school office or online. Thank you.")
+  // True once the school runs its money in this module: the older accounting screens then stop writing (lib/finance/legacy-guard.ts).
+  legacyRetired                Boolean  @default(true)
+  updatedAt                    DateTime @updatedAt
+}
+
+// ─── Finance, part 2: fee setup, billing, sponsors, controls, spending, payroll hand-over ───────────────
+// Foreign keys to School/User and between plain-id columns are written in the migration (20261104000000_finance_full).
+
+enum FinFeeStructureStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  SUPERSEDED
+}
+
+enum SponsorType {
+  BEAM
+  CHURCH
+  NGO
+  COMPANY
+  INDIVIDUAL
+}
+
+enum AwardStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  ENDED
+}
+
+enum PlanStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum InstalmentStatus {
+  DUE
+  PAID
+  MISSED
+}
+
+enum CashUpStatus {
+  OPEN
+  SUBMITTED
+  CONFIRMED
+  SIGNED_OFF
+}
+
+enum BankLineStatus {
+  UNMATCHED
+  MATCHED
+  IGNORED
+}
+
+enum PettyKind {
+  TOPUP
+  EXPENSE
+}
+
+enum PayrollStatus {
+  READY
+  PAID
+}
+
+enum StatutoryType {
+  PAYE
+  NSSA
+  ZIMDEF
+  AIDS_LEVY
+}
+
+// The school's list of things it charges for (Tuition, SDC levy, Boarding fee ...). Each belongs to a fund.
+model FeeItem {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  fundId    String
+  recurring Boolean  @default(true)
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+// What each learner pays in one term. Draft, submitted, approved by the Head; only an approved structure can be billed, and once
+// billed it is never edited: a change is a new version, and the difference is billed as an adjustment.
+model FinFeeStructure {
+  id            String                @id @default(cuid())
+  schoolId      String
+  termId        String
+  version       Int                   @default(1)
+  status        FinFeeStructureStatus @default(DRAFT)
+  note          String?
+  createdById   String
+  submittedById String?
+  submittedAt   DateTime?
+  approvedById  String?
+  approvedAt    DateTime?
+  billedAt      DateTime?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  lines FinFeeItem[]
+  runs  BillingRun[]
+
+  @@unique([termId, version])
+  @@index([schoolId, termId])
+}
+
+model BillingRun {
+  id              String   @id @default(cuid())
+  schoolId        String
+  termId          String
+  structureId     String
+  runById         String
+  charged         Int      @default(0)
+  skippedCharged  Int      @default(0)
+  skippedInactive Int      @default(0)
+  awardsCents     Json?
+  result          Json?
+  createdAt       DateTime @default(now())
+
+  structure FinFeeStructure @relation(fields: [structureId], references: [id])
+
+  @@index([schoolId, termId])
+}
+
+// A discount, waiver or award the school gives: fixed or a percentage of chosen fee items, for one term or standing until an end term.
+model DiscountRule {
+  id             String            @id @default(cuid())
+  schoolId       String
+  studentId      String
+  kind           AdjustmentKind
+  amountCents    Int?
+  percentBps     Int?
+  currency       Currency?
+  catalogItemIds String[]          @default([])
+  termFromId     String
+  termToId       String?
+  standing       Boolean           @default(false)
+  reason         String
+  status         FinApprovalStatus @default(PENDING)
+  createdById    String
+  decidedById    String?
+  decidedAt      DateTime?
+  decisionNote   String?
+  createdAt      DateTime          @default(now())
+
+  @@index([schoolId, studentId])
+  @@index([schoolId, status])
+}
+
+// A fee statement for a learner, or one for a family (a fee-payer guardian with all their children). The figures are a snapshot.
+model Invoice {
+  id          String   @id @default(cuid())
+  schoolId    String
+  number      String
+  studentId   String?
+  guardianId  String?
+  termId      String
+  data        Json
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@unique([schoolId, number])
+  @@index([schoolId, termId])
+}
+
+// Someone other than the parent who owes the money: BEAM, a church, an NGO, a company.
+model Sponsor {
+  id            String      @id @default(cuid())
+  schoolId      String
+  name          String
+  type          SponsorType
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  awards   SponsorAward[]
+  charges  SponsorCharge[]
+  payments SponsorPayment[]
+
+  @@index([schoolId])
+}
+
+model SponsorAward {
+  id             String      @id @default(cuid())
+  schoolId       String
+  sponsorId      String
+  studentId      String
+  catalogItemIds String[]    @default([])
+  percentBps     Int?
+  amountCents    Int?
+  currency       Currency
+  termFromId     String
+  termToId       String?
+  reference      String?
+  status         AwardStatus @default(PENDING)
+  createdById    String
+  approvedById   String?
+  approvedAt     DateTime?
+  cancelledById  String?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  createdAt      DateTime    @default(now())
+
+  sponsor Sponsor @relation(fields: [sponsorId], references: [id])
+
+  @@index([schoolId, studentId])
+  @@index([schoolId, sponsorId])
+}
+
+// The part of a learner's charge that the sponsor owes. The sponsor's account is these rows minus the payments allocated to them.
+model SponsorCharge {
+  id           String   @id @default(cuid())
+  schoolId     String
+  sponsorId    String
+  awardId      String
+  studentId    String
+  chargeId     String
+  adjustmentId String?
+  termId       String
+  fundId       String
+  currency     Currency
+  amountCents  Int
+  // CANCELLED when the award is cancelled and the amount goes back to the parent.
+  cancelled    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  sponsor     Sponsor                    @relation(fields: [sponsorId], references: [id])
+  allocations SponsorPaymentAllocation[]
+
+  @@unique([awardId, chargeId])
+  @@index([schoolId, sponsorId])
+}
+
+// Money received from a sponsor (a BEAM grant, a church). Recorded, verified by someone else, then allocated to the learners it covers.
+model SponsorPayment {
+  id              String           @id @default(cuid())
+  schoolId        String
+  sponsorId       String
+  currency        Currency
+  amountCents     Int
+  method          PaymentMethod
+  reference       String?
+  receivedOn      DateTime         @db.Date
+  receiptNumber   String?
+  ackNumber       String
+  proofKey        String?
+  status          FinPaymentStatus @default(PENDING)
+  recordedById    String
+  recordedAt      DateTime         @default(now())
+  verifiedById    String?
+  verifiedAt      DateTime?
+  rejectedById    String?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  voidedById      String?
+  voidedAt        DateTime?
+  voidReason      String?
+
+  sponsor     Sponsor                    @relation(fields: [sponsorId], references: [id])
+  allocations SponsorPaymentAllocation[]
+
+  @@unique([schoolId, receiptNumber])
+  @@index([schoolId, sponsorId])
+}
+
+model SponsorPaymentAllocation {
+  id              String   @id @default(cuid())
+  schoolId        String
+  paymentId       String
+  sponsorChargeId String
+  amountCents     Int
+  createdById     String
+  createdAt       DateTime @default(now())
+
+  payment       SponsorPayment @relation(fields: [paymentId], references: [id])
+  sponsorCharge SponsorCharge  @relation(fields: [sponsorChargeId], references: [id])
+
+  @@index([schoolId, paymentId])
+  @@index([schoolId, sponsorChargeId])
+}
+
+// Credit moved to a brother or sister on the same fee payer. It is a verified payment on the receiving account (method CREDIT_TRANSFER)
+// that a second person verifies, and it takes the same amount out of the source payment's credit.
+model CreditTransfer {
+  id            String   @id @default(cuid())
+  schoolId      String
+  fromStudentId String
+  toStudentId   String
+  fromPaymentId String
+  toPaymentId   String   @unique
+  currency      Currency
+  amountCents   Int
+  reason        String
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  @@index([schoolId, fromPaymentId])
+}
+
+// An agreement to pay a debt in instalments. The Head approves plans longer than one term.
+model PaymentPlan {
+  id           String     @id @default(cuid())
+  schoolId     String
+  guardianId   String
+  studentIds   String[]   @default([])
+  currency     Currency
+  totalCents   Int
+  startDate    DateTime   @db.Date
+  notes        String?
+  status       PlanStatus @default(ACTIVE)
+  createdById  String
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime   @default(now())
+
+  instalments PaymentPlanInstalment[]
+
+  @@index([schoolId, guardianId])
+}
+
+model PaymentPlanInstalment {
+  id             String           @id @default(cuid())
+  schoolId       String
+  planId         String
+  dueDate        DateTime         @db.Date
+  amountCents    Int
+  status         InstalmentStatus @default(DUE)
+  paidAt         DateTime?
+  reminderSentAt DateTime?
+  missedAlertAt  DateTime?
+
+  plan PaymentPlan @relation(fields: [planId], references: [id])
+
+  @@index([schoolId, dueDate])
+}
+
+// One clerk's day: the cash counted against the cash the system expects, confirmed by the bursar and signed off by the Head.
+model CashUp {
+  id                 String       @id @default(cuid())
+  schoolId           String
+  userId             String
+  date               DateTime     @db.Date
+  expectedUsdCents   Int          @default(0)
+  expectedZigCents   Int          @default(0)
+  countedUsdCents    Int          @default(0)
+  countedZigCents    Int          @default(0)
+  differenceUsdCents Int          @default(0)
+  differenceZigCents Int          @default(0)
+  explanation        String?
+  status             CashUpStatus @default(OPEN)
+  submittedAt        DateTime?
+  confirmedById      String?
+  confirmedAt        DateTime?
+  signedOffById      String?
+  signedOffAt        DateTime?
+  depositRef         String?
+  createdAt          DateTime     @default(now())
+
+  @@unique([schoolId, userId, date])
+  @@index([schoolId, date])
+}
+
+model BankMapping {
+  id        String   @id @default(cuid())
+  schoolId  String
+  bank      String
+  mapping   Json
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, bank])
+}
+
+model BankStatement {
+  id           String    @id @default(cuid())
+  schoolId     String
+  account      String
+  currency     Currency
+  periodFrom   DateTime? @db.Date
+  periodTo     DateTime? @db.Date
+  fileName     String
+  uploadedById String
+  createdAt    DateTime  @default(now())
+
+  lines BankStatementLine[]
+
+  @@index([schoolId])
+}
+
+model BankStatementLine {
+  id                      String         @id @default(cuid())
+  schoolId                String
+  statementId             String
+  date                    DateTime       @db.Date
+  amountCents             Int
+  reference               String?
+  description             String?
+  status                  BankLineStatus @default(UNMATCHED)
+  matchedPaymentId        String?
+  matchedSponsorPaymentId String?
+  matchedDepositRef       String?
+
+  statement BankStatement @relation(fields: [statementId], references: [id])
+
+  @@index([schoolId, statementId])
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  schoolId    String
+  name        String
+  contact     String?
+  phone       String?
+  bankDetails String?
+  ecocash     String?
+  taxNumber   String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([schoolId, name])
+}
+
+model ExpenseCategory {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, name])
+}
+
+model Budget {
+  id          String   @id @default(cuid())
+  schoolId    String
+  termId      String
+  fundId      String
+  categoryId  String
+  currency    Currency
+  amountCents Int
+  updatedAt   DateTime @updatedAt
+
+  @@unique([termId, fundId, categoryId, currency])
+  @@index([schoolId, termId])
+}
+
+// A float held by one custodian: topped up from the bursar, spent on small things, counted at each cash-up.
+model PettyCashFloat {
+  id                String   @id @default(cuid())
+  schoolId          String
+  custodianId       String
+  currency          Currency
+  expenseLimitCents Int
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  entries PettyCashEntry[]
+
+  @@unique([custodianId, currency])
+}
+
+model PettyCashEntry {
+  id          String    @id @default(cuid())
+  schoolId    String
+  floatId     String
+  kind        PettyKind
+  amountCents Int
+  description String
+  categoryId  String?
+  receiptKey  String?
+  date        DateTime  @db.Date
+  byId        String
+  createdAt   DateTime  @default(now())
+
+  float PettyCashFloat @relation(fields: [floatId], references: [id])
+
+  @@index([schoolId, floatId])
+}
+
+// HR prepares the payroll and the Owner approves it; Finance only pays it. Until HR exists a run can be handed over here by code.
+model PayrollRun {
+  id           String        @id @default(cuid())
+  schoolId     String
+  period       String
+  preparedById String
+  approvedById String
+  status       PayrollStatus @default(READY)
+  paidById     String?
+  paidAt       DateTime?
+  createdAt    DateTime      @default(now())
+
+  lines PayrollLine[]
+
+  @@unique([schoolId, period])
+}
+
+model PayrollLine {
+  id          String        @id @default(cuid())
+  schoolId    String
+  runId       String
+  employee    String
+  employeeRef String?
+  currency    Currency
+  netCents    Int
+  method      PaymentMethod
+  account     String?
+  paid        Boolean       @default(false)
+  reference   String?
+
+  run PayrollRun @relation(fields: [runId], references: [id])
+
+  @@index([runId])
+}
+
+model StatutoryPayment {
+  id           String        @id @default(cuid())
+  schoolId     String
+  type         StatutoryType
+  period       String
+  currency     Currency
+  amountCents  Int
+  dueDate      DateTime      @db.Date
+  paidAt       DateTime?
+  paidById     String?
+  reference    String?
+  payrollRunId String?
+  createdAt    DateTime      @default(now())
+
+  @@index([schoolId, dueDate])
+}
+
+// Official receipt and acknowledgement numbers: one row per school, year and book prefix, locked while a number is taken.
+model ReceiptSequence {
+  id         String @id @default(cuid())
+  schoolId   String
+  year       Int
+  prefix     String
+  nextNumber Int    @default(1)
+
+  @@unique([schoolId, year, prefix])
+}
+
+// A Paynow payment the parent started; the callback and the poll settle it.
+model PaynowAttempt {
+  id          String   @id @default(cuid())
+  schoolId    String
+  studentId   String
+  guardianId  String?
+  reference   String   @unique
+  pollUrl     String?
+  currency    Currency
+  amountCents Int
+  status      String   @default("CREATED")
+  paymentId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([schoolId, studentId])
 }

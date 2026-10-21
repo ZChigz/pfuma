@@ -4,6 +4,7 @@ import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { canManageLibrary } from '@/lib/permissions';
 import { getOpenTerm } from '@/lib/academic/terms';
+import { raiseCharge } from '@/lib/finance/external';
 import { parseBody, apiSuccess, apiError, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { z } from 'zod';
 import type { SessionUser } from '@/types';
@@ -85,18 +86,14 @@ async function _PATCH(
       if (existing.book.replacementCost == null) {
         await tx.book.update({ where: { id: existing.bookId }, data: { replacementCost: charge.amount } });
       }
-      const created = await tx.charge.create({
-        data: {
-          studentId: studentBorrower.id,
-          termId:    charge.termId,
-          label:     `Lost library book: ${existing.book.title} (${existing.accessionNumber})`,
-          currency:  charge.currency,
-          amount:    charge.amount,
-        } as never,
+      // On the student's account in Finance (General fund) for a school that runs its money there; else the first accounting tables.
+      const created = await raiseCharge(tx, {
+        schoolId: user.schoolId, actorId: user.id, studentId: studentBorrower.id, termId: charge.termId,
+        description: `Lost library book: ${existing.book.title} (${existing.accessionNumber})`, currency: charge.currency, amount: charge.amount, source: 'LIBRARY',
       });
       await logAudit(
         {
-          schoolId: user.schoolId, actorId: user.id, action: 'APPLY_CHARGE', entityType: 'Charge', entityId: created.id,
+          schoolId: user.schoolId, actorId: user.id, action: 'APPLY_CHARGE', entityType: created.legacy ? 'Charge' : 'FinCharge', entityId: created.id,
           detail: `Replacement cost of lost book ${existing.book.title} — ${charge.currency} ${charge.amount} (${studentBorrower.fullName})`,
         },
         tx,

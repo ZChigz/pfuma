@@ -11,6 +11,7 @@
 //    candidate's account and paid or unpaid shows on the list; otherwise it is ticked by hand. Unpaid candidates are flagged, not removed.
 //  • The Head approves the entry list; then it exports to Excel or CSV. After approval every change is logged as an amendment.
 import { z } from 'zod';
+import { alreadyCharged, feeSettled, raiseCharge } from '@/lib/finance/external';
 import type { Prisma } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
@@ -217,8 +218,7 @@ async function loadRows(tx: Db, schoolId: string, session: Prisma.BoardSessionGe
   const financeOn = !off.has('finance');
   const label = feeLabel(session);
   const studentIds = cands.map((c) => c.studentId).filter((x): x is string => !!x);
-  const charged = financeOn && studentIds.length ? await tx.charge.groupBy({ by: ['studentId'], where: { schoolId, studentId: { in: studentIds }, label }, _sum: { amount: true } }) : [];
-  const paid = financeOn && studentIds.length ? await tx.payment.groupBy({ by: ['studentId'], where: { schoolId, studentId: { in: studentIds }, feeLabel: label, status: 'VERIFIED' }, _sum: { amount: true } }) : [];
+  const settled = financeOn && studentIds.length ? await feeSettled(tx, schoolId, studentIds, label) : new Map<string, { charged: boolean; paid: boolean }>();
   const fees = { feePerSubject: num(session.feePerSubject)!, fixedFee: num(session.fixedFee)! };
 
   return cands
@@ -229,9 +229,8 @@ async function loadRows(tx: Db, schoolId: string, session: Prisma.BoardSessionGe
       const dob = c.student?.dateOfBirth ?? c.dateOfBirth;
       const idn = c.student?.birthCertificateNumber ?? c.idNumber;
       const total = feeTotalOf(fees, c.entries.length);
-      const chargeSum = charged.find((x) => x.studentId === c.studentId)?._sum.amount?.toNumber() ?? 0;
-      const paidSum = paid.find((x) => x.studentId === c.studentId)?._sum.amount?.toNumber() ?? 0;
-      const byFinance = financeOn && school && chargeSum > 0 && paidSum + 0.005 >= chargeSum;
+      const st = c.studentId ? settled.get(c.studentId) : undefined;
+      const byFinance = financeOn && school && !!st?.charged && !!st.paid;
       const feePaid = c.feePaidManual || byFinance;
       const checks: Check[] = [
         { key: 'name', label: 'Name matches the birth certificate', ok: c.nameChecked, detail: c.nameChecked ? 'Checked' : 'Look at the birth certificate and tick when the name matches exactly' },
@@ -435,11 +434,11 @@ export async function createFeeCharges(user: Actor, sessionId: string) {
     if (!term) throw new ServiceError('No term is open, so charges cannot be added', 409);
     const rows = await loadRows(tx, sid, session);
     const label = feeLabel(session);
-    const done = new Set((await tx.charge.findMany({ where: { schoolId: sid, label, studentId: { in: rows.map((r) => r.studentId).filter((x): x is string => !!x) } }, select: { studentId: true } })).map((c) => c.studentId));
+    const done = await alreadyCharged(tx, sid, rows.map((r) => r.studentId).filter((x): x is string => !!x), label);
     let created = 0;
     for (const r of rows) {
       if (!r.studentId || done.has(r.studentId) || r.feeTotal <= 0) continue;
-      await tx.charge.create({ data: { schoolId: sid, studentId: r.studentId, termId: term.id, label, currency: session.currency, amount: r.feeTotal } });
+      await raiseCharge(tx, { schoolId: sid, actorId: user.id, studentId: r.studentId, termId: term.id, description: label, currency: session.currency, amount: r.feeTotal, source: 'EXAM_ENTRY' });
       created++;
     }
     await logAudit({ schoolId: sid, actorId: user.id, action: 'CREATE_EXAM_FEES', entityType: 'BoardSession', entityId: sessionId, detail: `Added ${created} exam fee charge(s) for ${session.session}` }, tx);

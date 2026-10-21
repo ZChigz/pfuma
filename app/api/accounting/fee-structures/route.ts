@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { assertLegacyWritable } from '@/lib/finance/legacy-guard';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiError, apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
@@ -13,6 +14,7 @@ async function _POST(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await assertLegacyWritable(db, user.schoolId);
 
   try { await canBulkApplyFees(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 

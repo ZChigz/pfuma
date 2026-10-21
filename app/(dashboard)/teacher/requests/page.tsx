@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
@@ -9,6 +10,7 @@ import { NewRequestModal } from '@/components/teacher/NewRequestModal';
 import type { SessionUser } from '@/types';
 
 export default async function TeacherRequestsPage() {
+  await sendToFinance('/finance/requests');
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;

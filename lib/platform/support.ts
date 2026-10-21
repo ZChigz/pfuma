@@ -25,7 +25,7 @@ export function clearSchoolSessionCookie(): string {
   return `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${name.startsWith('__Secure-') ? '; Secure' : ''}`;
 }
 
-async function supportUser(schoolId: string) {
+export async function supportUser(schoolId: string) {
   const existing = await prisma.user.findFirst({ where: { schoolId, isSupport: true }, select: { id: true, tokenVersion: true } });
   if (existing) return existing;
   return prisma.user.create({

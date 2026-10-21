@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { BursarStudentsTable } from '@/components/accounting/BursarStudentsTable';
@@ -10,6 +11,7 @@ export default async function BursarStudentsPage({
 }: {
   searchParams: { q?: string };
 }) {
+  await sendToFinance('/finance/accounts');
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;

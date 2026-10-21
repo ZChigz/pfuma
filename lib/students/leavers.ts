@@ -8,6 +8,7 @@
 //      completed O or A Level, and leaves the student off class lists.
 // Students are never deleted: the status changes and the history stays. A former student can rejoin on the old record.
 import type { ExitReason, Prisma } from '@prisma/client';
+import { owedBy } from '@/lib/finance/external';
 import { z } from 'zod';
 import { ServiceError } from '@/lib/api';
 import { can, type AccessUser } from '@/lib/access-core';
@@ -53,16 +54,8 @@ export async function buildClearance(tx: Db, schoolId: string, studentId: string
   const items: ClearanceItem[] = [];
 
   if (!off.has('finance')) {
-    const [charges, payments] = await Promise.all([
-      tx.charge.groupBy({ by: ['currency'], where: { studentId }, _sum: { amount: true } }),
-      tx.payment.groupBy({ by: ['currency'], where: { studentId, status: 'VERIFIED' }, _sum: { amount: true } }),
-    ]);
-    const owed: string[] = [];
-    for (const c of charges) {
-      const paid = payments.find((p) => p.currency === c.currency)?._sum.amount?.toNumber() ?? 0;
-      const balance = (c._sum.amount?.toNumber() ?? 0) - paid;
-      if (balance > 0.005) owed.push(`${c.currency} ${money(balance)}`);
-    }
+    // The balance comes from Finance (or, for a school not yet on it, the first accounting tables); each currency on its own.
+    const owed = (await owedBy(tx, schoolId, studentId)).map((o) => `${o.currency} ${money(o.owed)}`);
     items.push({ key: 'fees', label: 'Fees balance', source: 'auto', clear: owed.length === 0, detail: owed.length ? `${owed.join(' and ')} outstanding` : 'Clear' });
   } else {
     items.push({ key: 'fees', label: 'Fees balance', source: 'manual', clear: previous.find((p) => p.key === 'fees')?.clear ?? false, detail: previous.find((p) => p.key === 'fees')?.clear ? 'Clear' : 'Tick when the fees are settled' });

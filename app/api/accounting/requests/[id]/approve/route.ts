@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { assertLegacyWritable } from '@/lib/finance/legacy-guard';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
@@ -15,6 +16,7 @@ async function _POST(
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await assertLegacyWritable(db, user.schoolId);
 
   try { await canApproveRequest(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
 

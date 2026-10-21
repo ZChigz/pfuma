@@ -58,6 +58,7 @@ export const ROLE_NAV: Record<UserRole, RoleNav> = {
       {
         title: 'Finance',
         items: [
+          { href: '/finance',        label: 'Finance module', icon: 'payments' },
           { href: '/director',       label: 'Profitability', icon: 'dashboard' },
           { href: '/director/voids', label: 'Void Entries',  icon: 'expenses'  },
         ],
@@ -70,6 +71,7 @@ export const ROLE_NAV: Record<UserRole, RoleNav> = {
       {
         title: 'Finance',
         items: [
+          { href: '/finance',       label: 'Finance module',   icon: 'payments' },
           { href: '/head',          label: 'Dashboard',        icon: 'dashboard' },
           { href: '/head/fees',     label: 'Fee Management',   icon: 'payments' },
           { href: '/head/payments', label: 'Payments',         icon: 'payments' },
@@ -92,6 +94,7 @@ export const ROLE_NAV: Record<UserRole, RoleNav> = {
       {
         title: 'Daily Work',
         items: [
+          { href: '/finance',              label: 'Finance module',  icon: 'payments' },
           { href: '/bursar/students',      label: 'Students',        icon: 'students' },
           { href: '/bursar/payments',      label: 'Record Payment',  icon: 'payments' },
           { href: '/bursar/disbursements', label: 'Disbursements',   icon: 'expenses' },

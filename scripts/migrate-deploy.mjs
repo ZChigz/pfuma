@@ -22,6 +22,8 @@ const RETRYABLE = [
   '20261031000200_students_module_constraints',
   '20261101000100_academics_module_backfill',
   '20261102000100_exams_core_backfill',
+  '20261103000100_finance_core_backfill',
+  '20261104000200_finance_full_backfill',
 ];
 
 async function failedRetryableMigrations() {

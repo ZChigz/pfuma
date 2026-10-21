@@ -12,6 +12,7 @@ import { ensureStudentMember } from '@/lib/library';
 import { dateOnly } from '@/lib/academic/terms';
 import { findOrCreateGuardian, linkGuardian } from '@/lib/students/guardians';
 import { idSchema } from '@/lib/students/common';
+import { billOnAdmission } from '@/lib/finance/billing';
 import {
   ageWarning, custom, isoDateField, mobilePhone, normalizeName, optionalText, personName, RELATIONSHIPS, todayInHarare, MIN_ADMISSION_DATE,
   type RegistrationWarning,
@@ -256,6 +257,9 @@ export async function admitTx(
       canReceiveSms: g.receivesSms, canCollect: g.canCollect, custodyNote: g.custodyNote,
     });
   }
+
+  // Once the term has been billed, a learner admitted now is billed at once (in full or by the weeks left), after their guardians are linked so a sibling discount can apply.
+  await billOnAdmission(tx, user, student.id, admitted);
 
   await logAudit(
     {

@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { formatUSD, formatZiG } from '@/lib/utils';
@@ -8,6 +9,7 @@ import { FeeStructureModal } from '@/components/accounting/FeeStructureModal';
 import type { SessionUser } from '@/types';
 
 export default async function HeadFeesPage() {
+  await sendToFinance('/finance/fees');
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;

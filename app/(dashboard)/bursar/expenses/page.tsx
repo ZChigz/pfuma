@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { formatUSD, formatZiG, formatDate } from '@/lib/utils';
@@ -6,6 +7,7 @@ import { ExpenseForm } from '@/components/accounting/ExpenseForm';
 import type { SessionUser } from '@/types';
 
 export default async function BursarExpensesPage() {
+  await sendToFinance('/finance/expenses');
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
