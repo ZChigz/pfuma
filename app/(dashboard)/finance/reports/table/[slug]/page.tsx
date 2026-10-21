@@ -7,7 +7,8 @@ import { getScopedDb } from '@/lib/scoped-db';
 import { todayInHarare } from '@/lib/finance/common';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { PrintButton, Section, Td, Th, fieldClass } from '@/components/finance/shared';
+import { PrintButton, Section, Td, Th } from '@/components/finance/shared';
+import { fieldClass } from '@/components/finance/format';
 
 export const metadata = { title: 'Finance report · Pfuma' };
 

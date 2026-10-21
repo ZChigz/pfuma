@@ -3,7 +3,8 @@ import { listPayroll, statutoryDue } from '@/lib/finance/payroll';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { FormAction } from '@/components/finance/FormAction';
-import { Money, MoneyLine, Notice, RowAction, Section, StatusBadge, Td, Th, methodLabel } from '@/components/finance/shared';
+import { Notice, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { Money, MoneyLine, methodLabel } from '@/components/finance/format';
 
 export const metadata = { title: 'Payroll · Pfuma' };
 

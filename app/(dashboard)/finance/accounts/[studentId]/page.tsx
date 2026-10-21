@@ -11,7 +11,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { FormAction } from '@/components/finance/FormAction';
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal';
-import { Money, PrintButton, RowAction, Section, StatusBadge, Td, Th, methodLabel } from '@/components/finance/shared';
+import { PrintButton, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { Money, methodLabel } from '@/components/finance/format';
 import { CURRENCIES, formatMoney } from '@/lib/finance/money';
 
 export const metadata = { title: 'Student account · Pfuma' };

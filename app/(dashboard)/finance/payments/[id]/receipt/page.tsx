@@ -3,7 +3,8 @@ import { getReceipt } from '@/lib/finance/payments';
 import { ServiceError } from '@/lib/api';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { PrintButton, methodLabel } from '@/components/finance/shared';
+import { PrintButton } from '@/components/finance/shared';
+import { methodLabel } from '@/components/finance/format';
 import { formatMoney } from '@/lib/finance/money';
 
 export const metadata = { title: 'Receipt · Pfuma' };

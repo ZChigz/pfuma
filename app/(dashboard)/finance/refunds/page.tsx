@@ -3,7 +3,8 @@ import { getAccess } from '@/lib/access';
 import { listRefunds } from '@/lib/finance/refunds';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { METHOD_OPTIONS, Money, Pager, RowAction, Section, StatusBadge, Td, Th, methodLabel } from '@/components/finance/shared';
+import { RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { METHOD_OPTIONS, Money, Pager, methodLabel } from '@/components/finance/format';
 
 export const metadata = { title: 'Refunds · Pfuma' };
 

@@ -4,7 +4,8 @@ import { getScopedDb } from '@/lib/scoped-db';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ArrearsTable } from '@/components/finance/ArrearsTable';
-import { MoneyLine, Section, fieldClass } from '@/components/finance/shared';
+import { Section } from '@/components/finance/shared';
+import { MoneyLine, fieldClass } from '@/components/finance/format';
 
 export const metadata = { title: 'Arrears · Pfuma' };
 

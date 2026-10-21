@@ -67,8 +67,7 @@ export function Section({ title, hint, action, children }: { title: string; hint
   );
 }
 
-export const linkButton = 'inline-flex min-h-[44px] items-center justify-center rounded-full border border-primary bg-white px-5 text-sm font-semibold text-primary hover:bg-tint';
-export const primaryLink = 'inline-flex min-h-[44px] items-center justify-center rounded-full bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover';
+export { linkButton, primaryLink } from '@/components/academics/styles';
 
 export const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 

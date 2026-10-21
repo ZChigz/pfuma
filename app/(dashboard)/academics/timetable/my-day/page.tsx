@@ -5,7 +5,8 @@ import { todayInHarare } from '@/lib/academics/common';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { Badge } from '@/components/ui/Badge';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Notice, primaryLink, linkButton } from '@/components/academics/shared';
+import { Notice } from '@/components/academics/shared';
+import { primaryLink, linkButton } from '@/components/academics/styles';
 
 export const metadata = { title: 'My day · Pfuma' };
 

@@ -10,7 +10,8 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { ProofLink } from '@/components/finance/ProofLink';
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal';
 import { VerifyWithSplits } from '@/components/finance/VerifyWithSplits';
-import { Money, Pager, RowAction, Section, StatusBadge, Td, Th, fieldClass, methodLabel } from '@/components/finance/shared';
+import { RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { Money, Pager, fieldClass, methodLabel } from '@/components/finance/format';
 
 export const metadata = { title: 'Payments · Pfuma' };
 

@@ -7,7 +7,8 @@ import { getScopedDb } from '@/lib/scoped-db';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { LineForm } from '@/components/finance/LineForm';
-import { Money, Notice, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { Notice, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { Money } from '@/components/finance/format';
 import { ServiceError } from '@/lib/api';
 
 export const metadata = { title: 'Fee structure · Pfuma' };

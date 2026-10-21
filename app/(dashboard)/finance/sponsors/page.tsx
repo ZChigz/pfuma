@@ -6,7 +6,8 @@ import { enabledCurrencies } from '@/lib/finance/common';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { FormAction } from '@/components/finance/FormAction';
-import { METHOD_OPTIONS, Money, MoneyLine, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { METHOD_OPTIONS, Money, MoneyLine } from '@/components/finance/format';
 
 export const metadata = { title: 'Sponsors · Pfuma' };
 

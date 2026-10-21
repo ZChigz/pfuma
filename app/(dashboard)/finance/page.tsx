@@ -8,7 +8,8 @@ import { AccessDenied } from '@/components/ui/AccessDenied';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal';
-import { Notice, Section, fieldClass, linkButton, methodLabel } from '@/components/finance/shared';
+import { Notice, Section } from '@/components/finance/shared';
+import { fieldClass, linkButton, methodLabel } from '@/components/finance/format';
 import { CURRENCIES, formatMoney, type Cur, type Totals } from '@/lib/finance/money';
 
 export const metadata = { title: 'Finance · Pfuma' };

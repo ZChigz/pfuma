@@ -3,7 +3,8 @@ import { getAccess } from '@/lib/access';
 import { TYPE_LABEL, listRequests } from '@/lib/finance/requests';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Money, Pager, Section, StatusBadge, Td, Th, linkButton, primaryLink } from '@/components/finance/shared';
+import { Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { Money, Pager, linkButton, primaryLink } from '@/components/finance/format';
 
 export const metadata = { title: 'Expense requests · Pfuma' };
 

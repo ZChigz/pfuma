@@ -6,7 +6,8 @@ import { ServiceError } from '@/lib/api';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { FormAction } from '@/components/finance/FormAction';
-import { METHOD_OPTIONS, Money, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { METHOD_OPTIONS, Money } from '@/components/finance/format';
 
 export const metadata = { title: 'Bank statement · Pfuma' };
 

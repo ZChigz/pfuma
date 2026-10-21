@@ -9,7 +9,7 @@ import { AccessDenied } from '@/components/ui/AccessDenied';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { TimetableClient } from '@/components/academics/TimetableClient';
-import { linkButton } from '@/components/academics/shared';
+import { linkButton } from '@/components/academics/styles';
 
 export const metadata = { title: 'Timetable · Pfuma' };
 

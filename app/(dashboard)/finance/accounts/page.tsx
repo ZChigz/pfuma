@@ -5,7 +5,8 @@ import { listFunds } from '@/lib/finance/setup';
 import { getScopedDb } from '@/lib/scoped-db';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Money, Pager, Section, Td, Th, fieldClass } from '@/components/finance/shared';
+import { Section, Td, Th } from '@/components/finance/shared';
+import { Money, Pager, fieldClass } from '@/components/finance/format';
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal';
 import { CURRENCIES, type Cur } from '@/lib/finance/money';
 

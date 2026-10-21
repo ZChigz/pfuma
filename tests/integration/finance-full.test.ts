@@ -266,7 +266,7 @@ describe('payment plans', () => {
 describe('payroll', () => {
   it('is paid by Finance, never by the person who prepared it, and records the salaries as expenses', async () => {
     await expect(prisma.$transaction((tx) => m.payroll.handOverPayroll(tx, A.schoolId, { period: '2026-10', preparedById: W.head.id, approvedById: W.head.id, lines: [{ employee: 'Mr X', currency: 'USD', netCents: 50000, method: 'BANK_TRANSFER' }] }))).rejects.toThrow(/approved by someone other/);
-    const run = await prisma.$transaction((tx) => m.payroll.handOverPayroll(tx, A.schoolId, {
+    const run: { id: string } = await prisma.$transaction((tx) => m.payroll.handOverPayroll(tx, A.schoolId, {
       period: '2026-10', preparedById: W.head.id, approvedById: W.owner.id,
       lines: [{ employee: 'Mr Banda', currency: 'USD', netCents: 50000, method: 'BANK_TRANSFER', account: '123' }, { employee: 'Mrs Chuma', currency: 'ZIG', netCents: 900000, method: 'ECOCASH' }],
       statutory: [{ type: 'PAYE', currency: 'USD', amountCents: 8000, dueDate: '2026-11-10' }],

@@ -7,7 +7,8 @@ import { getViewTerm } from '@/lib/system/view-term';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { FormAction } from '@/components/finance/FormAction';
-import { Money, RowAction, Section, Td, Th } from '@/components/finance/shared';
+import { RowAction, Section, Td, Th } from '@/components/finance/shared';
+import { Money } from '@/components/finance/format';
 
 export const metadata = { title: 'Budgets · Pfuma' };
 

@@ -364,7 +364,7 @@ describe('spending goes out along its own path', () => {
     expect(await prisma.finExpense.count({ where: { schoolId: A.schoolId, source: 'REQUEST' } })).toBe(0);
     const paid = await requests.disburseRequest(W.bursar, ids.req, { method: 'CASH', amount: '35.00', payee: 'Stationery World' });
     expect(await prisma.finExpense.count({ where: { schoolId: A.schoolId, source: 'REQUEST' } })).toBe(1);
-    const e = await prisma.finExpense.findUniqueOrThrow({ where: { id: paid.expenseId } });
+    const e = await prisma.finExpense.findUniqueOrThrow({ where: { id: paid.expenseId! } });
     expect(e).toMatchObject({ amountCents: 3500, currency: 'USD', source: 'REQUEST', requestId: ids.req, recordedById: W.bursar.id });
     expect((await requests.getRequest(W.bursar, ids.req)).status).toBe('DISBURSED');
     await fails(requests.disburseRequest(W.owner, ids.req, { method: 'CASH' }), 409, /already paid/);

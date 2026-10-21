@@ -5,7 +5,8 @@ import { enabledCurrencies } from '@/lib/finance/common';
 import { AccessDenied } from '@/components/ui/AccessDenied';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PlanForm } from '@/components/finance/PlanForm';
-import { Money, RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { RowAction, Section, StatusBadge, Td, Th } from '@/components/finance/shared';
+import { Money } from '@/components/finance/format';
 
 export const metadata = { title: 'Payment plans · Pfuma' };
 
