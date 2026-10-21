@@ -34,7 +34,7 @@ export default async function HeadDashboard() {
       where: { schoolId, status: 'ACTIVE' },
       select: {
         id: true,
-        grade: true,
+        currentClass: { select: { level: { select: { name: true } } } },
         charges: { select: { currency: true, amount: true, issuedAt: true } },
         payments: { where: { status: 'VERIFIED' }, select: { currency: true, amount: true } },
       },
@@ -53,7 +53,8 @@ export default async function HeadDashboard() {
     if (balUSD <= 0 && balZiG <= 0) continue;
     if (s.charges.length === 0) continue;
 
-    owingByGrade.set(s.grade, (owingByGrade.get(s.grade) ?? 0) + 1);
+    const form = s.currentClass?.level?.name ?? 'No class';
+    owingByGrade.set(form, (owingByGrade.get(form) ?? 0) + 1);
 
     const oldestMs = Math.min(...s.charges.map((c) => new Date(c.issuedAt).getTime()));
     if (getDaysOverdue(new Date(oldestMs)) >= 60) overdueCount++;
