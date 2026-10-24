@@ -14,7 +14,7 @@ import { FileUpload } from '@/components/ui/FileUpload';
 export interface FormField {
   name: string;
   label: string;
-  type?: 'text' | 'money' | 'date' | 'select' | 'textarea' | 'number' | 'student' | 'file';
+  type?: 'text' | 'money' | 'date' | 'select' | 'textarea' | 'number' | 'student' | 'file' | 'cents' | 'bool' | 'time';
   options?: { value: string; label: string }[];
   required?: boolean;
   placeholder?: string;
@@ -52,7 +52,7 @@ export function FormAction({ label, title, url, method = 'POST', fields, extra =
     for (const f of fields) {
       const raw = (v[f.name] ?? '').trim();
       if (raw === '') continue;
-      body[f.name] = f.type === 'number' ? Number(raw) : f.type === 'money' ? raw.replace(/,/g, '') : raw;
+      body[f.name] = f.type === 'number' ? Number(raw) : f.type === 'cents' ? Math.round(Number(raw.replace(/,/g, '')) * 100) : f.type === 'bool' ? raw === 'yes' : f.type === 'money' ? raw.replace(/,/g, '') : raw;
     }
     const r = await api(url, method, body);
     setBusy(false);
@@ -77,6 +77,10 @@ export function FormAction({ label, title, url, method = 'POST', fields, extra =
                 <div><FileUpload endpoint="proofOfPayment" onUpload={(k) => setV({ ...v, [f.name]: k })} />{v[f.name] && <p className="mt-1 text-xs text-muted">File attached.</p>}</div>
               ) : f.type === 'student' ? (
                 <StudentSearch id={`fa-${f.name}`} value={v[f.name] ?? ''} onChange={(id) => setV({ ...v, [f.name]: id })} />
+              ) : f.type === 'bool' ? (
+                <select id={`fa-${f.name}`} className={fieldClass} value={v[f.name] ?? ''} onChange={(e) => setV({ ...v, [f.name]: e.target.value })}>
+                  <option value="">No</option><option value="yes">Yes</option>
+                </select>
               ) : f.type === 'select' ? (
                 <select id={`fa-${f.name}`} className={fieldClass} value={v[f.name] ?? ''} onChange={(e) => setV({ ...v, [f.name]: e.target.value })}>
                   {!f.required && <option value="">—</option>}
@@ -86,7 +90,7 @@ export function FormAction({ label, title, url, method = 'POST', fields, extra =
               ) : f.type === 'textarea' ? (
                 <textarea id={`fa-${f.name}`} className="min-h-[88px] w-full rounded-xl border border-line bg-white p-3 text-sm" value={v[f.name] ?? ''} maxLength={f.maxLength ?? 300} onChange={(e) => setV({ ...v, [f.name]: e.target.value })} />
               ) : (
-                <input id={`fa-${f.name}`} className={fieldClass} type={f.type === 'date' ? 'date' : 'text'} inputMode={f.type === 'money' ? 'decimal' : f.type === 'number' ? 'numeric' : undefined} placeholder={f.placeholder ?? (f.type === 'money' ? '0.00' : undefined)} maxLength={f.maxLength} value={v[f.name] ?? ''} onChange={(e) => setV({ ...v, [f.name]: e.target.value })} />
+                <input id={`fa-${f.name}`} className={fieldClass} type={f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text'} inputMode={f.type === 'money' || f.type === 'cents' ? 'decimal' : f.type === 'number' ? 'numeric' : undefined} placeholder={f.placeholder ?? (f.type === 'money' || f.type === 'cents' ? '0.00' : undefined)} maxLength={f.maxLength} value={v[f.name] ?? ''} onChange={(e) => setV({ ...v, [f.name]: e.target.value })} />
               )}
             </Field>
           ))}

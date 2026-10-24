@@ -539,6 +539,7 @@ const EXEMPT: Record<string, string> = {
   'upload': 'UploadThing handler; school id comes from the session, files are keyed pop:<schoolId>:…',
   'account/change-password': "changes the signed-in user's own password; no id is accepted",
   'password-reset': 'public; the single-use reset link is the credential (tests/integration/rates-resets-assets.test.ts)',
+  'cron/hr': 'scheduler only (secret in the Authorization header); each school uses its own scoped client (tests/integration/hr-records.test.ts)',
   'cron/finance': 'scheduler only (secret in the Authorization header); each school uses its own scoped client (tests/integration/finance-full.test.ts)',
   'portal/paynow/start': 'public; the school and learner come from the hash of a secret portal link token (tests/integration/portal.test.ts)',
   'portal/paynow/callback': 'public; the school comes from the attempt reference and the post is refused unless it carries the school Paynow hash (tests/integration/finance-full.test.ts)',
@@ -567,6 +568,7 @@ for (const key of Object.keys(routeModules)) {
   // Finance routes run through guarded() and the scoped client. Other schools' payments, charges, requests and accounts are refused (404)
   // by the services (tests/integration/finance-flows.test.ts, "one school never sees another"), and the database refuses a row that
   // points into another school (tests/integration/finance-database.test.ts).
+  if (f.startsWith('hr/')) EXEMPT[f] = 'HR & Staff: scoped client + guarded(); isolation proven in tests/integration/hr-records.test.ts ("another school sees none of this") and hr-payroll.test.ts, and the database refuses cross-school references';
   if (f.startsWith('finance/')) EXEMPT[f] = 'Finance: scoped client + guarded(); isolation proven in tests/integration/finance-flows.test.ts and finance-database.test.ts';
 }
 

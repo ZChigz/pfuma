@@ -12,18 +12,18 @@ import { METHODS } from '@/lib/finance/methods';
 const STATUTORY = ['PAYE', 'NSSA', 'ZIMDEF', 'AIDS_LEVY'] as const;
 
 export const HandOverSchema = z.object({
-  period: textSchema('the pay period', 3, 20), preparedById: idSchema, approvedById: idSchema,
+  period: textSchema('the pay period', 3, 20), preparedById: idSchema, approvedById: idSchema, hrRunId: idSchema.optional(),
   lines: z.array(z.object({ employee: textSchema('the employee', 2, 80), employeeRef: z.string().trim().max(40).optional(), currency: currencySchema, netCents: centsSchema, method: z.enum(METHODS), account: z.string().trim().max(60).optional() })).min(1).max(1000),
   statutory: z.array(z.object({ type: z.enum(STATUTORY), currency: currencySchema, amountCents: centsSchema, dueDate: isoDateSchema })).max(20).default([]),
 });
 
-/** What HR calls when the Owner approves a payroll run: the lines become "Ready to pay". Not an HTTP route; HR is not built yet. */
+/** What HR calls when the Owner approves a payroll run (lib/payroll/run.ts): the lines become "Ready to pay". Not an HTTP route. */
 export async function handOverPayroll(tx: Db, schoolId: string, raw: unknown) {
   const input = HandOverSchema.parse(raw);
   if (input.preparedById === input.approvedById) throw new ServiceError('The payroll must be approved by someone other than the person who prepared it', 403);
   const run = await tx.payrollRun.create({
     data: {
-      schoolId, period: input.period, preparedById: input.preparedById, approvedById: input.approvedById, status: 'READY',
+      schoolId, period: input.period, preparedById: input.preparedById, approvedById: input.approvedById, status: 'READY', hrRunId: input.hrRunId ?? null,
       lines: { create: input.lines.map((l) => ({ schoolId, employee: l.employee, employeeRef: l.employeeRef || null, currency: l.currency, netCents: l.netCents, method: l.method, account: l.account || null })) },
     },
   });
@@ -34,7 +34,7 @@ export async function handOverPayroll(tx: Db, schoolId: string, raw: unknown) {
 }
 
 export interface PayrollRunView {
-  id: string; period: string; status: 'READY' | 'PAID'; preparedBy: string | null; approvedBy: string | null; paidBy: string | null; paidAt: string | null;
+  id: string; period: string; status: 'READY' | 'PAID' | 'CANCELLED'; preparedBy: string | null; approvedBy: string | null; paidBy: string | null; paidAt: string | null;
   totals: Record<Cur, number>; paidTotals: Record<Cur, number>;
   lines: { id: string; employee: string; employeeRef: string | null; currency: Cur; netCents: number; method: string; account: string | null; paid: boolean; reference: string | null }[];
   statutory: { id: string; type: string; currency: Cur; amountCents: number; dueDate: string; paidAt: string | null; reference: string | null }[];
@@ -43,7 +43,7 @@ export interface PayrollRunView {
 export async function listPayroll(user: Actor): Promise<PayrollRunView[]> {
   need(user, 'finance.payroll.pay');
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
-    const runs = await tx.payrollRun.findMany({ where: { schoolId: user.schoolId }, orderBy: { createdAt: 'desc' }, take: 36, include: { lines: { orderBy: { employee: 'asc' } } } });
+    const runs = await tx.payrollRun.findMany({ where: { schoolId: user.schoolId, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, take: 36, include: { lines: { orderBy: { employee: 'asc' } } } });
     const stat = await tx.statutoryPayment.findMany({ where: { schoolId: user.schoolId, payrollRunId: { in: runs.map((r) => r.id) } }, orderBy: { dueDate: 'asc' } });
     const names = await nameMap(tx, user.schoolId, runs.flatMap((r) => [r.preparedById, r.approvedById, r.paidById]));
     return runs.map((r) => {
@@ -68,6 +68,7 @@ export async function markPayrollPaid(user: Actor, runId: string, raw: unknown) 
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const run = await tx.payrollRun.findFirst({ where: { id: runId, schoolId: user.schoolId }, include: { lines: true } });
     if (!run) throw new ServiceError('Payroll run not found', 404);
+    if (run.status === 'CANCELLED') throw new ServiceError('The Owner reopened this payroll in HR. Wait for it to be approved again.', 409);
     if (run.status === 'PAID') throw new ServiceError('This payroll has already been paid', 409);
     if (run.preparedById === user.id) throw new ServiceError('You prepared this payroll, so someone else must pay it.', 403);
     const picked = run.lines.filter((l) => input.lineIds.includes(l.id));
@@ -92,6 +93,8 @@ export async function markPayrollPaid(user: Actor, runId: string, raw: unknown) 
     if (remaining === 0) {
       await tx.payrollRun.update({ where: { id: run.id }, data: { status: 'PAID', paidById: user.id, paidAt: new Date() } });
       await audit(tx, user, 'PAY_PAYROLL', 'PayrollRun', run.id, `Payroll for ${run.period} fully paid`, { status: 'READY' }, { status: 'PAID', paidById: user.id });
+      // HR learns that its run is paid: payslips are released, loan balances go down.
+      if (run.hrRunId) await (await import('@/lib/payroll/run')).onFinanceRunPaid(tx, user, run.hrRunId);
     }
     return { paid: picked.length, runPaid: remaining === 0 };
   });
@@ -107,7 +110,8 @@ export async function markStatutoryPaid(user: Actor, id: string, raw: unknown) {
     const s = await tx.statutoryPayment.findFirst({ where: { id, schoolId: user.schoolId } });
     if (!s) throw new ServiceError('Statutory payment not found', 404);
     if (s.paidAt) throw new ServiceError('This remittance has already been paid', 409);
-    const run = s.payrollRunId ? await tx.payrollRun.findFirst({ where: { id: s.payrollRunId, schoolId: user.schoolId }, select: { preparedById: true } }) : null;
+    const run = s.payrollRunId ? await tx.payrollRun.findFirst({ where: { id: s.payrollRunId, schoolId: user.schoolId }, select: { preparedById: true, status: true } }) : null;
+    if (run?.status === 'CANCELLED') throw new ServiceError('The Owner reopened this payroll in HR, so this remittance is not due.', 409);
     if (run?.preparedById === user.id) throw new ServiceError('You prepared this payroll, so someone else must pay it.', 403);
     const fund = (await tx.fund.findFirst({ where: { schoolId: user.schoolId, kind: 'GENERAL', active: true } })) ?? (await tx.fund.findFirst({ where: { schoolId: user.schoolId, active: true }, orderBy: { name: 'asc' } }));
     if (!fund) throw new ServiceError('Set up a fund before paying', 409);
@@ -127,7 +131,8 @@ export async function markStatutoryPaid(user: Actor, id: string, raw: unknown) {
 export async function statutoryDue(user: Actor) {
   need(user, 'finance.payroll.pay', 'finance.dashboard.view');
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
-    const rows = await tx.statutoryPayment.findMany({ where: { schoolId: user.schoolId, paidAt: null }, orderBy: { dueDate: 'asc' }, take: 50 });
+    const cancelled = (await tx.payrollRun.findMany({ where: { schoolId: user.schoolId, status: 'CANCELLED' }, select: { id: true } })).map((r) => r.id);
+    const rows = await tx.statutoryPayment.findMany({ where: { schoolId: user.schoolId, paidAt: null, ...(cancelled.length ? { OR: [{ payrollRunId: null }, { payrollRunId: { notIn: cancelled } }] } : {}) }, orderBy: { dueDate: 'asc' }, take: 50 });
     const today = dayOf(todayInHarare()).getTime();
     return rows.map((s) => ({ id: s.id, type: s.type, period: s.period, currency: s.currency as Cur, amountCents: s.amountCents, dueDate: ymd(s.dueDate), daysLeft: Math.round((s.dueDate.getTime() - today) / 86_400_000) }));
   });
