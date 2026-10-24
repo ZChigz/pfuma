@@ -116,7 +116,15 @@ describe('roles and permissions as data', () => {
           BURSAR: ['finance.dashboard.view', 'finance.fees.view', 'finance.fees.manage', 'finance.billing.run', 'finance.accounts.view', 'finance.charges.create', 'finance.adjustments.create', 'finance.sponsors.manage', 'finance.payments.view', 'finance.payments.record', 'finance.payments.verify', 'finance.payments.allocate', 'finance.refunds.request', 'finance.refunds.pay', 'finance.credit.transfer', 'finance.statements.view', 'finance.plans.manage', 'finance.expenses.view', 'finance.expenses.record', 'finance.expenses.manage', 'finance.suppliers.manage', 'finance.budgets.manage', 'finance.requests.view', 'finance.requests.create', 'finance.requests.disburse', 'finance.rates.view', 'finance.rates.manage', 'finance.cashup.confirm', 'finance.bank.reconcile', 'finance.reports.view', 'finance.reports.export', 'finance.payroll.pay'],
           CLASS_TEACHER: ['finance.requests.create', 'finance.arrears.flag'],
         };
-        expect(keys, r.key).toEqual([...own, ...(exams[r.key] ?? []), ...(finance[r.key] ?? []), 'system.calendar.view', 'system.dashboard.view'].sort());
+        // HR keys (hr_role_keys in the migration): every staff member gets the self-service keys; a few roles get more.
+        const self = ['hr.attendance.self', 'hr.leave.request', 'hr.self.details', 'hr.self.leave', 'hr.self.payslips'];
+        const hrMore: Record<string, string[]> = {
+          HEAD: ['hr.directory.view', 'hr.employees.view', 'hr.staff.view', 'hr.posts.approve', 'hr.leave.approve', 'hr.leave.view_all', 'hr.leave.view', 'hr.attendance.view', 'hr.duties.approve', 'hr.duties.view', 'hr.discipline.view', 'hr.reports.view'],
+          DEPUTY_HEAD: ['hr.directory.view', 'hr.attendance.view', 'hr.attendance.mark', 'hr.duties.manage', 'hr.duties.view', 'hr.leave.approve', 'hr.leave.view'],
+          HR_OFFICER: ['hr.directory.view', 'hr.employees.view', 'hr.employees.manage', 'hr.staff.view', 'hr.pay.view', 'hr.pay.manage', 'hr.posts.manage', 'hr.recruitment.manage', 'hr.contracts.manage', 'hr.attendance.mark', 'hr.attendance.view', 'hr.attendance.correct', 'hr.leave.view_all', 'hr.leave.view', 'hr.leave.adjust', 'hr.duties.view', 'hr.payroll.prepare', 'hr.payroll.view', 'hr.payroll.settings', 'hr.documents.manage', 'hr.discipline.manage', 'hr.discipline.view', 'hr.reports.view'],
+          BURSAR: ['hr.payroll.settings'], HOD: ['hr.directory.view', 'hr.duties.view'], BOARDING_MASTER: ['hr.duties.view'],
+        };
+        expect(keys, r.key).toEqual([...own, ...(exams[r.key] ?? []), ...(finance[r.key] ?? []), ...self, ...(hrMore[r.key] ?? []), 'system.calendar.view', 'system.dashboard.view'].sort());
       }
     }
   });

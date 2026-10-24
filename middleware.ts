@@ -80,8 +80,8 @@ const ROLE_ALLOWED: Record<UserRole, (pathname: string) => boolean> = {
 
 // Reachable by any signed-in user, whatever their role.
 // /system and /api/system: every signed-in user reaches them, and can() (lib/access.ts) decides what they may do.
-// /students and /api/students (Student Information), /academics and /api/academics, /exams and /api/exams (Examinations) and /finance and /api/finance (Finance) work the same way: every route and page asks can().
-const ANY_ROLE = ['/change-password', '/api/account', '/system', '/api/system', '/students', '/api/students', '/academics', '/api/academics', '/exams', '/api/exams', '/finance', '/api/finance', '/print'];
+// /students and /api/students (Student Information), /academics and /api/academics, /exams and /api/exams (Examinations) /finance and /api/finance (Finance), and /hr and /api/hr (HR & Staff) work the same way: every route and page asks can().
+const ANY_ROLE = ['/change-password', '/api/account', '/system', '/api/system', '/students', '/api/students', '/academics', '/api/academics', '/exams', '/api/exams', '/finance', '/api/finance', '/hr', '/api/hr', '/print'];
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 

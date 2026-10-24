@@ -24,6 +24,7 @@ const RETRYABLE = [
   '20261102000100_exams_core_backfill',
   '20261103000100_finance_core_backfill',
   '20261104000200_finance_full_backfill',
+  '20261105000200_hr_core_backfill',
 ];
 
 async function failedRetryableMigrations() {

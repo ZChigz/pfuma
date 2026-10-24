@@ -614,6 +614,53 @@ enum AuditAction {
   PAY_STATUTORY
   SEND_FINANCE_SMS
   SECOND_APPROVE_REQUEST
+  HR_SAVE_EMPLOYEE
+  HR_EMPLOYEE_STATUS
+  HR_CHANGE_PAY
+  HR_VIEW_SENSITIVE
+  HR_LINK_USER
+  HR_SAVE_EMPLOYEE_ITEM
+  HR_REQUEST_CHANGE
+  HR_DECIDE_CHANGE
+  HR_SAVE_POST
+  HR_APPROVE_POST
+  HR_SAVE_VACANCY
+  HR_SAVE_APPLICANT
+  HR_SCORE_APPLICANT
+  HR_HIRE_APPLICANT
+  HR_SAVE_CONTRACT
+  HR_RENEW_CONTRACT
+  HR_END_EMPLOYMENT
+  HR_MARK_ATTENDANCE
+  HR_SIGN_IN
+  HR_CORRECT_ATTENDANCE
+  HR_SAVE_SETTINGS
+  HR_SAVE_LEAVE_TYPE
+  HR_REQUEST_LEAVE
+  HR_DECIDE_LEAVE
+  HR_CANCEL_LEAVE
+  HR_ADJUST_LEAVE
+  HR_SAVE_DUTY_TYPE
+  HR_SAVE_ROSTER
+  HR_APPROVE_ROSTER
+  HR_PUBLISH_ROSTER
+  HR_SWAP_DUTY
+  HR_SAVE_PAY_SETUP
+  HR_SAVE_LOAN
+  HR_SAVE_TAX_SETTINGS
+  HR_CONFIRM_TAX_SETTINGS
+  HR_CREATE_RUN
+  HR_SAVE_VARIABLE
+  HR_CALCULATE_RUN
+  HR_SUBMIT_RUN
+  HR_APPROVE_RUN
+  HR_RETURN_RUN
+  HR_REOPEN_RUN
+  HR_RUN_PAID
+  HR_RELEASE_PAYSLIPS
+  HR_SAVE_DISCIPLINE
+  HR_GENERATE_LETTER
+  HR_EXPORT_REPORT
 }
 
 enum SchoolType {
@@ -4705,6 +4752,8 @@ enum PettyKind {
 enum PayrollStatus {
   READY
   PAID
+  // The HR run was reopened by the Owner before anything was paid; nothing in this hand-over can be paid any more.
+  CANCELLED
 }
 
 enum StatutoryType {
@@ -5144,11 +5193,14 @@ model PayrollRun {
   status       PayrollStatus @default(READY)
   paidById     String?
   paidAt       DateTime?
+  // The HR payroll run this hand-over came from (null for runs handed over by code).
+  hrRunId      String?
   createdAt    DateTime      @default(now())
 
   lines PayrollLine[]
 
-  @@unique([schoolId, period])
+  // One live hand-over per month: the database index ignores CANCELLED ones (migration 20261105000100_hr_core).
+  @@index([schoolId, period])
 }
 
 model PayrollLine {
@@ -5213,4 +5265,940 @@ model PaynowAttempt {
   updatedAt   DateTime @updatedAt
 
   @@index([schoolId, studentId])
+}
+
+// ─── HR & Staff ──────────────────────────────────────────────────────────────
+// One Employee per person who works at the school, whoever pays them. Rows are never deleted. Money is whole cents with a currency.
+// References to User and to other HR rows are plain ids; the foreign keys and the same-school checks are in the migration SQL.
+
+enum HrEmployer {
+  GOVERNMENT
+  SCHOOL
+}
+
+enum EmployeeCategory {
+  TEACHING
+  ADMINISTRATION
+  ANCILLARY
+  BOARDING
+  SECURITY
+  GROUNDS
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  RESIGNED
+  RETIRED
+  DISMISSED
+  DECEASED
+}
+
+enum EmployeeExitReason {
+  RESIGNATION
+  END_OF_CONTRACT
+  RETIREMENT
+  DISMISSAL
+  DEATH
+}
+
+enum ContractKind {
+  PERMANENT
+  FIXED_TERM
+  TEMPORARY
+  CASUAL
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+enum PostStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CLOSED
+}
+
+enum VacancyStatus {
+  OPEN
+  CLOSED
+  FILLED
+}
+
+enum ApplicantStage {
+  APPLIED
+  SHORTLISTED
+  INTERVIEWED
+  OFFERED
+  HIRED
+  REJECTED
+}
+
+enum StaffAttStatus {
+  PRESENT
+  LATE
+  ABSENT
+  ON_LEAVE
+  OFFICIAL_DUTY
+  HALF_DAY
+}
+
+enum StaffAttMethod {
+  OFFICE
+  SELF
+  TABLET
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum RosterStatus {
+  DRAFT
+  APPROVED
+  PUBLISHED
+}
+
+enum SwapStatus {
+  REQUESTED
+  ACCEPTED
+  DECLINED
+  CONFIRMED
+  CANCELLED
+}
+
+enum HrPayMethod {
+  BANK
+  ECOCASH
+  CASH
+}
+
+enum PayBasis {
+  MONTHLY
+  DAILY
+  HOURLY
+}
+
+enum ComponentKind {
+  ALLOWANCE
+  DEDUCTION
+}
+
+enum HrPayrollStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PAID
+  RETURNED
+}
+
+enum LoanStatus {
+  ACTIVE
+  REPAID
+  CANCELLED
+}
+
+enum ChangeGroup {
+  DETAILS
+  BANK
+  NEXT_OF_KIN
+}
+
+enum ChangeRequestStatus {
+  PENDING
+  HR_APPROVED
+  APPROVED
+  REJECTED
+}
+
+enum DisciplineOutcome {
+  VERBAL_WARNING
+  WRITTEN_WARNING
+  FINAL_WARNING
+  SUSPENSION
+  DISMISSAL
+  NO_ACTION
+}
+
+enum SensitiveKind {
+  SALARY
+  PAYSLIP
+  BANK
+  NATIONAL_ID
+  MEDICAL
+  DISCIPLINE
+}
+
+// Counters (EMP-0042, letter references) that never repeat and never skip.
+model HrSequence {
+  id         String @id @default(cuid())
+  schoolId   String
+  key        String
+  nextNumber Int    @default(1)
+
+  @@unique([schoolId, key])
+}
+
+model HrSettings {
+  id                   String   @id @default(cuid())
+  schoolId             String   @unique
+  lateAfter            String   @default("07:30")
+  signInFrom           String   @default("05:30")
+  signInUntil          String   @default("12:00")
+  officeRegister       Boolean  @default(true)
+  selfSignIn           Boolean  @default(false)
+  tabletSignIn         Boolean  @default(false)
+  signOutRequired      Boolean  @default(false)
+  // Signs in only from the school's network: the caller passes the network check; the setting records the school's choice.
+  wifiOnly             Boolean  @default(false)
+  // The Head may hand teaching-staff leave approval to this user (usually the Deputy).
+  leaveDelegateUserId  String?
+  // ZiG per US$1, in hundredths (27.50 = 2750), for staff whose pay is split by a rule.
+  payrollZigPerUsd     Int?
+  netChangeFlagPct     Int      @default(10)
+  payeDueDay           Int      @default(10)
+  nssaDueDay           Int      @default(15)
+  zimdefDueDay         Int      @default(15)
+  absentAlertDays      Int      @default(3)
+  contractReminderDays Int[]    @default([60, 30])
+  // Days from the Calendar are used for working days; these are the weekdays worked (1 = Monday ... 7 = Sunday).
+  workingWeekdays      Int[]    @default([1, 2, 3, 4, 5])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+}
+
+model Employee {
+  id            String              @id @default(cuid())
+  schoolId      String
+  employeeNo    String
+  userId        String?             @unique
+  title         String?
+  firstName     String
+  surname       String
+  gender        Gender?
+  dateOfBirth   DateTime?           @db.Date
+  // Sensitive: HR, the Owner and the employee only.
+  nationalId    String?
+  medicalNotes  String?
+  nationality   String?
+  maritalStatus String?
+  homeAddress   String?
+  personalPhone String?
+  personalEmail String?
+  workPhone     String?
+  photoKey      String?
+  jobTitle      String
+  departmentId  String?
+  category      EmployeeCategory    @default(ANCILLARY)
+  employer      HrEmployer          @default(SCHOOL)
+  ecNumber      String?
+  // The date the ministry posted a government teacher here.
+  postedOn      DateTime?           @db.Date
+  startDate     DateTime            @db.Date
+  status        EmployeeStatus      @default(ACTIVE)
+  lineManagerId String?
+  // The establishment post this person fills (for filled / vacant counts).
+  postId        String?
+  leavingDate   DateTime?           @db.Date
+  leavingReason EmployeeExitReason?
+  // The 4-digit PIN of the shared office tablet, hashed.
+  tabletPinHash String?
+  createdById   String
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @default(now()) @updatedAt
+
+  @@unique([schoolId, employeeNo])
+  @@index([schoolId, status])
+  @@index([schoolId, employer])
+  @@index([schoolId, departmentId])
+}
+
+model EmployeeNextOfKin {
+  id           String   @id @default(cuid())
+  schoolId     String
+  employeeId   String
+  name         String
+  relationship String
+  phone        String
+  address      String?
+  isEmergency  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([schoolId, employeeId])
+}
+
+model EmployeeQualification {
+  id          String    @id @default(cuid())
+  schoolId    String
+  employeeId  String
+  // QUALIFICATION, SUBJECT (a subject they can teach) or REGISTRATION (a professional body).
+  kind        String    @default("QUALIFICATION")
+  title       String
+  institution String?
+  year        Int?
+  documentKey String?
+  expiresOn   DateTime? @db.Date
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId, employeeId])
+}
+
+model EmployeeDocument {
+  id           String    @id @default(cuid())
+  schoolId     String
+  employeeId   String
+  // CONTRACT, ID_COPY, CERTIFICATE, APPOINTMENT_LETTER, DISCIPLINARY, LETTER, OTHER
+  kind         String
+  title        String
+  reference    String?
+  // The text of a letter generated from a template (the letterhead and the signature are added when it is printed).
+  body         String?
+  fileKey      String?
+  expiresOn    DateTime? @db.Date
+  // Disciplinary papers: HR, the Head and the Owner only.
+  restricted   Boolean   @default(false)
+  uploadedById String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  @@unique([schoolId, reference])
+  @@index([schoolId, employeeId])
+}
+
+// Position, salary and status changes. Added to, never changed.
+model EmployeeHistory {
+  id            String   @id @default(cuid())
+  schoolId      String
+  employeeId    String
+  field         String
+  oldValue      String?
+  newValue      String?
+  effectiveDate DateTime @db.Date
+  changedById   String
+  reason        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@index([schoolId, employeeId, createdAt])
+}
+
+// A staff member asks to change their own details; HR approves. Bank changes also need the Owner.
+model EmployeeChangeRequest {
+  id               String              @id @default(cuid())
+  schoolId         String
+  employeeId       String
+  group            ChangeGroup
+  changes          Json
+  reason           String?
+  status           ChangeRequestStatus @default(PENDING)
+  requestedById    String
+  hrDecidedById    String?
+  hrDecidedAt      DateTime?
+  ownerDecidedById String?
+  ownerDecidedAt   DateTime?
+  rejectedById     String?
+  rejectionReason  String?
+  appliedAt        DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @default(now()) @updatedAt
+
+  @@index([schoolId, status])
+  @@index([employeeId])
+}
+
+// Who looked at someone else's salary, payslip, bank details, ID number, medical notes or disciplinary record. Added to, never changed.
+model HrSensitiveView {
+  id         String        @id @default(cuid())
+  schoolId   String
+  employeeId String
+  viewerId   String
+  kind       SensitiveKind
+  context    String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @default(now()) @updatedAt
+
+  @@index([schoolId, employeeId, createdAt])
+}
+
+model StaffDisciplinary {
+  id           String             @id @default(cuid())
+  schoolId     String
+  employeeId   String
+  category     String
+  description  String
+  incidentDate DateTime           @db.Date
+  hearingDate  DateTime?          @db.Date
+  panel        String?
+  outcome      DisciplineOutcome?
+  appeal       String?
+  documentKeys String[]           @default([])
+  recordedById String
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @default(now()) @updatedAt
+
+  @@index([schoolId, employeeId])
+}
+
+// ── Establishment and recruitment ────────────────────────────────────────────
+
+model Post {
+  id                String           @id @default(cuid())
+  schoolId          String
+  title             String
+  departmentId      String?
+  category          EmployeeCategory @default(ANCILLARY)
+  employer          HrEmployer       @default(SCHOOL)
+  count             Int              @default(1)
+  currency          Currency         @default(USD)
+  monthlyCostCents  Int              @default(0)
+  note              String?
+  status            PostStatus       @default(PENDING)
+  requestedById     String
+  headApprovedById  String?
+  headApprovedAt    DateTime?
+  ownerApprovedById String?
+  ownerApprovedAt   DateTime?
+  // Set when the second of the two approvals lands.
+  approvedById      String?
+  rejectedById      String?
+  rejectionReason   String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @default(now()) @updatedAt
+
+  @@index([schoolId, status])
+}
+
+model Vacancy {
+  id           String        @id @default(cuid())
+  schoolId     String
+  postId       String
+  title        String
+  requirements String?
+  closingDate  DateTime      @db.Date
+  status       VacancyStatus @default(OPEN)
+  createdById  String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @default(now()) @updatedAt
+
+  @@index([schoolId, status])
+}
+
+model Applicant {
+  id              String         @id @default(cuid())
+  schoolId        String
+  vacancyId       String
+  name            String
+  phone           String?
+  email           String?
+  cvKey           String?
+  qualifications  String?
+  notes           String?
+  stage           ApplicantStage @default(APPLIED)
+  rejectionReason String?
+  hiredEmployeeId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @default(now()) @updatedAt
+
+  @@index([schoolId, vacancyId, stage])
+}
+
+model InterviewScore {
+  id             String   @id @default(cuid())
+  schoolId       String
+  applicantId    String
+  panelistId     String
+  criterion      String
+  score          Int
+  comment        String?
+  // HIRE, CONSIDER or DO_NOT_HIRE; the same on every row of one panelist.
+  recommendation String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([applicantId, panelistId, criterion])
+  @@index([schoolId, applicantId])
+}
+
+model Contract {
+  id                 String         @id @default(cuid())
+  schoolId           String
+  employeeId         String
+  kind               ContractKind
+  startDate          DateTime       @db.Date
+  endDate            DateTime?      @db.Date
+  probationEnd       DateTime?      @db.Date
+  jobTitle           String
+  gradeId            String?
+  // pay, hours per week, notice period: the terms as agreed.
+  terms              Json?
+  // The generated contract and the signed copy.
+  fileKey            String?
+  signedFileKey      String?
+  status             ContractStatus @default(DRAFT)
+  previousContractId String?
+  terminatedOn       DateTime?      @db.Date
+  createdById        String
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @default(now()) @updatedAt
+
+  @@index([schoolId, employeeId])
+  @@index([schoolId, status, endDate])
+}
+
+model EmployeeExit {
+  id             String             @id @default(cuid())
+  schoolId       String
+  employeeId     String             @unique
+  reason         EmployeeExitReason
+  lastDay        DateTime           @db.Date
+  noticeServed   Boolean            @default(false)
+  // Leave days owed paid out, deductions: lines { label, amountCents, currency, kind }.
+  finalPay       Json?
+  // keys returned, school property, library books: { item, done }.
+  clearance      Json?
+  certificateRef String?
+  processedById  String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @default(now()) @updatedAt
+}
+
+// ── Staff attendance ─────────────────────────────────────────────────────────
+
+model StaffAttendance {
+  id            String         @id @default(cuid())
+  schoolId      String
+  employeeId    String
+  date          DateTime       @db.Date
+  status        StaffAttStatus
+  arrivalTime   String?
+  departureTime String?
+  method        StaffAttMethod @default(OFFICE)
+  note          String?
+  markedById    String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now()) @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([schoolId, date])
+}
+
+// A change to a day that has passed: what it was, what it became, and why. Added to, never changed.
+model StaffAttendanceChange {
+  id          String   @id @default(cuid())
+  schoolId    String
+  employeeId  String
+  date        DateTime @db.Date
+  oldStatus   String?
+  newStatus   String
+  reason      String
+  changedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([schoolId, employeeId, date])
+}
+
+// ── Leave ────────────────────────────────────────────────────────────────────
+
+model LeaveType {
+  id                   String   @id @default(cuid())
+  schoolId             String
+  code                 String
+  name                 String
+  daysPerYear          Float    @default(0)
+  accruesMonthly       Boolean  @default(false)
+  carryOverMax         Float    @default(0)
+  // Sick leave: days on full pay and on half pay each year; certificate needed after this many days.
+  fullPayDays          Float?
+  halfPayDays          Float?
+  certificateAfterDays Int?
+  requiresAttachment   Boolean  @default(false)
+  // Official duty is not taken off any balance.
+  deductsBalance       Boolean  @default(true)
+  // Unpaid days feed payroll.
+  unpaid               Boolean  @default(false)
+  // Maternity: a fixed number of calendar days from a start date, not school days.
+  calendarDays         Boolean  @default(false)
+  active               Boolean  @default(true)
+  sortOrder            Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  @@unique([schoolId, code])
+}
+
+model LeaveBalance {
+  id          String   @id @default(cuid())
+  schoolId    String
+  employeeId  String
+  leaveTypeId String
+  year        Int
+  carriedOver Float    @default(0)
+  adjusted    Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([employeeId, leaveTypeId, year])
+}
+
+// A manual change to a balance, with the reason. Added to, never changed.
+model LeaveAdjustment {
+  id           String   @id @default(cuid())
+  schoolId     String
+  employeeId   String
+  leaveTypeId  String
+  year         Int
+  days         Float
+  reason       String
+  adjustedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([schoolId, employeeId, year])
+}
+
+model LeaveRequest {
+  id              String      @id @default(cuid())
+  schoolId        String
+  employeeId      String
+  leaveTypeId     String
+  startDate       DateTime    @db.Date
+  endDate         DateTime    @db.Date
+  startHalfDay    Boolean     @default(false)
+  endHalfDay      Boolean     @default(false)
+  // Counted school days (or calendar days for maternity).
+  days            Float
+  reason          String?
+  attachmentKey   String?
+  handoverNotes   String?
+  coverEmployeeId String?
+  status          LeaveStatus @default(PENDING)
+  requestedById   String
+  approvedById    String?
+  decidedAt       DateTime?
+  decisionReason  String?
+  // Government-paid teachers: recorded for the school; the formal application goes through the ministry.
+  recordOnly      Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @default(now()) @updatedAt
+
+  @@index([schoolId, status])
+  @@index([schoolId, employeeId, startDate])
+}
+
+// ── Duty roster ──────────────────────────────────────────────────────────────
+
+model DutyType {
+  id                 String             @id @default(cuid())
+  schoolId           String
+  name               String
+  wholeDay           Boolean            @default(false)
+  // Only these categories are eligible when auto-filling (empty = everyone who is eligible by default).
+  eligibleCategories EmployeeCategory[] @default([])
+  perDay             Int                @default(1)
+  active             Boolean            @default(true)
+  sortOrder          Int                @default(0)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @default(now()) @updatedAt
+
+  @@unique([schoolId, name])
+}
+
+model DutyRoster {
+  id           String       @id @default(cuid())
+  schoolId     String
+  label        String
+  startDate    DateTime     @db.Date
+  endDate      DateTime     @db.Date
+  status       RosterStatus @default(DRAFT)
+  createdById  String
+  approvedById String?
+  approvedAt   DateTime?
+  publishedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @default(now()) @updatedAt
+
+  @@index([schoolId, startDate])
+}
+
+model DutyAssignment {
+  id         String   @id @default(cuid())
+  schoolId   String
+  rosterId   String
+  dutyTypeId String
+  date       DateTime @db.Date
+  employeeId String
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@unique([rosterId, dutyTypeId, date, employeeId])
+  @@index([schoolId, employeeId, date])
+}
+
+model DutySwap {
+  id             String     @id @default(cuid())
+  schoolId       String
+  assignmentId   String
+  fromEmployeeId String
+  toEmployeeId   String
+  status         SwapStatus @default(REQUESTED)
+  reason         String?
+  confirmedById  String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @default(now()) @updatedAt
+
+  @@index([schoolId, status])
+}
+
+// ── Pay set-up ───────────────────────────────────────────────────────────────
+
+model PayGrade {
+  id            String   @id @default(cuid())
+  schoolId      String
+  code          String
+  name          String
+  basicUsdCents Int      @default(0)
+  basicZigCents Int      @default(0)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@unique([schoolId, code])
+}
+
+// Sensitive. One row per school-paid employee; every change is logged in EmployeeHistory with before, after and a reason.
+model EmployeePay {
+  id                 String      @id @default(cuid())
+  schoolId           String
+  employeeId         String      @unique
+  gradeId            String?
+  payBasis           PayBasis    @default(MONTHLY)
+  basicUsdCents      Int         @default(0)
+  basicZigCents      Int         @default(0)
+  // Split rule: this share of splitTotalUsdCents is paid in USD and the rest in ZiG at the payroll rate (replaces the two basics).
+  splitUsdBps        Int?
+  splitTotalUsdCents Int?
+  // Casual and hourly staff: days or hours worked times this rate, in rateCurrency.
+  rateCents          Int?
+  rateCurrency       Currency?
+  paymentMethod      HrPayMethod @default(BANK)
+  bankName           String?
+  bankBranch         String?
+  accountNumber      String?
+  ecocashNumber      String?
+  zimraTaxNo         String?
+  nssaNo             String?
+  medicalAidNo       String?
+  pensionNo          String?
+  effectiveFrom      DateTime    @db.Date
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @default(now()) @updatedAt
+}
+
+model PayComponent {
+  id                 String        @id @default(cuid())
+  schoolId           String
+  code               String
+  name               String
+  kind               ComponentKind
+  taxable            Boolean       @default(true)
+  // Variable components are entered each month in the run; fixed ones come from the employee's own values.
+  variable           Boolean       @default(false)
+  defaultAmountCents Int?
+  active             Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @default(now()) @updatedAt
+
+  @@unique([schoolId, code])
+}
+
+model EmployeePayComponent {
+  id             String    @id @default(cuid())
+  schoolId       String
+  employeeId     String
+  componentId    String
+  amountCents    Int
+  currency       Currency  @default(USD)
+  startsOn       DateTime  @db.Date
+  endsOn         DateTime? @db.Date
+  // Staff child fees: the employee's signed consent, and the child whose fees account receives the amount.
+  childStudentId String?
+  consentKey     String?
+  consentAt      DateTime?
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId, employeeId])
+}
+
+model Loan {
+  id              String     @id @default(cuid())
+  schoolId        String
+  employeeId      String
+  principalCents  Int
+  currency        Currency   @default(USD)
+  instalmentCents Int
+  balanceCents    Int
+  startMonth      String
+  status          LoanStatus @default(ACTIVE)
+  reason          String?
+  createdById     String
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @default(now()) @updatedAt
+
+  @@index([schoolId, employeeId, status])
+}
+
+// ── Statutory settings: append-only, effective-dated ─────────────────────────
+
+model TaxTable {
+  id            String    @id @default(cuid())
+  schoolId      String
+  currency      Currency
+  effectiveFrom DateTime  @db.Date
+  note          String?
+  confirmedById String?
+  confirmedAt   DateTime?
+  createdById   String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@unique([schoolId, currency, effectiveFrom])
+}
+
+model TaxBand {
+  id        String   @id @default(cuid())
+  schoolId  String
+  tableId   String
+  fromCents Int
+  rateBps   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([tableId, fromCents])
+}
+
+model StatutoryRate {
+  id                       String    @id @default(cuid())
+  schoolId                 String
+  effectiveFrom            DateTime  @db.Date
+  aidsLevyBps              Int
+  nssaEmployeeBps          Int
+  nssaEmployerBps          Int
+  nssaCeilingUsdCents      Int?
+  nssaCeilingZigCents      Int?
+  nssaDeductibleBeforePaye Boolean   @default(false)
+  zimdefBps                Int
+  note                     String?
+  confirmedById            String?
+  confirmedAt              DateTime?
+  createdById              String
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @default(now()) @updatedAt
+
+  @@unique([schoolId, effectiveFrom])
+}
+
+// ── Monthly payroll ──────────────────────────────────────────────────────────
+
+model HrPayrollRun {
+  id            String          @id @default(cuid())
+  schoolId      String
+  month         String
+  status        HrPayrollStatus @default(DRAFT)
+  preparedById  String
+  submittedAt   DateTime?
+  approvedById  String?
+  approvedAt    DateTime?
+  paidById      String?
+  paidAt        DateTime?
+  returnedById  String?
+  returnComment String?
+  reopenedById  String?
+  reopenReason  String?
+  // Totals per currency: { USD: { grossCents, payeCents, ... }, ZIG: { ... } }.
+  totals        Json?
+  // The Finance hand-over run created at approval.
+  financeRunId  String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+
+  @@unique([schoolId, month])
+  @@index([schoolId, status])
+}
+
+// One-off items for a month: overtime, bonuses, unpaid leave, casual days, and corrections of a past run (with the reason).
+model HrPayrollVariable {
+  id          String   @id @default(cuid())
+  schoolId    String
+  runId       String
+  employeeId  String
+  // OVERTIME, BONUS, DEDUCTION, UNPAID_DAYS, CASUAL_UNITS, ADJUSTMENT
+  kind        String
+  label       String
+  amountCents Int      @default(0)
+  currency    Currency @default(USD)
+  units       Float?
+  taxable     Boolean  @default(true)
+  // ADJUSTMENT lines can be negative (a correction of an earlier month); they must carry a reason.
+  reason      String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([schoolId, runId, employeeId])
+}
+
+// A snapshot: never recalculated after the run is approved.
+model HrPayrollLine {
+  id                String   @id @default(cuid())
+  schoolId          String
+  runId             String
+  employeeId        String
+  currency          Currency
+  departmentId      String?
+  earnings          Json
+  deductions        Json
+  grossCents        Int
+  taxableCents      Int
+  payeCents         Int
+  aidsLevyCents     Int
+  nssaEmployeeCents Int
+  nssaEmployerCents Int
+  zimdefCents       Int
+  netCents          Int
+  previousNetCents  Int?
+  flags             Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  @@unique([runId, employeeId, currency])
+  @@index([schoolId, runId])
+}
+
+model Payslip {
+  id               String    @id @default(cuid())
+  schoolId         String
+  runId            String
+  employeeId       String
+  verificationCode String    @unique
+  fileKey          String?
+  releasedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  @@unique([runId, employeeId])
+  @@index([schoolId, employeeId])
 }
