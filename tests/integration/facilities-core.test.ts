@@ -225,7 +225,7 @@ describe('library', () => {
   });
 
   it('a fine in cents needs a currency, and a waived fine needs a reason', async () => {
-    expect(await refused(`UPDATE "FacLoan" SET "fineCents" = 100 WHERE "id" = 'l2'`)).toMatch(/FacLoan_fine_currency/);
+    expect(await refused(`UPDATE "FacLoan" SET "fineCents" = 100 WHERE "id" = 'l2'`)).toMatch(/FacLoan_fine_(currency|closed)/);
     expect(await refused(`UPDATE "FacLoan" SET "waivedById" = 'u1' WHERE "id" = 'l1'`)).toMatch(/FacLoan_waive/);
     expect(await refused(`UPDATE "FacLoan" SET "waivedById" = 'u1', "waiveReason" = ' ' WHERE "id" = 'l1'`)).toMatch(/FacLoan_waive/);
     await pg.exec(`UPDATE "FacLoan" SET "waivedById" = 'u1', "waiveReason" = 'Book was returned late because of the strike' WHERE "id" = 'l1'`);

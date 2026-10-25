@@ -423,6 +423,35 @@ const ATTACKS: Attack[] = [
 
   // ── Academics: school A's administrator against school B's classes, assignments, registers, timetable, schemes ──
   ...academicsAttacks(),
+  // Facilities library: these come last, because adding a title closes the older library screens for the school.
+  { name: 'library titles (list)', file: 'facilities/library/titles', method: 'GET', as: 'DIRECTOR', expect: 'ok' },
+  { name: 'library title add (own school)', file: 'facilities/library/titles', method: 'POST', as: 'DIRECTOR', body: () => ({ title: 'Atlas', author: 'Anon' }), expect: 'ok' },
+  { name: 'library title of another school', file: 'facilities/library/titles/[id]', method: 'GET', as: 'DIRECTOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
+  { name: 'library copies for a title of another school', file: 'facilities/library/copies', method: 'POST', as: 'DIRECTOR', body: () => ({ titleId: 'not-in-this-school', count: 1 }), expect: 404 },
+  { name: 'library change a copy of another school', file: 'facilities/library/copies', method: 'PATCH', as: 'DIRECTOR', body: () => ({ copyId: 'not-in-this-school', condition: 'GOOD' }), expect: 404 },
+  { name: 'library member with an unknown number', file: 'facilities/library/members', method: 'GET', as: 'DIRECTOR', url: () => '?code=NOT-A-NUMBER', expect: 404 },
+  { name: 'library suspend a member of another school', file: 'facilities/library/members/suspend', method: 'POST', as: 'DIRECTOR', body: () => ({ memberId: 'not-in-this-school', suspended: false }), expect: 404 },
+  { name: 'library lend to a member of another school', file: 'facilities/library/checkout', method: 'POST', as: 'DIRECTOR', body: () => ({ memberId: 'not-in-this-school', barcode: 'ACC-00001' }), expect: 404 },
+  { name: 'library return a book of another school', file: 'facilities/library/return', method: 'POST', as: 'DIRECTOR', body: () => ({ barcode: 'NOT-A-BOOK' }), expect: 404 },
+  { name: 'library renew a loan of another school', file: 'facilities/library/loans/[id]/renew', method: 'POST', as: 'DIRECTOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
+  { name: 'library waive a fine of another school', file: 'facilities/library/loans/[id]/waive', method: 'POST', as: 'DIRECTOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ reason: 'Not mine' }), expect: 404 },
+  { name: 'library reserve for another school', file: 'facilities/library/reservations', method: 'POST', as: 'DIRECTOR', body: () => ({ titleId: 'not-in-this-school', memberId: 'not-in-this-school' }), expect: 404 },
+  { name: 'library cancel a reservation of another school', file: 'facilities/library/reservations/[id]/cancel', method: 'POST', as: 'DIRECTOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
+  { name: 'library lost book of another school', file: 'facilities/library/lost', method: 'POST', as: 'DIRECTOR', body: () => ({ copyId: 'not-in-this-school', kind: 'LOST', reason: 'Not mine' }), expect: 404 },
+  { name: 'library stocktakes (list)', file: 'facilities/library/stocktakes', method: 'GET', as: 'DIRECTOR', expect: 'ok' },
+  { name: 'library stocktake of another school', file: 'facilities/library/stocktakes/[id]', method: 'GET', as: 'DIRECTOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
+  { name: 'library scan into a stocktake of another school', file: 'facilities/library/stocktakes/[id]/scan', method: 'POST', as: 'DIRECTOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ barcode: 'ACC-00001' }), expect: 404 },
+  { name: 'library finish a stocktake of another school', file: 'facilities/library/stocktakes/[id]/finish', method: 'POST', as: 'DIRECTOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
+  { name: 'library reports', file: 'facilities/library/reports', method: 'GET', as: 'DIRECTOR', expect: 'ok' },
+  { name: 'library overdue reminders (own school)', file: 'facilities/library/reminders', method: 'POST', as: 'DIRECTOR', expect: 'ok' },
+  { name: 'library isbn lookup with a bad number', file: 'facilities/library/isbn', method: 'GET', as: 'DIRECTOR', url: () => '?isbn=123', expect: 422 },
+  { name: 'textbook sets (list)', file: 'facilities/textbooks/sets', method: 'GET', as: 'DIRECTOR', expect: 'ok' },
+  { name: 'textbook set with a title of another school', file: 'facilities/textbooks/sets', method: 'POST', as: 'DIRECTOR', body: () => ({ name: 'Set', items: [{ titleId: 'not-in-this-school' }] }), expect: 404 },
+  { name: 'textbooks of a class of another school', file: 'facilities/textbooks/class', method: 'GET', as: 'DIRECTOR', url: () => '?classId=not-in-this-school', expect: 404 },
+  { name: 'issue textbooks to a learner of another school', file: 'facilities/textbooks/issue', method: 'POST', as: 'DIRECTOR', body: () => ({ studentId: b().studentId, barcodes: ['ACC-00001'] }), expect: 404 },
+  { name: 'collect a textbook of another school', file: 'facilities/textbooks/return', method: 'POST', as: 'DIRECTOR', body: () => ({ barcode: 'NOT-A-BOOK' }), expect: 404 },
+  { name: 'textbook card of a learner of another school', file: 'facilities/textbooks/card', method: 'GET', as: 'DIRECTOR', url: () => `?studentId=${b().studentId}`, expect: 404 },
+  { name: 'mark textbooks missing for a learner of another school', file: 'facilities/textbooks/missing', method: 'POST', as: 'DIRECTOR', body: () => ({ studentId: b().studentId }), expect: 404 },
 ];
 
 function academicsAttacks(): Attack[] {

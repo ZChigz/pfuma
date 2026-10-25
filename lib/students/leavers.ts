@@ -9,6 +9,8 @@
 // Students are never deleted: the status changes and the history stays. A former student can rejoin on the old record.
 import type { ExitReason, Prisma } from '@prisma/client';
 import { owedBy } from '@/lib/finance/external';
+import { libraryMoved } from '@/lib/library';
+import { libraryClearance } from '@/lib/facilities/library';
 import { z } from 'zod';
 import { ServiceError } from '@/lib/api';
 import { can, type AccessUser } from '@/lib/access-core';
@@ -61,7 +63,12 @@ export async function buildClearance(tx: Db, schoolId: string, studentId: string
     items.push({ key: 'fees', label: 'Fees balance', source: 'manual', clear: previous.find((p) => p.key === 'fees')?.clear ?? false, detail: previous.find((p) => p.key === 'fees')?.clear ? 'Clear' : 'Tick when the fees are settled' });
   }
 
-  if (!off.has('facilities')) {
+  // The Facilities library (books out, textbooks not returned, fines) once the school has moved to it; the first library tables before that.
+  if (!off.has('facilities') && !off.has('facilities.library') && (await libraryMoved(tx, schoolId))) {
+    const lib = await libraryClearance(tx, schoolId, studentId);
+    const finesNote = lib.finesOpen > 0 ? `; ${lib.finesOpen} library fine${lib.finesOpen === 1 ? '' : 's'} unpaid` : '';
+    items.push({ key: 'library', label: 'Library books and textbooks', source: 'auto', clear: lib.clear && lib.finesOpen === 0, detail: lib.detail + finesNote });
+  } else if (!off.has('facilities')) {
     const open = await tx.borrowing.findMany({
       where: { returnDate: null, member: { studentId } },
       select: { copy: { select: { book: { select: { title: true } } } } },

@@ -2,8 +2,8 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { canManageLibrary } from '@/lib/permissions';
-import { countCopies, memberName } from '@/lib/library';
-import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
+import { countCopies, memberName, libraryMoved, LIBRARY_MOVED_MESSAGE } from '@/lib/library';
+import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi, apiError } from '@/lib/api';
 import { z } from 'zod';
 import type { SessionUser } from '@/types';
 
@@ -66,6 +66,7 @@ async function _PATCH(
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  if (await libraryMoved(db, user.schoolId)) return apiError(LIBRARY_MOVED_MESSAGE, 409);
 
   try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
 

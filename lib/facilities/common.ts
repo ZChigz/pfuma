@@ -9,6 +9,7 @@ import type { Actor } from '@/lib/academics/common';
 
 export type { Actor };
 export { audit, tellApprovers, currencySchema, centsSchema, amountSchema, textSchema, whySchema, idSchema, isoDateSchema, reasonSchema, noteSchema, todayInHarare, toDay, isoOf } from '@/lib/finance/common';
+export { addDays } from '@/lib/academics/common';
 export { MAX_CENTS, formatMoney, type Cur } from '@/lib/finance/money';
 
 /**

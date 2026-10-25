@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { libraryMoved, LIBRARY_MOVED_MESSAGE } from '@/lib/library';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
-import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
+import { apiSuccess, apiUnauthorized, parseBody, withApi, apiError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { canManageLibrary } from '@/lib/permissions';
 import type { SessionUser } from '@/types';
@@ -36,6 +37,7 @@ async function _PATCH(req: Request) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  if (await libraryMoved(db, user.schoolId)) return apiError(LIBRARY_MOVED_MESSAGE, 409);
 
   try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
 

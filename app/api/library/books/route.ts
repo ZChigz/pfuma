@@ -3,8 +3,8 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { canManageLibrary } from '@/lib/permissions';
-import { copyCounts } from '@/lib/library';
-import { parseBody, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
+import { copyCounts, libraryMoved, LIBRARY_MOVED_MESSAGE } from '@/lib/library';
+import { parseBody, apiSuccess, apiUnauthorized, withApi, apiError } from '@/lib/api';
 import { CreateBookSchema } from '@/lib/validations/library';
 import type { SessionUser } from '@/types';
 
@@ -56,6 +56,7 @@ async function _POST(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  if (await libraryMoved(db, user.schoolId)) return apiError(LIBRARY_MOVED_MESSAGE, 409);
 
   try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
 

@@ -121,3 +121,15 @@ export function checkoutBlock(ctx: CheckoutContext): { status: number; message: 
   }
   return null;
 }
+
+// ─── The library moved to Facilities & Operations ────────────────────────────
+// Once a school has titles in the Facilities library (the data step copies the old catalogue across), the first library screens stop
+// recording anything, so the two never disagree about who has which book. They can still be read.
+
+export const LIBRARY_MOVED_MESSAGE = 'This school keeps its library in Facilities & Operations now, so the older library screens no longer record anything. Open Facilities, Library in the sidebar.';
+
+type MovedReader = { facBookTitle: { count: (args: { where: { schoolId: string } }) => PromiseLike<number> } };
+
+export async function libraryMoved(db: MovedReader, schoolId: string): Promise<boolean> {
+  return (await db.facBookTitle.count({ where: { schoolId } })) > 0;
+}

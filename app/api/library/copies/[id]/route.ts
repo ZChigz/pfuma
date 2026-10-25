@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { libraryMoved, LIBRARY_MOVED_MESSAGE } from '@/lib/library';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
@@ -25,6 +26,7 @@ async function _PATCH(
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  if (await libraryMoved(db, user.schoolId)) return apiError(LIBRARY_MOVED_MESSAGE, 409);
 
   try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
 
