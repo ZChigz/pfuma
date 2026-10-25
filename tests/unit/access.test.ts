@@ -84,6 +84,9 @@ describe('can()', () => {
   });
 });
 
+// The parts of Facilities & Operations that have pages so far; the others show "Coming soon".
+const LIVE_FACILITIES = ['Inventory'];
+
 describe('sidebar', () => {
   it('lists the groups in the required order', () => {
     expect(NAV_GROUPS.map((g) => g.label)).toEqual([
@@ -92,10 +95,10 @@ describe('sidebar', () => {
     expect(NAV_GROUPS[0].items.map((i) => i.label)).toEqual(['Dashboard', 'Calendar', 'School Settings', 'Users', 'Roles & Permissions', 'Audit Log', 'Subscription']);
   });
 
-  it('makes Dashboard & System, Student Information, Academics, Examinations, Finance and HR & Staff live; every other item is "coming soon"', () => {
+  it('makes Dashboard & System, Student Information, Academics, Examinations, Finance and HR & Staff live, with the Facilities parts going live one at a time (Inventory so far); every other item is "coming soon"', () => {
     const nav = buildNav(user('ADMIN', { grants: ALL }));
     expect(nav.map((g) => g.module)).toEqual(MODULES.map((m) => m.key));
-    for (const g of nav) for (const i of g.items) expect(i.comingSoon, `${g.label} / ${i.label}`).toBe(!['system', 'students', 'academics', 'exams', 'finance', 'hr'].includes(g.module) || (g.module === 'students' && i.label === 'Attendance'));
+    for (const g of nav) for (const i of g.items) expect(i.comingSoon, `${g.label} / ${i.label}`).toBe(g.module === 'facilities' ? !LIVE_FACILITIES.includes(i.label) : !['system', 'students', 'academics', 'exams', 'finance', 'hr'].includes(g.module) || (g.module === 'students' && i.label === 'Attendance'));
     for (const i of nav[0].items) expect(i.href).toMatch(/^\/system\//);
   });
 

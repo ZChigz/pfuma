@@ -24,7 +24,7 @@ const TABLES = [
   'FacReservation', 'FacTextbookSet', 'FacTextbookIssue', 'FacStocktake', 'FacStocktakeScan', 'FacRoute', 'FacStop', 'FacStudentRoute', 'FacVehicle',
   'FacVehicleDocument', 'FacDriver', 'FacDriverDocument', 'FacTrip', 'FacTripPassenger', 'FacFuelLog', 'FacVehicleBooking', 'FacStore', 'FacStockItem',
   'FacStockLot', 'FacStockMovement', 'FacStockCount', 'FacStockCountLine', 'FacAssetCategory', 'FacAsset', 'FacAssetTransfer', 'FacMaintenanceSchedule',
-  'FacMaintenanceJob', 'FacAssetDisposal', 'FacVerificationRound', 'FacVerificationScan',
+  'FacMaintenanceJob', 'FacAssetDisposal', 'FacVerificationRound', 'FacVerificationScan', 'FacWriteoffRequest',
 ];
 
 // Rows that are only ever added: no updatedAt.
