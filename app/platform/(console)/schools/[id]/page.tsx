@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { ServiceError } from '@/lib/api';
-import { MODULES } from '@/lib/access-core';
+import { MODULE_SWITCHES } from '@/lib/access-core';
 import { getSchoolDetail } from '@/lib/platform/schools';
 import { STAFF_ROLE_LABEL } from '@/lib/staff-roles';
 import { formatDate, formatDateTime } from '@/lib/utils';
@@ -69,7 +69,7 @@ export default async function SchoolDetailPage({ params }: { params: { id: strin
         plans={plans.map((p) => ({ id: p.id, name: p.name }))}
         studentLimit={school.studentLimit}
         renewalDate={day(school.renewalDate)}
-        modules={MODULES.map((m) => ({ key: m.key, label: m.label, on: modules[m.key] }))}
+        modules={MODULE_SWITCHES.map((m) => ({ key: m.key, label: m.label, on: modules[m.key] }))}
       />
 
       <InvoicesPanel

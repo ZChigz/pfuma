@@ -156,6 +156,9 @@ const studentBody = () => ({
 
 const ATTACKS: Attack[] = [
   // ── Accounting ──
+  // Facilities & Operations: one settings row per school, reached only through the signed-in user's own school.
+  { name: 'facilities settings (read)', file: 'facilities/settings', method: 'GET', as: 'DIRECTOR', expect: 'ok' },
+  { name: 'facilities settings (change, own school)', file: 'facilities/settings', method: 'PATCH', as: 'DIRECTOR', body: () => ({ learnerMaxLoans: 3 }), expect: 'ok' },
   { name: 'dashboard (list)', file: 'accounting/dashboard', method: 'GET', as: 'DIRECTOR', expect: 'ok' },
   { name: 'exchange rate read', file: 'accounting/exchange-rate', method: 'GET', as: 'BURSAR', expect: 'ok' },
   { name: 'exchange rate set (own school)', file: 'accounting/exchange-rate', method: 'POST', as: 'BURSAR', body: () => ({ usdToZig: 27.5 }), expect: 'ok' },

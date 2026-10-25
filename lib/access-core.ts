@@ -21,7 +21,29 @@ export const MODULES = [
 ] as const;
 
 export type ModuleKey = (typeof MODULES)[number]['key'];
-export const MODULE_KEYS: readonly string[] = MODULES.map((m) => m.key);
+
+// Facilities & Operations has eight parts, each switched on or off for a school on its own. A part is a SchoolModule row whose
+// module is 'facilities.<part>'; no row means on. Switching the whole of Facilities off hides every part.
+export const FACILITY_PARTS = [
+  { key: 'hostel',    label: 'Hostel' },
+  { key: 'exeats',    label: 'Exeats and visiting days' },
+  { key: 'sickbay',   label: 'Sick bay' },
+  { key: 'tuckshop',  label: 'Tuck shop and pocket money' },
+  { key: 'library',   label: 'Library and textbooks' },
+  { key: 'transport', label: 'Transport' },
+  { key: 'inventory', label: 'Inventory and stores' },
+  { key: 'assets',    label: 'Assets and maintenance' },
+] as const;
+export type FacilityPart = (typeof FACILITY_PARTS)[number]['key'];
+export const facilityModuleKey = (part: FacilityPart) => `facilities.${part}`;
+export const FACILITY_PART_KEYS: readonly string[] = FACILITY_PARTS.map((p) => facilityModuleKey(p.key));
+
+export const MODULE_KEYS: readonly string[] = [...MODULES.map((m) => m.key), ...FACILITY_PART_KEYS];
+
+/** Every switch the platform console shows: the modules, then the parts of Facilities under it. */
+export const MODULE_SWITCHES: readonly { key: string; label: string }[] = [
+  ...MODULES.flatMap((m) => [m, ...(m.key === 'facilities' ? FACILITY_PARTS.map((p) => ({ key: facilityModuleKey(p.key), label: `${m.label}: ${p.label}` })) : [])]),
+];
 
 /** The System module holds the switches themselves, so it cannot be switched off. */
 export const ALWAYS_ON_MODULES: readonly string[] = ['system'];
@@ -225,9 +247,42 @@ export const PERMISSIONS = {
   'hr.self.details':            'See my own details and duties',
   'hr.reports.view':            'See HR reports',
 
+  // Facilities & Operations: the same keys are rows in the Permission table (migration 20261106000000). Owner and Administrator hold
+  // them through '*'; scoped roles (boarding master, matron, librarian, storekeeper, transport officer) are given keys in System, Roles.
   'facilities.assets.view':     'View assets',
   'facilities.library.view':    'View the library',
   'facilities.inventory.view':  'View inventory',
+  'facilities.hostel.view':        'See the hostels, rooms, beds and roll calls',
+  'facilities.hostel.manage':      'Set up hostels, rooms and beds',
+  'facilities.hostel.allocate':    'Give learners beds and move them',
+  'facilities.hostel.rollcall':    'Take the hostel roll call',
+  'facilities.hostel.inspect':     'Inspect rooms',
+  'facilities.exeats.request':     'Record exeat requests',
+  'facilities.exeats.approve':     'Approve long and emergency exeats',
+  'facilities.exeats.signout':     'Sign learners out and in at the gate or hostel office',
+  'facilities.visitors.log':       'Keep the visitor log',
+  'facilities.sickbay.record':     'Record sick bay visits and medication',
+  'facilities.sickbay.view':       'See sick bay visit details',
+  'facilities.wallets.manage':     'Take pocket money deposits and handle wallets',
+  'facilities.wallets.view':       'See pocket money wallets',
+  'facilities.tuckshop.sell':      'Sell at the tuck shop',
+  'facilities.tuckshop.cashup':    'Cash up the tuck shop',
+  'facilities.library.manage':     'Run the catalogue, members and library settings',
+  'facilities.library.desk':       'Lend and take back books at the desk',
+  'facilities.library.waive':      'Waive library fines',
+  'facilities.textbooks.issue':    'Issue and collect textbooks',
+  'facilities.transport.manage':   'Manage routes, vehicles, drivers and bookings',
+  'facilities.transport.trips':    'Record daily trips and fuel',
+  'facilities.transport.assign':   'Put learners on a route',
+  'facilities.inventory.manage':   'Set up stores and stock items',
+  'facilities.inventory.receive':  'Receive goods into stores',
+  'facilities.inventory.issue':    'Issue, sell and transfer stock',
+  'facilities.inventory.count':    'Count stock',
+  'facilities.inventory.writeoff': 'Approve stock write-offs and count adjustments',
+  'facilities.assets.manage':      'Keep the asset register',
+  'facilities.assets.maintain':    'Assign and record maintenance',
+  'facilities.assets.dispose':     'Approve the disposal of assets',
+  'facilities.assets.verify':      'Run the annual asset verification',
 
   'communication.announcements.view': 'View announcements',
   'communication.messages.view':      'View SMS and WhatsApp messages',
@@ -246,6 +301,23 @@ export const PERMISSION_KEYS = Object.keys(PERMISSIONS) as PermissionKey[];
 /** The module a permission belongs to ('account' for self-service keys). */
 export function moduleOf(permission: string): string {
   return permission.split('.')[0] ?? '';
+}
+
+/** The part of Facilities & Operations a permission belongs to (null for every other permission). */
+export function facilityPartOf(permission: string): FacilityPart | null {
+  const [mod, area] = permission.split('.');
+  if (mod !== 'facilities') return null;
+  switch (area) {
+    case 'hostel': return 'hostel';
+    case 'exeats': case 'visitors': return 'exeats';
+    case 'sickbay': return 'sickbay';
+    case 'wallets': case 'tuckshop': return 'tuckshop';
+    case 'library': case 'textbooks': return 'library';
+    case 'transport': return 'transport';
+    case 'inventory': return 'inventory';
+    case 'assets': return 'assets';
+    default: return null;
+  }
 }
 
 const isSelfService = (permission: string) => moduleOf(permission) === 'account';
@@ -287,6 +359,8 @@ export function can(user: AccessUser | null | undefined, permission: string, sco
 
   const mod = moduleOf(permission);
   if (!ALWAYS_ON_MODULES.includes(mod) && user.disabledModules?.includes(mod)) return false;
+  const part = facilityPartOf(permission);
+  if (part && user.disabledModules?.includes(facilityModuleKey(part))) return false;
 
   const action = permission.split('.').pop() ?? '';
   if (user.readOnly && !LOOKING.has(action)) return false;
