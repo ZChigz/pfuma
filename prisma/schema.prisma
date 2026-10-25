@@ -661,6 +661,64 @@ enum AuditAction {
   HR_SAVE_DISCIPLINE
   HR_GENERATE_LETTER
   HR_EXPORT_REPORT
+  FAC_SAVE_SETTINGS
+  FAC_HOSTEL_SAVE
+  FAC_ALLOCATE_BED
+  FAC_MOVE_BED
+  FAC_ROLL_CALL
+  FAC_ROLL_CALL_ALERT
+  FAC_INSPECT_ROOM
+  FAC_DECIDE_DAMAGE
+  FAC_EXEAT_REQUEST
+  FAC_EXEAT_APPROVE
+  FAC_EXEAT_REJECT
+  FAC_EXEAT_SIGN_OUT
+  FAC_EXEAT_SIGN_IN
+  FAC_EXEAT_OVERDUE
+  FAC_VISITOR_LOG
+  FAC_SICKBAY_VISIT
+  FAC_SICKBAY_DISCHARGE
+  FAC_MEDICATION_DOSE
+  FAC_WALLET_DEPOSIT
+  FAC_WALLET_WITHDRAW
+  FAC_WALLET_SETTINGS
+  FAC_WALLET_CLOSE
+  FAC_TUCKSHOP_SALE
+  FAC_TUCKSHOP_CASHUP
+  FAC_BOOK_SAVE
+  FAC_COPY_SAVE
+  FAC_LOAN_OUT
+  FAC_LOAN_RETURN
+  FAC_LOAN_RENEW
+  FAC_FINE_WAIVE
+  FAC_COPY_LOST
+  FAC_RESERVE
+  FAC_TEXTBOOK_ISSUE
+  FAC_TEXTBOOK_RETURN
+  FAC_STOCKTAKE
+  FAC_ROUTE_SAVE
+  FAC_ROUTE_ASSIGN
+  FAC_VEHICLE_SAVE
+  FAC_DRIVER_SAVE
+  FAC_TRIP_RECORD
+  FAC_FUEL_LOG
+  FAC_VEHICLE_BOOK
+  FAC_STORE_SAVE
+  FAC_ITEM_SAVE
+  FAC_STOCK_RECEIVE
+  FAC_STOCK_ISSUE
+  FAC_STOCK_SELL
+  FAC_STOCK_TRANSFER
+  FAC_STOCK_COUNT
+  FAC_STOCK_ADJUST
+  FAC_STOCK_WRITEOFF
+  FAC_ASSET_SAVE
+  FAC_ASSET_TRANSFER
+  FAC_ASSET_CONFIRM
+  FAC_MAINTENANCE
+  FAC_ASSET_DISPOSE
+  FAC_ASSET_VERIFY
+  FAC_EXPORT_REPORT
 }
 
 enum SchoolType {
@@ -4278,6 +4336,8 @@ enum FundKind {
   EXAMS
   GENERAL
   OTHER
+  TRUST
+  TUCKSHOP
 }
 
 enum FinPaymentStatus {
@@ -4324,6 +4384,7 @@ enum ChargeSource {
   ADMISSION
   BOARDING_CHANGE
   DIFFERENCE
+  FACILITIES
 }
 
 enum FinExpenseSource {
@@ -6201,4 +6262,1294 @@ model Payslip {
 
   @@unique([runId, employeeId])
   @@index([schoolId, employeeId])
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Facilities & Operations: hostel, exeats, sick bay, tuck shop, library, transport, inventory, assets.
+// Every table is named Fac* because Asset, Book, SickBayVisit, Room and others already exist from earlier modules (they stay
+// until the part that replaces them copies their rows across). Like the HR tables, a Fac table keeps its links as plain ids;
+// the foreign keys, same-school checks, row-level security and audit triggers are written in the migration.
+// Money is integer cents with a currency. USD and ZiG are never added together.
+// ═════════════════════════════════════════════════════════════════════════════
+
+enum FacBedType {
+  SINGLE
+  BUNK_TOP
+  BUNK_BOTTOM
+}
+
+enum FacRollSession {
+  MORNING
+  EVENING
+  LIGHTS_OUT
+}
+
+enum FacRollStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXEAT
+  SICK_BAY
+  SUSPENDED
+}
+
+enum FacExeatType {
+  WEEKEND
+  LONG
+  MEDICAL
+  EMERGENCY
+  SCHOOL_ACTIVITY
+}
+
+enum FacExeatStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  SIGNED_OUT
+  RETURNED
+  CANCELLED
+}
+
+enum FacComplaint {
+  HEADACHE
+  FEVER
+  STOMACH_PAIN
+  INJURY
+  MENSTRUAL
+  ASTHMA
+  OTHER
+}
+
+enum FacVisitOutcome {
+  BACK_TO_CLASS
+  REST_IN_SICK_BAY
+  SENT_TO_CLINIC
+  SENT_HOME
+}
+
+enum FacWalletEntryType {
+  DEPOSIT
+  WITHDRAWAL
+  PURCHASE
+  REFUND
+}
+
+enum FacWalletClose {
+  REFUNDED
+  CARRIED_FORWARD
+}
+
+enum FacSalePayment {
+  CASH
+  WALLET
+}
+
+enum FacCopyCondition {
+  NEW
+  GOOD
+  WORN
+  DAMAGED
+}
+
+enum FacCopyStatus {
+  AVAILABLE
+  ON_LOAN
+  RESERVED
+  LOST
+  WITHDRAWN
+}
+
+enum FacCopySource {
+  BOUGHT
+  DONATED
+}
+
+enum FacBookCategory {
+  FICTION
+  REFERENCE
+  TEXTBOOK
+  PAST_PAPERS
+}
+
+enum FacMemberType {
+  LEARNER
+  STAFF
+}
+
+enum FacStockCategory {
+  UNIFORMS
+  STATIONERY
+  FOOD
+  CLEANING
+  MEDICAL
+  AGRICULTURE
+  MAINTENANCE
+}
+
+enum FacStockUnit {
+  EACH
+  BOX
+  KG
+  LITRE
+}
+
+enum FacMovementType {
+  IN
+  ISSUE
+  SALE
+  TRANSFER
+  ADJUSTMENT
+  WRITEOFF
+}
+
+enum FacWriteoffReason {
+  EXPIRED
+  DAMAGED
+  STOLEN
+  OTHER
+}
+
+enum FacCountStatus {
+  OPEN
+  SUBMITTED
+  APPROVED
+  CLOSED
+}
+
+enum FacAssetCondition {
+  NEW
+  GOOD
+  FAIR
+  POOR
+}
+
+enum FacAssetStatus {
+  IN_USE
+  IN_STORAGE
+  UNDER_REPAIR
+  LOST
+  DISPOSED
+}
+
+enum FacDisposalMethod {
+  SOLD
+  SCRAPPED
+  DONATED
+  STOLEN
+  LOST
+}
+
+enum FacJobStatus {
+  REPORTED
+  ASSIGNED
+  DONE
+  CANCELLED
+}
+
+enum FacScanResult {
+  FOUND
+  WRONG_PLACE
+}
+
+enum FacVehicleOwner {
+  SCHOOL
+  HIRED
+}
+
+enum FacVehicleDocType {
+  LICENCE
+  INSURANCE
+  FITNESS
+  ROUTE_PERMIT
+}
+
+enum FacDriverDocType {
+  DRIVING_LICENCE
+  DEFENSIVE_DRIVING
+}
+
+enum FacTripLeg {
+  MORNING
+  AFTERNOON
+  OTHER
+}
+
+enum FacApproval {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// The parts that cost a learner money keep their own ledger when Finance is off (and say where the Finance charge is when it is on).
+enum FacLedgerPart {
+  HOSTEL
+  LIBRARY
+  TRANSPORT
+  INVENTORY
+  TUCKSHOP
+}
+
+enum FacLedgerStatus {
+  OPEN
+  SETTLED
+  WAIVED
+}
+
+// ── Shared ──────────────────────────────────────────────────────────────────
+
+model FacSettings {
+  id                         String           @id @default(cuid())
+  schoolId                   String           @unique
+  // Hostel and exeats
+  rollCallSessions           FacRollSession[] @default([MORNING, EVENING, LIGHTS_OUT])
+  exeatHeadAlertMinutes      Int              @default(120)
+  longExeatNights            Int              @default(3)
+  // Library (learners 2 books for 14 days, staff 5 for 30 days)
+  learnerMaxLoans            Int              @default(2)
+  learnerLoanDays            Int              @default(14)
+  staffMaxLoans              Int              @default(5)
+  staffLoanDays              Int              @default(30)
+  lateFinePerDayCents        Int              @default(0)
+  lateFineCurrency           Currency         @default(USD)
+  // Transport
+  prorateTransport           Boolean          @default(true)
+  // Limits above which a second person must approve (cents; USD and ZiG are compared only with their own kind).
+  adjustmentLimitUsdCents    Int              @default(0)
+  adjustmentLimitZigCents    Int              @default(0)
+  disposalOwnerLimitUsdCents Int              @default(0)
+  disposalOwnerLimitZigCents Int              @default(0)
+  // Tuck shop
+  walletLowBalanceCents      Int              @default(0)
+  expiryWarningDays          Int              @default(30)
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @default(now()) @updatedAt
+}
+
+model FacSequence {
+  id         String   @id @default(cuid())
+  schoolId   String
+  key        String
+  nextNumber Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@unique([schoolId, key])
+}
+
+// What a learner owes for a facilities service when Finance is switched off (and the link to the Finance charge when it is on).
+model FacLedgerEntry {
+  id          String          @id @default(cuid())
+  schoolId    String
+  part        FacLedgerPart
+  studentId   String
+  termId      String?
+  description String
+  currency    Currency
+  amountCents Int
+  status      FacLedgerStatus @default(OPEN)
+  // The Finance charge that now carries the amount, when Finance is on.
+  chargeId    String?
+  sourceType  String?
+  sourceId    String?
+  settledAt   DateTime?
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @default(now()) @updatedAt
+
+  @@index([schoolId, part, status])
+  @@index([schoolId, studentId])
+}
+
+// ── Hostel ──────────────────────────────────────────────────────────────────
+
+model FacHostel {
+  id               String   @id @default(cuid())
+  schoolId         String
+  name             String
+  gender           Gender
+  boardingMasterId String?
+  matronId         String?
+  capacity         Int      @default(0)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  @@unique([schoolId, name])
+}
+
+model FacRoom {
+  id        String   @id @default(cuid())
+  schoolId  String
+  hostelId  String
+  name      String
+  floor     String?
+  capacity  Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([hostelId, name])
+  @@index([schoolId, hostelId])
+}
+
+model FacBed {
+  id           String     @id @default(cuid())
+  schoolId     String
+  roomId       String
+  number       String
+  bedType      FacBedType @default(SINGLE)
+  lockerNumber String?
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
+
+  @@unique([roomId, number])
+  @@index([schoolId, roomId])
+}
+
+model FacBedAllocation {
+  id            String    @id @default(cuid())
+  schoolId      String
+  studentId     String
+  bedId         String
+  termId        String
+  fromDate      DateTime  @db.Date
+  toDate        DateTime? @db.Date
+  reason        String?
+  allocatedById String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId, studentId])
+  @@index([schoolId, bedId])
+  @@index([schoolId, termId])
+}
+
+model FacRollCall {
+  id        String         @id @default(cuid())
+  schoolId  String
+  hostelId  String
+  date      DateTime       @db.Date
+  session   FacRollSession
+  takenById String
+  takenAt   DateTime       @default(now())
+  // Idempotency key from the offline queue, so a re-sent roll call is not stored twice.
+  clientId  String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @default(now()) @updatedAt
+
+  @@unique([schoolId, hostelId, date, session])
+  @@unique([schoolId, clientId])
+}
+
+model FacRollCallEntry {
+  id          String        @id @default(cuid())
+  schoolId    String
+  rollCallId  String
+  studentId   String
+  status      FacRollStatus
+  // Exeat, sick bay and suspended entries are filled in by the system and cannot be changed by hand.
+  locked      Boolean       @default(false)
+  explainedBy String?
+  note        String?
+  alertedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
+
+  @@unique([rollCallId, studentId])
+  @@index([schoolId, studentId])
+}
+
+model FacInspection {
+  id            String   @id @default(cuid())
+  schoolId      String
+  hostelId      String
+  roomId        String
+  date          DateTime @db.Date
+  inspectedById String
+  // Whole-room score out of 100.
+  score         Int
+  notes         String?
+  photoKeys     String[] @default([])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@index([schoolId, hostelId, date])
+}
+
+model FacInspectionItem {
+  id                 String       @id @default(cuid())
+  schoolId           String
+  inspectionId       String
+  // CLEANLINESS, BEDS_MADE, LOCKERS, DAMAGE or a word of the boarding master's own.
+  item               String
+  score              Int
+  note               String?
+  // Damage that becomes a charge needs the boarding master's approval.
+  damageStudentId    String?
+  damageCents        Int?
+  damageCurrency     Currency?
+  damageStatus       FacApproval?
+  damageApprovedById String?
+  ledgerEntryId      String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+
+  @@index([schoolId, inspectionId])
+}
+
+// ── Exeats and visitors ─────────────────────────────────────────────────────
+
+model FacExeat {
+  id               String         @id @default(cuid())
+  schoolId         String
+  studentId        String
+  type             FacExeatType
+  outAt            DateTime
+  dueBackAt        DateTime
+  reason           String
+  // { guardianId } for an authorised guardian, or { name, idNumber, phone, primaryConfirmedAt, primaryConfirmedBy, confirmMethod }.
+  collectedBy      Json
+  status           FacExeatStatus @default(REQUESTED)
+  requestedById    String
+  approvedById     String?
+  approvedAt       DateTime?
+  rejectedReason   String?
+  signedOutAt      DateTime?
+  signedOutById    String?
+  signedInAt       DateTime?
+  signedInById     String?
+  // When the boarding master and then the Head were told it is overdue.
+  overdueAlertedAt DateTime?
+  headAlertedAt    DateTime?
+  // A general exeat weekend set on the Calendar.
+  calendarEventId  String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @default(now()) @updatedAt
+
+  @@index([schoolId, studentId])
+  @@index([schoolId, status, dueBackAt])
+}
+
+model FacVisitorLog {
+  id              String    @id @default(cuid())
+  schoolId        String
+  studentId       String
+  visitorName     String
+  idNumber        String?
+  phone           String?
+  // A guardian on record, or a visitor the boarding master approved.
+  guardianId      String?
+  approvedById    String?
+  calendarEventId String?
+  timeIn          DateTime
+  timeOut         DateTime?
+  loggedById      String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId, studentId])
+  @@index([schoolId, timeIn])
+}
+
+// ── Sick bay ────────────────────────────────────────────────────────────────
+
+model FacSickBayVisit {
+  id                     String          @id @default(cuid())
+  schoolId               String
+  studentId              String
+  visitedAt              DateTime
+  complaint              FacComplaint
+  complaintNote          String?
+  temperatureC           Float?
+  observations           String?
+  treatment              String?
+  // [{ name, dose, givenAt, stockItemId?, movementId? }]
+  medication             Json            @default("[]")
+  outcome                FacVisitOutcome
+  guardianInformedAt     DateTime?
+  guardianInformedMethod String?
+  admittedAt             DateTime?
+  dischargedAt           DateTime?
+  // { facility, transport, accompaniedBy, followUp }
+  referral               Json?
+  recordedById           String
+  legacyVisitId          String?         @unique
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @default(now()) @updatedAt
+
+  @@index([schoolId, studentId])
+  @@index([schoolId, visitedAt])
+}
+
+model FacMedicationRound {
+  id          String   @id @default(cuid())
+  schoolId    String
+  date        DateTime @db.Date
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([schoolId, date])
+}
+
+model FacMedicationDose {
+  id                String    @id @default(cuid())
+  schoolId          String
+  roundId           String
+  studentId         String
+  medicationEntryId String?
+  medicine          String
+  dose              String?
+  dueTime           String
+  givenAt           DateTime?
+  givenById         String?
+  // Flagged when the round is closed without the dose being ticked.
+  missed            Boolean   @default(false)
+  note              String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId, roundId])
+  @@index([schoolId, studentId])
+}
+
+// ── Tuck shop and pocket money ──────────────────────────────────────────────
+
+// One per boarder per currency. The balance is the sum of its entries, never a stored number.
+model FacWallet {
+  id               String          @id @default(cuid())
+  schoolId         String
+  studentId        String
+  currency         Currency
+  weeklyLimitCents Int?
+  lowBalanceCents  Int?
+  closedAt         DateTime?
+  closeAction      FacWalletClose?
+  closedById       String?
+  // The guardian's written consent, uploaded, before a balance is ever used for fees.
+  consentKey       String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now()) @updatedAt
+
+  @@unique([studentId, currency])
+  @@index([schoolId])
+}
+
+model FacWalletEntry {
+  id           String             @id @default(cuid())
+  schoolId     String
+  walletId     String
+  currency     Currency
+  // Plus for money in, minus for money out.
+  amountCents  Int
+  type         FacWalletEntryType
+  // The Finance payment into the pocket-money fund, or the tuck shop sale.
+  paymentId    String?
+  saleId       String?
+  note         String?
+  // Cash handed to the learner, signed for on the phone.
+  signatureKey String?
+  createdById  String
+  createdAt    DateTime           @default(now())
+
+  @@index([schoolId, walletId, createdAt])
+}
+
+model FacTuckShopSale {
+  id          String         @id @default(cuid())
+  schoolId    String
+  attendantId String
+  studentId   String?
+  walletId    String?
+  payment     FacSalePayment
+  currency    Currency
+  totalCents  Int
+  // What the stock sold cost (weighted average at the time), for profit.
+  costCents   Int            @default(0)
+  soldAt      DateTime       @default(now())
+  cashUpId    String?
+  // Idempotency key from the offline queue.
+  clientId    String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @default(now()) @updatedAt
+
+  @@unique([schoolId, clientId])
+  @@index([schoolId, soldAt])
+  @@index([schoolId, attendantId, soldAt])
+}
+
+model FacTuckShopSaleLine {
+  id             String   @id @default(cuid())
+  schoolId       String
+  saleId         String
+  stockItemId    String
+  qty            Int
+  unitPriceCents Int
+  unitCostCents  Int      @default(0)
+  movementId     String?
+  createdAt      DateTime @default(now())
+
+  @@index([schoolId, saleId])
+}
+
+model FacTuckShopCashUp {
+  id                String   @id @default(cuid())
+  schoolId          String
+  attendantId       String
+  date              DateTime @db.Date
+  currency          Currency
+  expectedCashCents Int
+  countedCashCents  Int
+  note              String?
+  confirmedById     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  @@unique([schoolId, attendantId, date, currency])
+}
+
+// ── Library and textbooks ───────────────────────────────────────────────────
+
+model FacBookTitle {
+  id               String          @id @default(cuid())
+  schoolId         String
+  title            String
+  authors          String[]        @default([])
+  isbn             String?
+  publisher        String?
+  year             Int?
+  edition          String?
+  subject          String?
+  level            String?
+  category         FacBookCategory @default(FICTION)
+  shelfLocation    String?
+  coverKey         String?
+  // Reference books are not lent out.
+  lendable         Boolean         @default(true)
+  replacementCents Int?
+  currency         Currency?
+  legacyBookId     String?         @unique
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now()) @updatedAt
+
+  @@index([schoolId])
+  @@index([schoolId, isbn])
+}
+
+// The number of copies of a title is counted from these rows, never stored.
+model FacBookCopy {
+  id           String           @id @default(cuid())
+  schoolId     String
+  titleId      String
+  accessionNo  String
+  barcode      String
+  condition    FacCopyCondition @default(NEW)
+  status       FacCopyStatus    @default(AVAILABLE)
+  source       FacCopySource    @default(BOUGHT)
+  costCents    Int              @default(0)
+  currency     Currency         @default(USD)
+  legacyCopyId String?          @unique
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @default(now()) @updatedAt
+
+  @@unique([schoolId, accessionNo])
+  @@unique([schoolId, barcode])
+  @@index([schoolId, titleId])
+  @@index([schoolId, status])
+}
+
+model FacLibraryMember {
+  id              String        @id @default(cuid())
+  schoolId        String
+  type            FacMemberType
+  studentId       String?       @unique
+  employeeId      String?       @unique
+  suspended       Boolean       @default(false)
+  suspendedReason String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
+
+  @@index([schoolId])
+}
+
+model FacLoan {
+  id                String            @id @default(cuid())
+  schoolId          String
+  copyId            String
+  memberId          String
+  outAt             DateTime          @default(now())
+  dueAt             DateTime
+  returnedAt        DateTime?
+  renewedCount      Int               @default(0)
+  conditionOnReturn FacCopyCondition?
+  fineCents         Int               @default(0)
+  fineCurrency      Currency?
+  // The Finance charge for the fine (Finance on), or the library ledger entry (Finance off).
+  chargeId          String?
+  ledgerEntryId     String?
+  waivedById        String?
+  waiveReason       String?
+  checkedOutById    String
+  returnedToId      String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @default(now()) @updatedAt
+
+  @@index([schoolId, copyId])
+  @@index([schoolId, memberId])
+  @@index([schoolId, returnedAt, dueAt])
+}
+
+model FacReservation {
+  id          String    @id @default(cuid())
+  schoolId    String
+  titleId     String
+  memberId    String
+  reservedAt  DateTime  @default(now())
+  notifiedAt  DateTime?
+  fulfilledAt DateTime?
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId, titleId])
+  @@index([schoolId, memberId])
+}
+
+model FacTextbookSet {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  levelId   String?
+  // [{ titleId, qty }]
+  items     Json     @default("[]")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([schoolId, name])
+}
+
+model FacTextbookIssue {
+  id            String            @id @default(cuid())
+  schoolId      String
+  copyId        String
+  studentId     String
+  setId         String?
+  yearId        String?
+  issuedAt      DateTime          @default(now())
+  issuedById    String
+  conditionOut  FacCopyCondition?
+  returnedAt    DateTime?
+  returnedById  String?
+  conditionIn   FacCopyCondition?
+  // Marked when a leaver or the year-end return does not bring it back; it shows on the leaving clearance.
+  missingAt     DateTime?
+  chargeId      String?
+  ledgerEntryId String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @default(now()) @updatedAt
+
+  @@index([schoolId, studentId])
+  @@index([schoolId, copyId])
+}
+
+model FacStocktake {
+  id          String    @id @default(cuid())
+  schoolId    String
+  name        String
+  shelf       String?
+  startedAt   DateTime  @default(now())
+  closedAt    DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId])
+}
+
+model FacStocktakeScan {
+  id          String   @id @default(cuid())
+  schoolId    String
+  stocktakeId String
+  copyId      String
+  scannedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([stocktakeId, copyId])
+  @@index([schoolId])
+}
+
+// ── Transport ───────────────────────────────────────────────────────────────
+
+model FacRoute {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  zone      String?
+  amTime    String?
+  pmTime    String?
+  vehicleId String?
+  driverId  String?
+  // Fee per term for the route or zone.
+  feeCents  Int      @default(0)
+  currency  Currency @default(USD)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([schoolId, name])
+}
+
+model FacStop {
+  id           String   @id @default(cuid())
+  schoolId     String
+  routeId      String
+  name         String
+  sequence     Int
+  amPickupTime String?
+  pmDropTime   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@unique([routeId, sequence])
+  @@index([schoolId, routeId])
+}
+
+model FacStudentRoute {
+  id            String    @id @default(cuid())
+  schoolId      String
+  studentId     String
+  routeId       String
+  amStopId      String
+  pmStopId      String
+  termId        String
+  fromDate      DateTime  @db.Date
+  // Removing a learner stops the charge from the next term; the row stays.
+  removedAt     DateTime?
+  chargeId      String?
+  ledgerEntryId String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@unique([studentId, termId])
+  @@index([schoolId, routeId])
+}
+
+model FacVehicle {
+  id           String          @id @default(cuid())
+  schoolId     String
+  registration String
+  make         String
+  model        String?
+  seats        Int
+  owner        FacVehicleOwner @default(SCHOOL)
+  odometerKm   Int             @default(0)
+  // The register entry for the vehicle, so its maintenance and cost sit with the asset.
+  assetId      String?
+  active       Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @default(now()) @updatedAt
+
+  @@unique([schoolId, registration])
+}
+
+model FacVehicleDocument {
+  id        String            @id @default(cuid())
+  schoolId  String
+  vehicleId String
+  type      FacVehicleDocType
+  number    String?
+  expiry    DateTime          @db.Date
+  fileKey   String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @default(now()) @updatedAt
+
+  @@index([schoolId, vehicleId])
+  @@index([schoolId, expiry])
+}
+
+model FacDriver {
+  id            String   @id @default(cuid())
+  schoolId      String
+  employeeId    String
+  licenceClass  String
+  licenceNumber String?
+  phone         String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@unique([schoolId, employeeId])
+}
+
+model FacDriverDocument {
+  id        String           @id @default(cuid())
+  schoolId  String
+  driverId  String
+  type      FacDriverDocType
+  number    String?
+  expiry    DateTime         @db.Date
+  fileKey   String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
+
+  @@index([schoolId, driverId])
+  @@index([schoolId, expiry])
+}
+
+model FacTrip {
+  id            String     @id @default(cuid())
+  schoolId      String
+  routeId       String?
+  bookingId     String?
+  vehicleId     String
+  driverId      String
+  date          DateTime   @db.Date
+  leg           FacTripLeg @default(MORNING)
+  odometerStart Int?
+  odometerEnd   Int?
+  departedAt    DateTime?
+  arrivedAt     DateTime?
+  recordedById  String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @default(now()) @updatedAt
+
+  @@index([schoolId, vehicleId, date])
+  @@index([schoolId, routeId, date])
+}
+
+model FacTripPassenger {
+  id            String    @id @default(cuid())
+  schoolId      String
+  tripId        String?
+  bookingId     String?
+  studentId     String
+  boardedAt     DateTime?
+  // A school trip can be billed to the learners going.
+  chargeId      String?
+  ledgerEntryId String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId, tripId])
+  @@index([schoolId, bookingId])
+}
+
+model FacFuelLog {
+  id           String   @id @default(cuid())
+  schoolId     String
+  vehicleId    String
+  tripId       String?
+  date         DateTime @db.Date
+  litres       Float
+  costCents    Int
+  currency     Currency
+  receiptKey   String?
+  odometerKm   Int?
+  // The Finance expense this created (Finance on).
+  expenseId    String?
+  recordedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([schoolId, vehicleId, date])
+}
+
+model FacVehicleBooking {
+  id              String      @id @default(cuid())
+  schoolId        String
+  vehicleId       String
+  driverId        String?
+  startAt         DateTime
+  endAt           DateTime
+  purpose         String
+  destination     String?
+  // Charge per learner going (billed to them), in cents.
+  perLearnerCents Int?
+  currency        Currency?
+  status          FacApproval @default(PENDING)
+  requestedById   String
+  approvedById    String?
+  cancelledAt     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @default(now()) @updatedAt
+
+  @@index([schoolId, vehicleId, startAt])
+}
+
+// ── Inventory and stores ────────────────────────────────────────────────────
+
+model FacStore {
+  id            String   @id @default(cuid())
+  schoolId      String
+  name          String
+  storekeeperId String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@unique([schoolId, name])
+}
+
+model FacStockItem {
+  id            String           @id @default(cuid())
+  schoolId      String
+  name          String
+  category      FacStockCategory
+  unit          FacStockUnit     @default(EACH)
+  size          String?
+  gender        Gender?
+  barcode       String?
+  reorderLevel  Int              @default(0)
+  // Selling price when the item is sold to learners or at the tuck shop.
+  priceCents    Int?
+  priceCurrency Currency?
+  tracksExpiry  Boolean          @default(false)
+  active        Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @default(now()) @updatedAt
+
+  @@index([schoolId, category])
+  @@index([schoolId, barcode])
+}
+
+model FacStockLot {
+  id        String    @id @default(cuid())
+  schoolId  String
+  itemId    String
+  storeId   String
+  expiry    DateTime? @db.Date
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId, itemId, storeId])
+  @@index([schoolId, expiry])
+}
+
+// Stock on hand is the sum of these rows per item and store. Plus for goods in, minus for goods out.
+model FacStockMovement {
+  id                 String             @id @default(cuid())
+  schoolId           String
+  itemId             String
+  storeId            String
+  lotId              String?
+  type               FacMovementType
+  qty                Float
+  unitCostCents      Int                @default(0)
+  currency           Currency           @default(USD)
+  purchaseRequestId  String?
+  deliveryNote       String?
+  photoKey           String?
+  // Required for donations, opening stock, adjustments and write-offs.
+  reason             String?
+  writeoffReason     FacWriteoffReason?
+  shortfallNote      String?
+  // The other side of a transfer.
+  transferGroupId    String?
+  receiverName       String?
+  receiverEmployeeId String?
+  department         String?
+  signatureKey       String?
+  studentId          String?
+  chargeId           String?
+  ledgerEntryId      String?
+  countId            String?
+  approvedById       String?
+  approvedAt         DateTime?
+  createdById        String
+  createdAt          DateTime           @default(now())
+
+  @@index([schoolId, itemId, storeId])
+  @@index([schoolId, type, createdAt])
+  @@index([schoolId, purchaseRequestId])
+}
+
+model FacStockCount {
+  id           String         @id @default(cuid())
+  schoolId     String
+  storeId      String
+  status       FacCountStatus @default(OPEN)
+  countedAt    DateTime       @default(now())
+  createdById  String
+  submittedAt  DateTime?
+  approvedById String?
+  approvedAt   DateTime?
+  closedAt     DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now()) @updatedAt
+
+  @@index([schoolId, storeId])
+}
+
+model FacStockCountLine {
+  id          String   @id @default(cuid())
+  schoolId    String
+  countId     String
+  itemId      String
+  lotId       String?
+  // What the system said was there when the sheet was made.
+  expectedQty Float
+  countedQty  Float?
+  movementId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([countId, itemId, lotId])
+  @@index([schoolId, countId])
+}
+
+// ── Assets and maintenance ──────────────────────────────────────────────────
+
+model FacAssetCategory {
+  id                String   @id @default(cuid())
+  schoolId          String
+  name              String
+  // Straight-line depreciation; none when null.
+  depreciationYears Int?
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  @@unique([schoolId, name])
+}
+
+model FacAsset {
+  id            String            @id @default(cuid())
+  schoolId      String
+  tag           String
+  name          String
+  categoryId    String
+  location      String
+  custodianId   String?
+  costCents     Int               @default(0)
+  currency      Currency          @default(USD)
+  purchasedAt   DateTime?         @db.Date
+  supplierId    String?
+  requestId     String?
+  expenseId     String?
+  condition     FacAssetCondition @default(GOOD)
+  status        FacAssetStatus    @default(IN_USE)
+  serial        String?
+  warrantyEnd   DateTime?         @db.Date
+  photoKey      String?
+  notes         String?
+  legacyAssetId String?           @unique
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @default(now()) @updatedAt
+
+  @@unique([schoolId, tag])
+  @@index([schoolId, status])
+  @@index([schoolId, location])
+  @@index([schoolId, custodianId])
+}
+
+model FacAssetTransfer {
+  id              String    @id @default(cuid())
+  schoolId        String
+  assetId         String
+  fromLocation    String
+  toLocation      String
+  fromCustodianId String?
+  toCustodianId   String?
+  date            DateTime  @db.Date
+  recordedById    String
+  confirmedAt     DateTime?
+  confirmedById   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId, assetId])
+}
+
+model FacMaintenanceSchedule {
+  id               String    @id @default(cuid())
+  schoolId         String
+  assetId          String
+  title            String
+  everyMonths      Int?
+  everyKm          Int?
+  remindDaysBefore Int       @default(14)
+  lastDoneAt       DateTime? @db.Date
+  lastDoneKm       Int?
+  nextDueAt        DateTime? @db.Date
+  nextDueKm        Int?
+  active           Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId, assetId])
+  @@index([schoolId, nextDueAt])
+}
+
+model FacMaintenanceJob {
+  id              String       @id @default(cuid())
+  schoolId        String
+  assetId         String
+  scheduleId      String?
+  problem         String
+  photoKey        String?
+  reportedById    String
+  assignedToId    String?
+  status          FacJobStatus @default(REPORTED)
+  workDone        String?
+  provider        String?
+  costCents       Int?
+  currency        Currency?
+  // The Finance expense for the work (Finance on).
+  expenseId       String?
+  doneAt          DateTime?
+  nextServiceDate DateTime?    @db.Date
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @default(now()) @updatedAt
+
+  @@index([schoolId, assetId])
+  @@index([schoolId, status])
+}
+
+// One disposal per asset, ever.
+model FacAssetDisposal {
+  id                String            @id @default(cuid())
+  schoolId          String
+  assetId           String            @unique
+  method            FacDisposalMethod
+  reason            String
+  date              DateTime          @db.Date
+  proceedsCents     Int?
+  currency          Currency?
+  headApprovedById  String
+  ownerApprovedById String?
+  // The Finance income recorded for the money received.
+  incomeRef         String?
+  recordedById      String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @default(now()) @updatedAt
+}
+
+model FacVerificationRound {
+  id          String    @id @default(cuid())
+  schoolId    String
+  name        String
+  startedAt   DateTime  @default(now())
+  closedAt    DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@index([schoolId])
+}
+
+model FacVerificationScan {
+  id              String        @id @default(cuid())
+  schoolId        String
+  roundId         String
+  assetId         String
+  scannedLocation String
+  result          FacScanResult
+  scannedById     String
+  scannedAt       DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+
+  @@unique([roundId, assetId])
+  @@index([schoolId])
 }

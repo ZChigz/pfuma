@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getAccess, MODULES } from '@/lib/access';
+import { getAccess, MODULE_SWITCHES } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { getSchoolProfile } from '@/lib/system/settings';
 import { getStructure } from '@/lib/system/structure';
@@ -78,7 +78,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: { t
         year={year}
         nextSaved={sequences.get(year) ?? 1}
         plan={subscription ? { name: subscription.plan?.name ?? 'No plan', status: subscription.status, endsAt: subscription.renewalDate ? day(subscription.renewalDate) : null } : null}
-        modules={MODULES.map((m) => ({ key: m.key, label: m.label, on: modules[m.key] }))}
+        modules={MODULE_SWITCHES.map((m) => ({ key: m.key, label: m.label, on: modules[m.key] }))}
         canUpdate={can('system.settings.edit')}
       />
     );

@@ -22,6 +22,8 @@
     "@uploadthing/react": "^7.3.3",
     "@upstash/ratelimit": "^2.2.0",
     "@upstash/redis": "^1.39.0",
+    "@zxing/browser": "0.2.1",
+    "@zxing/library": "0.23.0",
     "autoprefixer": "^10.5.0",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.4.0",
