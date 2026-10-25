@@ -7339,6 +7339,8 @@ model FacStockMovement {
   unitCostCents      Int                @default(0)
   currency           Currency           @default(USD)
   purchaseRequestId  String?
+  // The line of the purchase request this delivery fills in.
+  requestItemId      String?
   deliveryNote       String?
   photoKey           String?
   // Required for donations, opening stock, adjustments and write-offs.
@@ -7366,18 +7368,21 @@ model FacStockMovement {
 }
 
 model FacStockCount {
-  id           String         @id @default(cuid())
-  schoolId     String
-  storeId      String
-  status       FacCountStatus @default(OPEN)
-  countedAt    DateTime       @default(now())
-  createdById  String
-  submittedAt  DateTime?
-  approvedById String?
-  approvedAt   DateTime?
-  closedAt     DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @default(now()) @updatedAt
+  id            String         @id @default(cuid())
+  schoolId      String
+  storeId       String
+  status        FacCountStatus @default(OPEN)
+  countedAt     DateTime       @default(now())
+  createdById   String
+  submittedAt   DateTime?
+  submittedById String?
+  // Set when the value of the differences is above the school's limit: the Head approves before they are posted.
+  needsApproval Boolean        @default(false)
+  approvedById  String?
+  approvedAt    DateTime?
+  closedAt      DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now()) @updatedAt
 
   @@index([schoolId, storeId])
 }
@@ -7552,4 +7557,28 @@ model FacVerificationScan {
 
   @@unique([roundId, assetId])
   @@index([schoolId])
+}
+
+// A stock write-off waits here until someone with the write-off permission (not the person who asked) approves it; only then is the
+// WRITEOFF movement made.
+model FacWriteoffRequest {
+  id             String            @id @default(cuid())
+  schoolId       String
+  storeId        String
+  itemId         String
+  lotId          String?
+  qty            Float
+  writeoffReason FacWriteoffReason
+  reason         String
+  status         FacApproval       @default(PENDING)
+  requestedById  String
+  decidedById    String?
+  decidedAt      DateTime?
+  decisionReason String?
+  movementId     String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @default(now()) @updatedAt
+
+  @@index([schoolId, status])
+  @@index([schoolId, storeId])
 }
