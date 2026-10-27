@@ -2,7 +2,7 @@ import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiError, apiSuccess, apiUnauthorized, apiForbidden, apiNotFound, parseBody, withApi } from '@/lib/api';
-import { canVerifyMarks } from '@/lib/permissions';
+import { authorize, guards, reachesSheet } from '@/lib/access';
 import { logAudit } from '@/lib/audit';
 import { VerifyMarksSchema } from '@/lib/validations/results';
 import { classRoster } from '@/lib/academic/roster';
@@ -15,8 +15,7 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canVerifyMarks(user.role); }
-  catch (e) { if (e instanceof Response) return e; throw e; }
+  const access = await authorize(user, 'exams.marks.verify');
 
   const parsed = await parseBody(req, VerifyMarksSchema);
   if ('error' in parsed) return parsed.error;
@@ -30,7 +29,9 @@ async function _POST(req: NextRequest) {
   if (assignment.term.status === 'CLOSED') return apiError(`${assignment.term.name} is closed, so its results are locked. The Director can reopen the term.`, 409);
 
 
-  if (user.role === 'TEACHER' && assignment.teacherId !== user.id) {
+  // Rule 6: whoever teaches the class cannot verify its sheet; it goes to the department's other verifier.
+  guards.teacherCannotVerifyOwnSheet(user, assignment);
+  if (!(await reachesSheet(access, ['exams.marks.verify'], assignment))) {
     return apiForbidden();
   }
 

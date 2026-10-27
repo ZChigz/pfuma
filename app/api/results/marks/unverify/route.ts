@@ -2,7 +2,7 @@ import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiError, apiSuccess, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
-import { canUnverifyMarks } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { logAudit } from '@/lib/audit';
 import { UnverifyMarksSchema } from '@/lib/validations/results';
 import { classRosterIds } from '@/lib/academic/roster';
@@ -14,8 +14,7 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canUnverifyMarks(user.role); }
-  catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'exams.marks.unlock');
 
   const parsed = await parseBody(req, UnverifyMarksSchema);
   if ('error' in parsed) return parsed.error;

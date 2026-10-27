@@ -16,7 +16,7 @@ export default async function EditStudentPage({ params }: { params: { id: string
   const db = getScopedDb(user.schoolId, user.id);
   const open = await db.academicTerm.findFirst({ where: { status: 'OPEN' }, select: { id: true } });
   const [s, houses] = await Promise.all([
-    db.student.findFirst({ where: { AND: [studentScope(user, open?.id), { id: params.id }] } }),
+    db.student.findFirst({ where: { AND: [await studentScope(user, open?.id, 'students.profiles.edit'), { id: params.id }] } }),
     db.house.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
   ]);
   if (!s) notFound();

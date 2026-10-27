@@ -3,7 +3,7 @@ import { assertLegacyWritable } from '@/lib/finance/legacy-guard';
 import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canApplyCharge } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { CreateChargeSchema } from '@/lib/validations/accounting';
 import { requireTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
@@ -22,12 +22,7 @@ async function _POST(
   const parsed = await parseBody(req, CreateChargeSchema);
   if ('error' in parsed) return parsed.error;
 
-  try {
-    await canApplyCharge(user.role);
-  } catch (e) {
-    if (e instanceof Response) return e;
-    throw e;
-  }
+  await authorize(user, 'finance.charges.create');
 
   // Verify the student belongs to this school (never trust body schoolId)
   const student = await db.student.findUnique({

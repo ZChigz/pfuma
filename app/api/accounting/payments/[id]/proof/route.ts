@@ -2,9 +2,8 @@ import { UTApi } from 'uploadthing/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
-import { Permission } from '@/lib/permissions';
+import { authorizeAny } from '@/lib/access';
 import { POP_URL_TTL, proofKeyBelongsTo } from '@/lib/proof-of-payment';
-import { apiForbidden } from '@/lib/api';
 import type { SessionUser } from '@/types';
 
 // Returns a signed link to the payment's proof that expires after a few minutes.
@@ -15,8 +14,7 @@ async function _GET(_req: Request, { params }: { params: { id: string } }) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  const allowed = [...Permission.recordPayment, ...Permission.verifyPayment, ...Permission.voidPayment];
-  if (!allowed.includes(user.role)) return apiForbidden();
+  await authorizeAny(user, ['finance.payments.record', 'finance.payments.verify', 'finance.payments.void']);
 
   const payment = await db.payment.findUnique({
     where: { id: params.id, schoolId: user.schoolId },

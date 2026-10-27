@@ -18,7 +18,7 @@ let k1: string[];
 let k2: string[];
 let hod: Awaited<ReturnType<typeof sessionFor>>;
 
-const admin = () => A.users.ADMIN;
+const admin = () => A.operator!;
 const get = (query = '', as = admin()) => call('academics/analytics', 'GET', { as, query });
 
 /** A morning register straight into the database: marks by student, default present, marked at the given time. */
@@ -37,8 +37,8 @@ beforeAll(async () => {
   ({ prisma } = await import('@/lib/prisma'));
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await buildWorld(prisma, A);
   k1 = [A.studentId, ...(await students(prisma, A, W.f1North, 3, 'One'))]; // 4 in Form 1 North (2 boys, 2 girls)
   k2 = await students(prisma, A, W.f2East, 2, 'Two'); // 2 in Form 2 East
@@ -91,7 +91,7 @@ describe('who sees the page', () => {
     expect((await get('', A.users.TEACHER)).status).toBe(403);
     expect((await get('', null as never)).status).toBe(401);
     expect((await get('', admin())).status).toBe(200);
-    expect((await get('', B.users.ADMIN)).json.data.attendance.byClass).toEqual([]); // another school sees only its own
+    expect((await get('', B.operator!)).json.data.attendance.byClass).toEqual([]); // another school sees only its own
   });
 });
 

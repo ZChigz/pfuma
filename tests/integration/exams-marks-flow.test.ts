@@ -6,6 +6,7 @@ import { startTestDb, type TestDb } from '../helpers/test-db';
 import { seedSchool, type SeededSchool } from '../helpers/seed';
 import { actorOf, addTeacher } from '../helpers/academics';
 import { classWith, examWorld, typeIds, type ExamWorld } from '../helpers/exams';
+import { PERMISSION_KEYS } from '@/lib/access-core';
 
 let t: TestDb;
 let A: SeededSchool;
@@ -60,8 +61,8 @@ beforeAll(async () => {
   assessments = await import('@/lib/exams/assessments');
   marks = await import('@/lib/exams/marks');
   sheets = await import('@/lib/exams/sheets');
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await examWorld(prisma, A);
   const room = await classWith(prisma, A, { classId: W.f2East, subjectId: W.subjects.maths, teacherId: W.teachers.chikore, count: 4, prefix: 'Kid' });
   kids = room.kids;
@@ -70,7 +71,7 @@ beforeAll(async () => {
   hod = await actorOf(prisma, W.hod);
   officer = await actorOf(prisma, W.examsOfficer);
   head = await actorOf(prisma, A.users.HEAD.id);
-  admin = await actorOf(prisma, A.users.ADMIN.id);
+  admin = await actorOf(prisma, A.operator!.id);
   await setup.listTypes(officer);
   T = await typeIds(prisma, A);
 }, 240_000);
@@ -433,17 +434,17 @@ describe('rules the database keeps by itself', () => {
 
   it('refuses a mark of a student for an assessment of another school', async () => {
     const foreign = await prisma.assessment.create({ data: { schoolId: B.schoolId, termId: B.termId, levelId: B.levelId, subjectId: B.subjectId, typeId: (await prisma.assessmentType.create({ data: { schoolId: B.schoolId, name: 'Test' } })).id, title: 'B test', maxMark: 10 } });
-    await expect(t.pg.query(`INSERT INTO "AssessmentMark" ("id", "schoolId", "assessmentId", "assignmentId", "studentId", "value", "enteredById") VALUES ('x1', '${A.schoolId}', '${foreign.id}', '${assignmentId}', '${kids[0]!}', 5, '${A.users.ADMIN.id}')`)).rejects.toThrow(/Cross-school/);
+    await expect(t.pg.query(`INSERT INTO "AssessmentMark" ("id", "schoolId", "assessmentId", "assignmentId", "studentId", "value", "enteredById") VALUES ('x1', '${A.schoolId}', '${foreign.id}', '${assignmentId}', '${kids[0]!}', 5, '${A.operator!.id}')`)).rejects.toThrow(/Cross-school/);
   });
 });
 
 describe('school isolation', () => {
   it('does not show or change another school\'s mark sheets', async () => {
-    const outsider = await actorOf(prisma, B.users.ADMIN.id);
+    const outsider = await actorOf(prisma, B.operator!.id);
     await fails(marks.loadGrid(outsider, assignmentId), 404);
     await fails(save(outsider, [cell(kids[0]!, examAid, 10)]), 404);
     await fails(sheets.verifySheet(outsider, assignmentId), 404);
-    await fails(sheets.unlockSheet({ ...outsider, grants: ['*'] }, assignmentId, { reason: 'trying it on' }), 404);
+    await fails(sheets.unlockSheet({ ...outsider, grants: [...PERMISSION_KEYS] }, assignmentId, { reason: 'trying it on' }), 404);
     expect((await setup.listPlans(outsider, B.termId)).length).toBe(0);
   });
 });
@@ -456,13 +457,13 @@ describe('administrators', () => {
 
   it('cannot verify the marks of a class they teach themselves', async () => {
     // The administrator also teaches this class: self-verification is refused even for an admin.
-    const adminAssignment = await classWith(prisma, A, { classId: W.f1North, subjectId: W.subjects.english, teacherId: A.users.ADMIN.id, count: 2, prefix: 'Adm' });
+    const adminAssignment = await classWith(prisma, A, { classId: W.f1North, subjectId: W.subjects.english, teacherId: A.operator!.id, count: 2, prefix: 'Adm' });
     const a = await assessments.createAssessment(admin, { assignmentId: adminAssignment.assignmentId, typeId: T['Class test'], title: 'Admin test', maxMark: 10 });
     await marks.saveMarks(admin, { assignmentId: adminAssignment.assignmentId, cells: adminAssignment.kids.map((k) => ({ studentId: k, assessmentId: a.id, value: 5, code: null })) });
     await setup.savePlan(officer, { termId: A.termId, levelId: (await prisma.schoolClass.findUniqueOrThrow({ where: { id: W.f1North } })).levelId, lines: [{ label: 'Tests', weight: 100, rule: 'AVERAGE', typeIds: [T['Class test']!] }] });
     await sheets.submitSheet(admin, adminAssignment.assignmentId);
     await fails(sheets.verifySheet(admin, adminAssignment.assignmentId), 403, /own marks/);
     const sheet = await prisma.markSheet.findFirstOrThrow({ where: { assignmentId: adminAssignment.assignmentId } });
-    await expect(t.pg.query(`UPDATE "MarkSheet" SET "status" = 'VERIFIED', "verifiedById" = '${A.users.ADMIN.id}', "verifiedAt" = now() WHERE "id" = '${sheet.id}'`)).rejects.toThrow(/cannot verify your own marks/);
+    await expect(t.pg.query(`UPDATE "MarkSheet" SET "status" = 'VERIFIED', "verifiedById" = '${A.operator!.id}', "verifiedAt" = now() WHERE "id" = '${sheet.id}'`)).rejects.toThrow(/cannot verify your own marks/);
   });
 });

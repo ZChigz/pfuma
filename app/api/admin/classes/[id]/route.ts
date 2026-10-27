@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, apiNotFound, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canManageClasses } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { UpdateClassSchema } from '@/lib/validations/admin';
 import { classDisplayName, normalizeStream } from '@/lib/academic/rules';
 import { getOpenTerm } from '@/lib/academic/terms';
@@ -16,6 +16,7 @@ async function _GET(_req: Request, ctx: { params: { id: string } }) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorize(user, 'academics.classes.view');
 
   const schoolClass = await db.schoolClass.findFirst({
     where: { id: ctx.params.id, schoolId: user.schoolId },
@@ -52,7 +53,7 @@ async function _PATCH(req: NextRequest, ctx: { params: { id: string } }) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageClasses(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'academics.classes.manage');
 
   const existing = await db.schoolClass.findFirst({ where: { id: ctx.params.id, schoolId: user.schoolId } });
   if (!existing) return apiNotFound('Class');

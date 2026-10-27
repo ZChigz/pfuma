@@ -2,13 +2,13 @@
 
 import { StatCard } from '@/components/ui/StatCard';
 import { useState } from 'react';
+import { useCan } from '@/components/access/AccessProvider';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { CheckoutModal } from '@/components/library/CheckoutModal';
 import { ReturnModal } from '@/components/library/ReturnModal';
 import { LibrarySettings } from '@/components/library/LibrarySettings';
 import { formatDate } from '@/lib/utils';
-import type { UserRole } from '@/types';
 
 type OverdueItem = {
   id: string;
@@ -27,16 +27,15 @@ interface Props {
     overdue:     number;
   };
   overdueList: OverdueItem[];
-  userRole:    UserRole;
   settings:    { libraryFineLimit: number; studentLoanLimit: number; staffLoanLimit: number };
 }
 
-export function LibraryOverviewClient({ stats, overdueList, userRole, settings }: Props) {
+export function LibraryOverviewClient({ stats, overdueList, settings }: Props) {
   const router = useRouter();
   const [showCheckout, setShowCheckout] = useState(false);
   const [showReturn,   setShowReturn]   = useState(false);
 
-  const canManage = ['DIRECTOR', 'HEAD', 'LIBRARIAN'].includes(userRole);
+  const canManage = useCan('facilities.library.manage');
 
   return (
     <div className="flex flex-col gap-6">

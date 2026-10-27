@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
@@ -14,7 +15,7 @@ export default async function HeadFeesPage() {
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
-  if (user.role !== 'HEAD') redirect('/');
+  await guardPage(user, 'finance.fees.approve');
 
   const [feeStructures, classes, levels, termRows] = await Promise.all([
     db.feeStructure.findMany({

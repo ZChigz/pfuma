@@ -72,7 +72,7 @@ export async function getPayslip(user: Actor, runId: string, employeeId?: string
     if (!e) throw new ServiceError('Payslip not found', 404);
     const own = e.userId === user.id;
     if (own) need(user, 'hr.self.payslips');
-    else need(user, 'hr.payroll.view');
+    else need(user, 'hr.pay.view'); // someone else's payslip is pay data: payroll totals (hr.payroll.view) do not open it
     const slip = await tx.payslip.findFirst({ where: { runId, employeeId: target, schoolId: user.schoolId } });
     if (!slip?.releasedAt) throw new ServiceError('This payslip has not been released yet. Payslips are released when the payroll is paid.', 404);
     if (!own) await logSensitiveView(tx, user, e, 'PAYSLIP', `payslip ${slip.verificationCode}`);

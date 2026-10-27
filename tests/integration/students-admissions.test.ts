@@ -3,7 +3,7 @@
 // applicant as a student, ranking and the intake report.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startTestDb, type TestDb } from '../helpers/test-db';
-import { grantPermission, seedSchool, type SeededSchool } from '../helpers/seed';
+import { grantPermission, seedSchool, userWithRoles, type SeededSchool } from '../helpers/seed';
 import { call } from '../helpers/route';
 import { addClass, dayOffset } from '../helpers/students';
 
@@ -27,20 +27,20 @@ const applicant = (over: Record<string, unknown> = {}) => {
     guardianName: `Parent ${letters(n)}`, guardianRelationship: 'MOTHER', guardianPhone: `07731${String(10000 + n)}`, previousSchool: 'Mbare Primary', entryResults: { grade7Units: 10 }, ...over,
   };
 };
-const apply = async (over: Record<string, unknown> = {}, as = A.users.ADMIN) => {
+const apply = async (over: Record<string, unknown> = {}, as = A.operator!) => {
   const r = await call('students/admissions/applications', 'POST', { as, body: applicant(over) });
   expect(r.status, r.text).toBe(201);
   return r.json.data.id as string;
 };
-const move = (ids: string[], to: string, as: { id: string } = A.users.ADMIN, note?: string) =>
+const move = (ids: string[], to: string, as: { id: string } = A.operator!, note?: string) =>
   call('students/admissions/applications/move', 'POST', { as: as as never, body: { applicationIds: ids, to, note } });
 const stageOf = async (id: string) => (await prisma.application.findUniqueOrThrow({ where: { id } })).stage;
 
 beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   for (const S of [A, B]) await prisma.academicTerm.update({ where: { id: S.termId }, data: { startDate: new Date(`${dayOffset(-30)}T00:00:00Z`), endDate: new Date(`${dayOffset(60)}T00:00:00Z`) } });
   form1North = A.classId;
   await prisma.school.update({ where: { id: A.schoolId }, data: { schoolCode: 'ADM', headName: 'Mrs R. Ncube' } });
@@ -48,11 +48,11 @@ beforeAll(async () => {
   await grantPermission(prisma, A.schoolId, 'BURSAR', 'students.admissions.view');
   await grantPermission(prisma, A.schoolId, 'BURSAR', 'students.admissions.manage'); // may manage, may not approve
   const r = await call('students/admissions', 'POST', {
-    as: A.users.ADMIN,
+    as: A.operator!,
     body: { name: `Form 1, ${Y + 1}`, levelId: A.levelId, year: Y + 1, places: 3, testDate: dayOffset(20), reportingDate: dayOffset(100), applicationFee: 10, requirements: ['Birth certificate copy', 'Two passport photos'] },
   });
   intakeId = r.json.data.id;
-  roomId = (await call('students/admissions', 'POST', { as: A.users.ADMIN, body: { name: `Roomy ${letters(Y)}`, levelId: A.levelId, year: Y, places: 60, reportingDate: dayOffset(100), requirements: ['Birth certificate copy', 'Two passport photos'] } })).json.data.id;
+  roomId = (await call('students/admissions', 'POST', { as: A.operator!, body: { name: `Roomy ${letters(Y)}`, levelId: A.levelId, year: Y, places: 60, reportingDate: dayOffset(100), requirements: ['Birth certificate copy', 'Two passport photos'] } })).json.data.id;
 }, 120_000);
 
 afterAll(async () => {
@@ -65,13 +65,13 @@ describe('intakes', () => {
     const list = await call('students/admissions', 'GET', { as: A.users.TEACHER });
     expect(list.status).toBe(200);
     expect(list.json.data.intakes[0]).toMatchObject({ name: `Form 1, ${Y + 1}`, level: 'Form 1', places: 3, applicationFee: 10, requirements: ['Birth certificate copy', 'Two passport photos'] });
-    expect((await call('students/admissions', 'GET', { as: A.users.HEAD })).status).toBe(403);
+    expect((await call('students/admissions', 'GET', { as: (await userWithRoles(prisma, A, [])) })).status).toBe(403);
     expect((await call('students/admissions', 'POST', { as: A.users.TEACHER, body: { name: 'Form 1, 2030', levelId: A.levelId, year: 2030, places: 10 } })).status).toBe(403);
     expect((await call('students/admissions/[intakeId]', 'PATCH', { as: A.users.TEACHER, params: { intakeId }, body: { name: 'x', levelId: A.levelId, year: 2030, places: 1 } })).status).toBe(403);
   });
 
   it('check their fields, and the form must belong to the school', async () => {
-    const post = (body: Record<string, unknown>) => call('students/admissions', 'POST', { as: A.users.ADMIN, body: { name: 'Lower 6, 2030', levelId: A.levelId, year: 2030, places: 10, ...body } });
+    const post = (body: Record<string, unknown>) => call('students/admissions', 'POST', { as: A.operator!, body: { name: 'Lower 6, 2030', levelId: A.levelId, year: 2030, places: 10, ...body } });
     expect((await post({ places: 0 })).status).toBe(422);
     expect((await post({ name: 'x' })).status).toBe(422);
     expect((await post({ year: 1990 })).status).toBe(422);
@@ -84,10 +84,10 @@ describe('intakes', () => {
   });
 
   it('keep at least as many places as there are offers', async () => {
-    const mini = (await call('students/admissions', 'POST', { as: A.users.ADMIN, body: { name: `Mini ${letters(Y)}`, levelId: A.levelId, year: Y, places: 2 } })).json.data.id;
+    const mini = (await call('students/admissions', 'POST', { as: A.operator!, body: { name: `Mini ${letters(Y)}`, levelId: A.levelId, year: Y, places: 2 } })).json.data.id;
     const ids = [await apply({ intakeId: mini }), await apply({ intakeId: mini })];
     await move(ids, 'OFFERED');
-    const shrink = await call('students/admissions/[intakeId]', 'PATCH', { as: A.users.ADMIN, params: { intakeId: mini }, body: { name: `Mini ${letters(Y)}`, levelId: A.levelId, year: Y, places: 1 } });
+    const shrink = await call('students/admissions/[intakeId]', 'PATCH', { as: A.operator!, params: { intakeId: mini }, body: { name: `Mini ${letters(Y)}`, levelId: A.levelId, year: Y, places: 1 } });
     expect(shrink.status).toBe(409);
   });
 });
@@ -95,7 +95,7 @@ describe('intakes', () => {
 describe('applications', () => {
   it('need students.admissions.manage and check the student and guardian fields', async () => {
     expect((await call('students/admissions/applications', 'POST', { as: A.users.TEACHER, body: applicant() })).status).toBe(403);
-    const bad = async (over: Record<string, unknown>) => (await call('students/admissions/applications', 'POST', { as: A.users.ADMIN, body: applicant(over) })).status;
+    const bad = async (over: Record<string, unknown>) => (await call('students/admissions/applications', 'POST', { as: A.operator!, body: applicant(over) })).status;
     expect(await bad({ firstName: 'A' })).toBe(422);
     expect(await bad({ gender: 'X' })).toBe(422);
     expect(await bad({ dateOfBirth: dayOffset(4) })).toBe(422);
@@ -109,26 +109,26 @@ describe('applications', () => {
 
   it('start at Applied with a stage history, and cannot be entered twice for one intake', async () => {
     const body = applicant({ firstName: 'Twinned', dateOfBirth: `${Y - 13}-09-09` });
-    const first = await call('students/admissions/applications', 'POST', { as: A.users.ADMIN, body });
+    const first = await call('students/admissions/applications', 'POST', { as: A.operator!, body });
     expect(first.status).toBe(201);
     const row = await prisma.application.findUniqueOrThrow({ where: { id: first.json.data.id } });
     expect(row.stage).toBe('APPLIED');
-    expect(row.stageHistory).toMatchObject([{ stage: 'APPLIED', byId: A.users.ADMIN.id }]);
-    expect((await call('students/admissions/applications', 'POST', { as: A.users.ADMIN, body: { ...body, guardianPhone: '0773999000' } })).status).toBe(409);
+    expect(row.stageHistory).toMatchObject([{ stage: 'APPLIED', byId: A.operator!.id }]);
+    expect((await call('students/admissions/applications', 'POST', { as: A.operator!, body: { ...body, guardianPhone: '0773999000' } })).status).toBe(409);
     expect(await prisma.auditLog.count({ where: { schoolId: A.schoolId, action: 'CREATE_APPLICATION', entityId: row.id } })).toBe(1);
   });
 
   it('are refused for a closed intake or after the closing date, and for another school', async () => {
-    const closed = (await call('students/admissions', 'POST', { as: A.users.ADMIN, body: { name: `Closed ${letters(Y)}`, levelId: A.levelId, year: Y, places: 5, closed: true } })).json.data.id;
-    expect((await call('students/admissions/applications', 'POST', { as: A.users.ADMIN, body: applicant({ intakeId: closed }) })).status).toBe(409);
-    const late = (await call('students/admissions', 'POST', { as: A.users.ADMIN, body: { name: `Late ${letters(Y)}`, levelId: A.levelId, year: Y, places: 5, applicationOpens: dayOffset(-60), applicationCloses: dayOffset(-2) } })).json.data.id;
-    expect((await call('students/admissions/applications', 'POST', { as: A.users.ADMIN, body: applicant({ intakeId: late }) })).status).toBe(409);
-    expect((await call('students/admissions/applications', 'POST', { as: B.users.ADMIN, body: applicant() })).status).toBe(404);
+    const closed = (await call('students/admissions', 'POST', { as: A.operator!, body: { name: `Closed ${letters(Y)}`, levelId: A.levelId, year: Y, places: 5, closed: true } })).json.data.id;
+    expect((await call('students/admissions/applications', 'POST', { as: A.operator!, body: applicant({ intakeId: closed }) })).status).toBe(409);
+    const late = (await call('students/admissions', 'POST', { as: A.operator!, body: { name: `Late ${letters(Y)}`, levelId: A.levelId, year: Y, places: 5, applicationOpens: dayOffset(-60), applicationCloses: dayOffset(-2) } })).json.data.id;
+    expect((await call('students/admissions/applications', 'POST', { as: A.operator!, body: applicant({ intakeId: late }) })).status).toBe(409);
+    expect((await call('students/admissions/applications', 'POST', { as: B.operator!, body: applicant() })).status).toBe(404);
   });
 
   it('keep a test score, interview notes and the intended class', async () => {
     const id = await apply();
-    const patch = (body: Record<string, unknown>, as = A.users.ADMIN) => call('students/admissions/applications/[id]', 'PATCH', { as, params: { id }, body });
+    const patch = (body: Record<string, unknown>, as = A.operator!) => call('students/admissions/applications/[id]', 'PATCH', { as, params: { id }, body });
     expect((await patch({ testScore: 72.5, interviewNotes: 'Confident and polite', targetClassId: form1North })).status).toBe(200);
     expect(await prisma.application.findUniqueOrThrow({ where: { id } })).toMatchObject({ interviewNotes: 'Confident and polite', targetClassId: form1North });
     expect((await prisma.application.findUniqueOrThrow({ where: { id } })).testScore!.toNumber()).toBe(72.5);
@@ -176,7 +176,7 @@ describe('moving applicants', () => {
 
   it("does not reach another school's applicants", async () => {
     const mine = await apply();
-    expect((await move([mine], 'SHORTLISTED', B.users.ADMIN)).status).toBe(404);
+    expect((await move([mine], 'SHORTLISTED', B.operator!)).status).toBe(404);
     expect(await stageOf(mine)).toBe('APPLIED');
   });
 
@@ -191,21 +191,21 @@ describe('moving applicants', () => {
 
   it('records who approved an offer and files the offer letter with a reference number', async () => {
     const id = await apply();
-    const r = await move([id], 'OFFERED', A.users.ADMIN);
+    const r = await move([id], 'OFFERED', A.operator!);
     expect(r.status).toBe(200);
     const a = await prisma.application.findUniqueOrThrow({ where: { id } });
-    expect(a).toMatchObject({ stage: 'OFFERED', offerApprovedById: A.users.ADMIN.id });
+    expect(a).toMatchObject({ stage: 'OFFERED', offerApprovedById: A.operator!.id });
     expect(a.offerApprovedAt).toBeTruthy();
     expect(a.offerReference).toMatch(new RegExp(`^OFR-${Y}-\\d{5}$`));
     const doc = await prisma.studentDocument.findFirstOrThrow({ where: { applicationId: id } });
     expect(doc).toMatchObject({ type: 'LETTER_OFFER', generated: true, referenceNo: a.offerReference, studentId: null });
     expect(doc.snapshot).toMatchObject({ body: { applicantName: expect.stringContaining('Candidate'), intakeName: `Roomy ${letters(Y)}`, requirements: ['Birth certificate copy', 'Two passport photos'] } });
     const audit = await prisma.auditLog.findFirstOrThrow({ where: { schoolId: A.schoolId, action: 'APPROVE_OFFER', entityId: id } });
-    expect(audit.after).toMatchObject({ stage: 'OFFERED', approvedById: A.users.ADMIN.id });
+    expect(audit.after).toMatchObject({ stage: 'OFFERED', approvedById: A.operator!.id });
   });
 
   it('never makes more offers than there are places', async () => {
-    const mini = (await call('students/admissions', 'POST', { as: A.users.ADMIN, body: { name: `Tight ${letters(Y)}`, levelId: A.levelId, year: Y, places: 2 } })).json.data.id;
+    const mini = (await call('students/admissions', 'POST', { as: A.operator!, body: { name: `Tight ${letters(Y)}`, levelId: A.levelId, year: Y, places: 2 } })).json.data.id;
     const ids = [await apply({ intakeId: mini }), await apply({ intakeId: mini }), await apply({ intakeId: mini })];
     const r = await move(ids, 'OFFERED');
     expect(r.status).toBe(409);
@@ -217,21 +217,21 @@ describe('moving applicants', () => {
 
   it('prints the offer letter as a PDF for those who may see admissions', async () => {
     const id = await apply();
-    expect((await call('students/admissions/applications/[id]/offer-letter', 'GET', { as: A.users.ADMIN, params: { id } })).status).toBe(404); // no offer yet
+    expect((await call('students/admissions/applications/[id]/offer-letter', 'GET', { as: A.operator!, params: { id } })).status).toBe(404); // no offer yet
     await move([id], 'OFFERED');
     const pdf = await call('students/admissions/applications/[id]/offer-letter', 'GET', { as: A.users.TEACHER, params: { id } });
     expect(pdf.status).toBe(200);
     expect(pdf.response.headers.get('content-type')).toBe('application/pdf');
     expect(pdf.text.startsWith('%PDF')).toBe(true);
-    expect((await call('students/admissions/applications/[id]/offer-letter', 'GET', { as: A.users.HEAD, params: { id } })).status).toBe(403);
-    expect((await call('students/admissions/applications/[id]/offer-letter', 'GET', { as: B.users.ADMIN, params: { id } })).status).toBe(404);
+    expect((await call('students/admissions/applications/[id]/offer-letter', 'GET', { as: (await userWithRoles(prisma, A, [])), params: { id } })).status).toBe(403);
+    expect((await call('students/admissions/applications/[id]/offer-letter', 'GET', { as: B.operator!, params: { id } })).status).toBe(404);
   });
 });
 
 describe('accepting an offer', () => {
   it('records the date, and the deposit when Finance is on', async () => {
     const id = await apply();
-    const accept = (body: Record<string, unknown> = {}, as = A.users.ADMIN) => call('students/admissions/applications/[id]/accept', 'POST', { as, params: { id }, body });
+    const accept = (body: Record<string, unknown> = {}, as = A.operator!) => call('students/admissions/applications/[id]/accept', 'POST', { as, params: { id }, body });
     expect((await accept()).status).toBe(409); // not offered yet
     await move([id], 'OFFERED');
     expect((await accept({ acceptedOn: dayOffset(3) })).status).toBe(422);
@@ -247,7 +247,7 @@ describe('accepting an offer', () => {
     await prisma.schoolModule.upsert({ where: { schoolId_module: { schoolId: A.schoolId, module: 'finance' } }, update: { enabled: false }, create: { schoolId: A.schoolId, module: 'finance', enabled: false } });
     const id = await apply();
     await move([id], 'OFFERED');
-    const accept = (body: Record<string, unknown>) => call('students/admissions/applications/[id]/accept', 'POST', { as: A.users.ADMIN, params: { id }, body });
+    const accept = (body: Record<string, unknown>) => call('students/admissions/applications/[id]/accept', 'POST', { as: A.operator!, params: { id }, body });
     expect((await accept({ depositPaid: true })).status).toBe(409);
     expect((await accept({})).status).toBe(200);
     expect((await prisma.application.findUniqueOrThrow({ where: { id } })).depositPaid).toBeNull();
@@ -259,15 +259,15 @@ describe('enrolling an applicant', () => {
   const accepted = async (over: Record<string, unknown> = {}) => {
     const id = await apply(over);
     await move([id], 'OFFERED');
-    await call('students/admissions/applications/[id]/accept', 'POST', { as: A.users.ADMIN, params: { id }, body: {} });
+    await call('students/admissions/applications/[id]/accept', 'POST', { as: A.operator!, params: { id }, body: {} });
     return id;
   };
-  const enrol = (id: string, body: Record<string, unknown>, as = A.users.ADMIN) => call('students/admissions/applications/[id]/enrol', 'POST', { as, params: { id }, body });
+  const enrol = (id: string, body: Record<string, unknown>, as = A.operator!) => call('students/admissions/applications/[id]/enrol', 'POST', { as, params: { id }, body });
 
   it('turns an accepted applicant into a student with a new admission number and an Enrollment in the chosen class', async () => {
     const id = await accepted({ birthCertificateNumber: '63-424242 A 42', address: '5 Mbare Rd, Harare' });
     await call('students/admissions/applications/[id]/documents', 'POST', {
-      as: A.users.ADMIN, params: { id }, body: { type: 'GRADE7_RESULTS_SLIP', title: 'Grade 7 slip', fileKey: `sdoc:${A.schoolId}:slipslipslip1`, mimeType: 'application/pdf', sizeBytes: 90_000 },
+      as: A.operator!, params: { id }, body: { type: 'GRADE7_RESULTS_SLIP', title: 'Grade 7 slip', fileKey: `sdoc:${A.schoolId}:slipslipslip1`, mimeType: 'application/pdf', sizeBytes: 90_000 },
     });
     const r = await enrol(id, { classId: form1North, acknowledgedWarnings: ['AGE_OUT_OF_RANGE', 'CLASS_FULL'] });
     expect(r.status, r.text).toBe(201);
@@ -335,7 +335,7 @@ describe('enrolling an applicant', () => {
 describe('applicant documents', () => {
   it('are private uploads that belong to this school', async () => {
     const id = await apply();
-    const up = (body: Record<string, unknown>, as = A.users.ADMIN) => call('students/admissions/applications/[id]/documents', 'POST', { as, params: { id }, body });
+    const up = (body: Record<string, unknown>, as = A.operator!) => call('students/admissions/applications/[id]/documents', 'POST', { as, params: { id }, body });
     const doc = { type: 'BIRTH_CERTIFICATE', title: 'Birth certificate', fileKey: `sdoc:${A.schoolId}:applicantdoc12`, mimeType: 'image/jpeg', sizeBytes: 1000 };
     expect((await up(doc, A.users.TEACHER)).status).toBe(403);
     expect((await up({ ...doc, fileKey: `sdoc:${B.schoolId}:applicantdoc12` })).status).toBe(422);
@@ -349,13 +349,13 @@ describe('the board, the ranking and the report', () => {
   let ranked: string;
 
   it('ranks applicants by Grade 7 units, test score or points, with the cut-off at the number of places', async () => {
-    ranked = (await call('students/admissions', 'POST', { as: A.users.ADMIN, body: { name: `Ranked ${letters(Y)}`, levelId: A.levelId, year: Y, places: 2 } })).json.data.id;
+    ranked = (await call('students/admissions', 'POST', { as: A.operator!, body: { name: `Ranked ${letters(Y)}`, levelId: A.levelId, year: Y, places: 2 } })).json.data.id;
     const a = await apply({ intakeId: ranked, firstName: 'Alpha', entryResults: { grade7Units: 8 }, gender: 'F' });
     const b = await apply({ intakeId: ranked, firstName: 'Bravo', entryResults: { grade7Units: 5 }, gender: 'M' });
     const c = await apply({ intakeId: ranked, firstName: 'Charlie', entryResults: { grade7Units: 11 }, gender: 'F' });
     const d = await apply({ intakeId: ranked, firstName: 'Delta', entryResults: {}, gender: 'M' });
-    for (const [id, score] of [[a, 60], [b, 55], [c, 90]] as const) await call('students/admissions/applications/[id]', 'PATCH', { as: A.users.ADMIN, params: { id }, body: { testScore: score } });
-    const rank = async (by: string) => (await call('students/admissions/[intakeId]', 'GET', { as: A.users.ADMIN, params: { intakeId: ranked }, query: `?by=${by}` })).json.data.ranking.map((r: { fullName: string; rank: number; withinPlaces: boolean }) => `${r.rank}${r.withinPlaces ? '*' : ''}:${r.fullName.split(' ')[0]}`);
+    for (const [id, score] of [[a, 60], [b, 55], [c, 90]] as const) await call('students/admissions/applications/[id]', 'PATCH', { as: A.operator!, params: { id }, body: { testScore: score } });
+    const rank = async (by: string) => (await call('students/admissions/[intakeId]', 'GET', { as: A.operator!, params: { intakeId: ranked }, query: `?by=${by}` })).json.data.ranking.map((r: { fullName: string; rank: number; withinPlaces: boolean }) => `${r.rank}${r.withinPlaces ? '*' : ''}:${r.fullName.split(' ')[0]}`);
     expect(await rank('units')).toEqual(['1*:Bravo', '2*:Alpha', '3:Charlie', '4:Delta']);
     expect(await rank('score')).toEqual(['1*:Charlie', '2*:Alpha', '3:Bravo', '4:Delta']);
     await move([c], 'REJECTED');
@@ -364,14 +364,14 @@ describe('the board, the ranking and the report', () => {
   });
 
   it('counts applications, offers, acceptances and enrolments by gender, with the conversion at each stage', async () => {
-    const rep = (await call('students/admissions/[intakeId]', 'GET', { as: A.users.ADMIN, params: { intakeId: ranked } })).json.data.report;
+    const rep = (await call('students/admissions/[intakeId]', 'GET', { as: A.operator!, params: { intakeId: ranked } })).json.data.report;
     expect(rep.stages.map((s: { key: string; total: number }) => [s.key, s.total])).toEqual([['applications', 4], ['offers', 0], ['acceptances', 0], ['enrolments', 0]]);
     expect(rep.stages[0]).toMatchObject({ male: 2, female: 2, conversion: null });
     const apps = await prisma.application.findMany({ where: { intakeId: ranked }, orderBy: { firstName: 'asc' } });
     const [alpha, bravo] = [apps[0]!.id, apps[1]!.id];
     await move([alpha, bravo], 'OFFERED');
-    await call('students/admissions/applications/[id]/accept', 'POST', { as: A.users.ADMIN, params: { id: bravo }, body: {} });
-    const rep2 = (await call('students/admissions/[intakeId]', 'GET', { as: A.users.ADMIN, params: { intakeId: ranked } })).json.data.report;
+    await call('students/admissions/applications/[id]/accept', 'POST', { as: A.operator!, params: { id: bravo }, body: {} });
+    const rep2 = (await call('students/admissions/[intakeId]', 'GET', { as: A.operator!, params: { intakeId: ranked } })).json.data.report;
     expect(rep2.stages[1]).toMatchObject({ key: 'offers', total: 2, male: 1, female: 1, conversion: 50 });
     expect(rep2.stages[2]).toMatchObject({ key: 'acceptances', total: 1, male: 1, female: 0, conversion: 50 });
     expect(rep2.stages[3]).toMatchObject({ key: 'enrolments', total: 0, conversion: 0 });
@@ -381,7 +381,7 @@ describe('the board, the ranking and the report', () => {
     const r = await call('students/admissions/[intakeId]', 'GET', { as: A.users.TEACHER, params: { intakeId: ranked } });
     expect(r.status).toBe(200);
     expect(r.json.data.applicants[0]).toMatchObject({ fullName: expect.any(String), stage: expect.any(String), guardianPhone: expect.stringMatching(/^\+263/) });
-    expect((await call('students/admissions/[intakeId]', 'GET', { as: A.users.HEAD, params: { intakeId: ranked } })).status).toBe(403);
-    expect((await call('students/admissions/[intakeId]', 'GET', { as: B.users.ADMIN, params: { intakeId: ranked } })).status).toBe(404);
+    expect((await call('students/admissions/[intakeId]', 'GET', { as: (await userWithRoles(prisma, A, [])), params: { intakeId: ranked } })).status).toBe(403);
+    expect((await call('students/admissions/[intakeId]', 'GET', { as: B.operator!, params: { intakeId: ranked } })).status).toBe(404);
   });
 });

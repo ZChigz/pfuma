@@ -80,10 +80,10 @@ describe('Facilities migration', () => {
     for (const t of TABLES.filter((x) => x !== 'FacSequence')) expect(audited.has(t), `${t} audited`).toBe(true);
   });
 
-  it('seeds every permission key, and gives none of them to a role by itself', async () => {
+  it('seeds every permission key, and gives none of them to a teacher', async () => {
     const rows = await q(`SELECT "key" FROM "Permission" WHERE "key" LIKE 'facilities.%'`);
     for (const k of KEYS) expect(rows.map((r) => r.key), k).toContain(k);
-    expect((await q(`SELECT count(*)::int AS n FROM "RolePermission" WHERE "permissionKey" = ANY(ARRAY['${KEYS.join("','")}'])`))[0]!.n).toBe(0);
+    expect((await q(`SELECT count(*)::int AS n FROM "RolePermission" rp JOIN "RoleDefinition" rd ON rd."id" = rp."roleId" WHERE rd."key" = 'TEACHER' AND rp."permissionKey" = ANY(ARRAY['${KEYS.join("','")}'])`))[0]!.n).toBe(0);
   });
 
   it('audit entries for these tables belong to Facilities & Operations', async () => {

@@ -15,7 +15,7 @@ import { notifyUsers } from '@/lib/system/notifications';
 import { deputyIds, peopleWith } from '@/lib/academics/common';
 import { round2 } from '@/lib/results';
 import { allocateSeats, endTime, findClashes, type Clash, type ClashPaper } from '@/lib/exams/clashes';
-import { ensureDefaultTypes, holds, idSchema, isFull, isoDateSchema, num, toDay, type Actor } from '@/lib/exams/common';
+import { ensureDefaultTypes, holds, idSchema, isoDateSchema, num, toDay, type Actor } from '@/lib/exams/common';
 
 const need = (user: Actor, ...keys: Parameters<typeof holds>[1][]) => {
   if (!keys.some((k) => holds(user, k))) throw new ServiceError('Forbidden', 403);
@@ -41,8 +41,8 @@ export interface PeriodRow {
 }
 
 export async function listPeriods(user: Actor, termId?: string): Promise<PeriodRow[]> {
-  if (!isFull(user) && !holds(user, 'exams.timetable.manage') && !holds(user, 'exams.timetable.approve') && !holds(user, 'exams.invigilation.manage') && !holds(user, 'exams.marks.enter')) throw new ServiceError('Forbidden', 403);
-  const seeAll = isFull(user) || holds(user, 'exams.timetable.manage') || holds(user, 'exams.timetable.approve') || holds(user, 'exams.invigilation.manage');
+  if (!holds(user, 'exams.timetable.manage') && !holds(user, 'exams.timetable.approve') && !holds(user, 'exams.invigilation.manage') && !holds(user, 'exams.marks.enter')) throw new ServiceError('Forbidden', 403);
+  const seeAll = holds(user, 'exams.timetable.manage') || holds(user, 'exams.timetable.approve') || holds(user, 'exams.invigilation.manage');
   const rows = await getScopedDb(user.schoolId, user.id).examPeriod.findMany({
     where: { schoolId: user.schoolId, ...(termId ? { termId } : {}), ...(seeAll ? {} : { status: 'APPROVED' }) },
     include: { type: { select: { name: true } }, levels: { include: { level: { select: { id: true, name: true, order: true } } } }, _count: { select: { papers: true } } },
@@ -187,14 +187,14 @@ export interface PeriodDetail {
 }
 
 export async function getPeriod(user: Actor, id: string): Promise<PeriodDetail> {
-  if (!isFull(user) && !holds(user, 'exams.timetable.manage') && !holds(user, 'exams.timetable.approve') && !holds(user, 'exams.invigilation.manage') && !holds(user, 'exams.marks.enter')) throw new ServiceError('Forbidden', 403);
+  if (!holds(user, 'exams.timetable.manage') && !holds(user, 'exams.timetable.approve') && !holds(user, 'exams.invigilation.manage') && !holds(user, 'exams.marks.enter')) throw new ServiceError('Forbidden', 403);
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const p = await tx.examPeriod.findFirst({
       where: { id, schoolId: user.schoolId },
       include: { type: { select: { name: true } }, term: { select: { name: true } }, levels: { include: { level: { select: { id: true, name: true, order: true } } } } },
     });
     if (!p) throw new ServiceError('Exam period not found', 404);
-    const staff = isFull(user) || holds(user, 'exams.timetable.manage') || holds(user, 'exams.timetable.approve') || holds(user, 'exams.invigilation.manage');
+    const staff = holds(user, 'exams.timetable.manage') || holds(user, 'exams.timetable.approve') || holds(user, 'exams.invigilation.manage');
     if (!staff && p.status !== 'APPROVED') throw new ServiceError('Exam period not found', 404);
     const papers = await tx.examPaper.findMany({ where: { periodId: id, schoolId: user.schoolId }, include: paperInclude, orderBy: [{ date: 'asc' }, { session: 'asc' }, { startTime: 'asc' }, { name: 'asc' }] });
     const { clashes, candidates } = await clashesOf(tx, user.schoolId, id);

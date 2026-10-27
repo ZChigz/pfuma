@@ -1,11 +1,11 @@
 import { CrumbLabel } from '@/components/layout/Breadcrumbs';
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/Badge';
 import { EditClassModal } from '@/components/admin/EditClassModal';
-import { canManageClasses } from '@/lib/permissions';
 import { getOpenTerm } from '@/lib/academic/terms';
 import { PRIMARY_GUARDIAN_INCLUDE } from '@/lib/students/guardians';
 import type { SessionUser } from '@/types';
@@ -20,7 +20,7 @@ export default async function AdminClassDetailPage({ params }: Props) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageClasses(user.role); } catch { redirect('/accounting'); }
+  await guardPage(user, 'academics.classes.manage', '/accounting');
 
   const openTerm = await getOpenTerm(user.schoolId, db);
   const [schoolClass, teachers, levels] = await Promise.all([

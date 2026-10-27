@@ -55,7 +55,7 @@ export interface MedicalView {
 
 async function reachable(tx: Db, user: AccessUser, studentId: string) {
   const open = await tx.academicTerm.findFirst({ where: { schoolId: user.schoolId, status: 'OPEN' }, select: { id: true } });
-  const [s] = await loadReachable(tx, user, [studentId], open?.id);
+  const [s] = await loadReachable(tx, user, [studentId], open?.id, 'students.medical.view');
   return s!;
 }
 

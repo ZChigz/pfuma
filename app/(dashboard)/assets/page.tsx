@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { AssetsClient } from '@/components/assets/AssetsClient';
@@ -15,7 +16,8 @@ export default async function AssetsPage() {
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
-  const { schoolId, role } = user;
+  await guardPage(user, 'facilities.assets.view');
+  const { schoolId } = user;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -89,7 +91,6 @@ export default async function AssetsPage() {
       categories={categories}
       stats={{ activeCount, maintenanceCount, disposedThisTerm }}
       overdueAssets={overdueAssets}
-      userRole={role}
     />
   );
 }

@@ -24,17 +24,17 @@ beforeAll(async () => {
   ({ prisma } = await import('@/lib/prisma'));
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await buildWorld(prisma, A);
   kids = [A.studentId, ...(await students(prisma, A, W.f1North, 5, 'Kid'))];
   await students(prisma, A, W.f2East, 3, 'Other');
-  await call('academics/classes/[id]/class-teacher', 'PUT', { as: A.users.ADMIN, params: { id: W.f1North }, body: { userId: W.teachers.chikore } });
-  await call('academics/classes/[id]/class-teacher', 'PUT', { as: A.users.ADMIN, params: { id: W.f2East }, body: { userId: W.teachers.moyo } });
+  await call('academics/classes/[id]/class-teacher', 'PUT', { as: A.operator!, params: { id: W.f1North }, body: { userId: W.teachers.chikore } });
+  await call('academics/classes/[id]/class-teacher', 'PUT', { as: A.operator!, params: { id: W.f2East }, body: { userId: W.teachers.moyo } });
   classTeacher = await sessionFor(prisma, W.teachers.chikore);
   otherTeacher = await sessionFor(prisma, W.teachers.ncube);
   deputy = await addTeacher(prisma, A, 'Deputy Dee', ['DEPUTY_HEAD']);
-  await prisma.calendarEvent.create({ data: { schoolId: A.schoolId, title: 'Test holiday', kind: 'PUBLIC_HOLIDAY', startDate: new Date('2026-10-09'), endDate: new Date('2026-10-09'), createdById: A.users.ADMIN.id } });
+  await prisma.calendarEvent.create({ data: { schoolId: A.schoolId, title: 'Test holiday', kind: 'PUBLIC_HOLIDAY', startDate: new Date('2026-10-09'), endDate: new Date('2026-10-09'), createdById: A.operator!.id } });
 }, 180_000);
 
 afterAll(async () => {
@@ -124,7 +124,7 @@ describe('marking the register', () => {
     expect((await reg(otherTeacher, mark([{ studentId: kids[1], status: 'ABSENT' }]))).status).toBe(404);
     expect((await reg(null, mark([]))).status).toBe(401);
     expect((await reg(classTeacher, mark([{ studentId: kids[1], status: 'ABSENT' }], { date: day(1) }))).json.message).toMatch(/has not come yet/);
-    expect((await reg(A.users.ADMIN, mark([{ studentId: kids[4], status: 'ABSENT' }], { changedAt: at(120_000) }))).status).toBe(200);
+    expect((await reg(A.operator!, mark([{ studentId: kids[4], status: 'ABSENT' }], { changedAt: at(120_000) }))).status).toBe(200);
     expect(await statusOf(TODAY, kids[4]!)).toBe('ABSENT');
   });
 
@@ -207,7 +207,7 @@ describe('changing a register after its day', () => {
 
   it('cannot change a closed term', async () => {
     await prisma.academicTerm.update({ where: { id: A.termId }, data: { status: 'CLOSED' } });
-    const r = await reg(A.users.ADMIN, mark([{ studentId: kids[1], status: 'ABSENT' }], { changedAt: at(600_000) }));
+    const r = await reg(A.operator!, mark([{ studentId: kids[1], status: 'ABSENT' }], { changedAt: at(600_000) }));
     expect(r.status).toBe(409);
     expect(r.json.message).toMatch(/closed/);
     await prisma.academicTerm.update({ where: { id: A.termId }, data: { status: 'OPEN' } });
@@ -293,7 +293,7 @@ describe('alerts', () => {
   const outbox = (studentId: string) => prisma.messageOutbox.findMany({ where: { schoolId: A.schoolId, studentId, dedupeKey: { contains: `:${TODAY}:AM` } } });
 
   it('queue an SMS to the primary guardian for an absence without a reason, and none for a reason', async () => {
-    await reg(A.users.ADMIN, mark([
+    await reg(A.operator!, mark([
       { studentId: kids[4], status: 'ABSENT' },
       { studentId: kids[3], status: 'EXCUSED', reason: 'SICK' },
       { studentId: kids[2], status: 'ABSENT', reason: 'FAMILY' },
@@ -309,22 +309,22 @@ describe('alerts', () => {
   });
 
   it('are not duplicated when the register is saved again, and are withdrawn if the student turns out to be present', async () => {
-    await reg(A.users.ADMIN, mark([{ studentId: kids[4], status: 'ABSENT' }, { studentId: kids[1], status: 'LATE', arrivalTime: '09:00' }], { changedAt: at(2_100_000) }));
+    await reg(A.operator!, mark([{ studentId: kids[4], status: 'ABSENT' }, { studentId: kids[1], status: 'LATE', arrivalTime: '09:00' }], { changedAt: at(2_100_000) }));
     expect(await outbox(kids[4]!)).toHaveLength(1);
-    await reg(A.users.ADMIN, mark([{ studentId: kids[4], status: 'PRESENT' }], { changedAt: at(2_200_000) }));
+    await reg(A.operator!, mark([{ studentId: kids[4], status: 'PRESENT' }], { changedAt: at(2_200_000) }));
     expect(await outbox(kids[4]!)).toHaveLength(0);
   });
 
   it('can be switched off, and need the Communication module', async () => {
     await prisma.academicsSettings.update({ where: { schoolId: A.schoolId }, data: { absentSmsAlert: false } });
-    await reg(A.users.ADMIN, mark([{ studentId: kids[2], status: 'ABSENT' }], { changedAt: at(2_300_000) }));
+    await reg(A.operator!, mark([{ studentId: kids[2], status: 'ABSENT' }], { changedAt: at(2_300_000) }));
     expect(await outbox(kids[2]!)).toHaveLength(0);
     await prisma.academicsSettings.update({ where: { schoolId: A.schoolId }, data: { absentSmsAlert: true } });
     await prisma.schoolModule.create({ data: { schoolId: A.schoolId, module: 'communication', enabled: false } });
-    await reg(A.users.ADMIN, mark([{ studentId: kids[2], status: 'ABSENT' }], { changedAt: at(2_400_000) }));
+    await reg(A.operator!, mark([{ studentId: kids[2], status: 'ABSENT' }], { changedAt: at(2_400_000) }));
     expect(await outbox(kids[2]!)).toHaveLength(0);
     await prisma.schoolModule.deleteMany({ where: { schoolId: A.schoolId, module: 'communication' } });
-    await reg(A.users.ADMIN, mark([{ studentId: kids[2], status: 'ABSENT' }, { studentId: kids[0], status: 'LATE', arrivalTime: '08:30' }], { changedAt: at(2_500_000) }));
+    await reg(A.operator!, mark([{ studentId: kids[2], status: 'ABSENT' }, { studentId: kids[0], status: 'LATE', arrivalTime: '08:30' }], { changedAt: at(2_500_000) }));
     expect(await outbox(kids[2]!)).toHaveLength(1); // on again
   });
 
@@ -332,7 +332,7 @@ describe('alerts', () => {
     // Monday and Tuesday were marked above with this student absent; today's register makes the third.
     expect(await statusOf(day(-2), kids[1]!)).toBe('ABSENT');
     expect(await statusOf(day(-1), kids[1]!)).toBe('ABSENT');
-    await reg(A.users.ADMIN, mark([{ studentId: kids[1], status: 'ABSENT', reason: 'OTHER' }], { changedAt: at(2_600_000) }));
+    await reg(A.operator!, mark([{ studentId: kids[1], status: 'ABSENT', reason: 'OTHER' }], { changedAt: at(2_600_000) }));
     const notes = await prisma.notification.findMany({ where: { schoolId: A.schoolId, type: 'CHRONIC_ABSENCE', title: { contains: 'in a row' } } });
     const to = new Set(notes.map((n) => n.userId));
     expect(to.has(W.teachers.chikore)).toBe(true);
@@ -343,7 +343,7 @@ describe('alerts', () => {
   it('can be switched off', async () => {
     await prisma.academicsSettings.update({ where: { schoolId: A.schoolId }, data: { chronicAbsenceAlert: false } });
     const before = await prisma.notification.count({ where: { schoolId: A.schoolId, type: 'CHRONIC_ABSENCE' } });
-    await reg(A.users.ADMIN, mark([{ studentId: kids[1], status: 'ABSENT', reason: 'OTHER' }, { studentId: kids[2], status: 'ABSENT', reason: 'OTHER' }], { changedAt: at(2_700_000) }));
+    await reg(A.operator!, mark([{ studentId: kids[1], status: 'ABSENT', reason: 'OTHER' }, { studentId: kids[2], status: 'ABSENT', reason: 'OTHER' }], { changedAt: at(2_700_000) }));
     expect(await prisma.notification.count({ where: { schoolId: A.schoolId, type: 'CHRONIC_ABSENCE' } })).toBe(before);
     await prisma.academicsSettings.update({ where: { schoolId: A.schoolId }, data: { chronicAbsenceAlert: true } });
   });
@@ -353,9 +353,9 @@ describe('alerts', () => {
     await prisma.academicsSettings.update({ where: { schoolId: A.schoolId }, data: { attendanceThresholdPct: 90 } });
     const before = await prisma.notification.count({ where: { schoolId: A.schoolId, type: 'CHRONIC_ABSENCE', title: { contains: 'below 90%' } } });
     for (const d of ['2026-10-06', '2026-10-07', '2026-10-08']) {
-      await call('academics/attendance/register', 'PUT', { as: A.users.ADMIN, body: mark([{ studentId: kids[0], status: 'ABSENT', reason: 'OTHER' }], { date: d, correctionReason: 'Back-fill for the test', changedAt: at(2_800_000) }) });
+      await call('academics/attendance/register', 'PUT', { as: A.operator!, body: mark([{ studentId: kids[0], status: 'ABSENT', reason: 'OTHER' }], { date: d, correctionReason: 'Back-fill for the test', changedAt: at(2_800_000) }) });
     }
-    await reg(A.users.ADMIN, mark([{ studentId: kids[0], status: 'ABSENT', reason: 'OTHER' }], { changedAt: at(2_900_000) }));
+    await reg(A.operator!, mark([{ studentId: kids[0], status: 'ABSENT', reason: 'OTHER' }], { changedAt: at(2_900_000) }));
     const notes = await prisma.notification.findMany({ where: { schoolId: A.schoolId, type: 'CHRONIC_ABSENCE', title: { contains: 'below 90%' } } });
     expect(notes.length).toBeGreaterThan(before);
     expect(new Set(notes.map((n) => n.userId)).has(deputy)).toBe(true);
@@ -371,7 +371,7 @@ describe("the class teacher's dashboard and the Head's daily summary", () => {
   });
 
   it('shows registers marked and not marked by class, present % by form and the absentees', async () => {
-    const r = await call('academics/attendance/summary', 'GET', { as: A.users.ADMIN });
+    const r = await call('academics/attendance/summary', 'GET', { as: A.operator! });
     expect(r.status).toBe(200);
     const d = r.json.data;
     expect(d).toMatchObject({ schoolDay: true, marked: 1 });
@@ -385,7 +385,7 @@ describe("the class teacher's dashboard and the Head's daily summary", () => {
   });
 
   it('has no summary on a day without school', async () => {
-    const r = await call('academics/attendance/summary', 'GET', { as: A.users.ADMIN, query: '?date=2026-10-17' });
+    const r = await call('academics/attendance/summary', 'GET', { as: A.operator!, query: '?date=2026-10-17' });
     expect(r.json.data).toMatchObject({ schoolDay: false, classes: [] });
     expect(r.json.data.reason).toMatch(/weekend/);
   });
@@ -403,7 +403,7 @@ describe("the class teacher's dashboard and the Head's daily summary", () => {
   });
 
   it('gives the class a term summary with each student\'s rate', async () => {
-    const r = await call('academics/classes/[id]/attendance', 'GET', { as: A.users.ADMIN, params: { id: W.f1North } });
+    const r = await call('academics/classes/[id]/attendance', 'GET', { as: A.operator!, params: { id: W.f1North } });
     expect(r.status).toBe(200);
     expect(r.json.data.registersMarked).toBeGreaterThan(1);
     const kid = r.json.data.students.find((s: { id: string }) => s.id === kids[1]);
@@ -415,9 +415,9 @@ describe("the class teacher's dashboard and the Head's daily summary", () => {
 describe('another school', () => {
   it('cannot read or mark this school\'s register', async () => {
     const b = await sessionFor(prisma, B.users.TEACHER.id);
-    expect((await call('academics/attendance/register', 'PUT', { as: B.users.ADMIN, body: mark([{ studentId: kids[1], status: 'ABSENT' }], { changedAt: at(5_000_000) }) })).status).toBe(404);
-    expect((await call('academics/attendance/view', 'GET', { as: B.users.ADMIN, query: `?classId=${W.f1North}` })).status).toBe(404);
-    expect((await call('academics/attendance/summary', 'GET', { as: B.users.ADMIN })).json.data.classes.map((c: { id: string }) => c.id)).not.toContain(W.f1North);
+    expect((await call('academics/attendance/register', 'PUT', { as: B.operator!, body: mark([{ studentId: kids[1], status: 'ABSENT' }], { changedAt: at(5_000_000) }) })).status).toBe(404);
+    expect((await call('academics/attendance/view', 'GET', { as: B.operator!, query: `?classId=${W.f1North}` })).status).toBe(404);
+    expect((await call('academics/attendance/summary', 'GET', { as: B.operator! })).json.data.classes.map((c: { id: string }) => c.id)).not.toContain(W.f1North);
     expect(b.schoolId).toBe(B.schoolId);
   });
 });

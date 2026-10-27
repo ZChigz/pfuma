@@ -1,23 +1,20 @@
-// Which students a user may reach. Owner and Administrator ("*") reach every student of their school.
-// Every other role that has been given students.profiles.view reaches only students it teaches: the class
-// teacher's class, or a class the person has a subject allocation for in the open term. (Wider scopes,
-// such as a department or a hostel, come later; when they do, only this file changes.)
+// Which students a user may reach. The answer comes from the engine (lib/access): the scope at which the person holds the key they are
+// using. Held for the whole school (the Owner, the Head, the Administrator, a bursar looking a child up) it reaches every student; held for
+// a class (a class teacher) or for the classes taught (a subject teacher) it reaches those students; for a department (a head of
+// department) the students taking the department's subjects; for a hostel (a boarding master, the matron) its boarders.
 import type { Prisma } from '@prisma/client';
-import { WILDCARD, type AccessUser } from '@/lib/access-core';
+import { schoolWide, type AccessUser, type PermissionKey } from '@/lib/access-core';
+import { scopeWhere } from '@/lib/access/where';
+import type { Db } from '@/lib/scoped-db';
 
-export const reachesEveryStudent = (user: AccessUser) => (user.grants ?? []).includes(WILDCARD);
+/** True when the key reaches every student of the school (no narrowing). */
+export const reachesEveryStudent = (user: AccessUser, key: PermissionKey = 'students.profiles.view') => schoolWide(user, key);
 
 /**
- * A Prisma filter for Student. Always includes the school. `termId` is the open term, used to find the
- * subject allocations of a teacher; without a term only the class teacher's own classes count.
+ * A Prisma filter for Student, always including the school, limited to what the person's grants of `key` reach. Use it in every list,
+ * search, export and lookup of students. `termId` is no longer needed (the engine works out the open term); it is kept so older
+ * callers read the same.
  */
-export function studentScope(user: AccessUser, termId?: string | null): Prisma.StudentWhereInput {
-  if (reachesEveryStudent(user)) return { schoolId: user.schoolId };
-  const taught: Prisma.SchoolClassWhereInput[] = [{ classTeacherId: user.id }];
-  if (termId) taught.push({ assignments: { some: { teacherId: user.id, termId } } });
-  const or: Prisma.StudentWhereInput[] = [{ currentClass: { OR: taught } }];
-  if (termId) or.push({ enrollments: { some: { termId, class: { OR: taught } } } });
-  // A teacher of a teaching group (an elective taught across classes) reaches the students in the group.
-  if (termId) or.push({ teachingGroups: { some: { group: { termId, assignments: { some: { status: 'ACTIVE', OR: [{ teacherId: user.id }, { coTeacherId: user.id }] } } } } } });
-  return { schoolId: user.schoolId, OR: or };
+export async function studentScope(user: AccessUser, _termId?: string | null, key: PermissionKey = 'students.profiles.view', db?: Db): Promise<Prisma.StudentWhereInput> {
+  return (await scopeWhere(user, key, 'Student', db)) as Prisma.StudentWhereInput;
 }

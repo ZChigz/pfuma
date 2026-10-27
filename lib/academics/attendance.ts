@@ -22,7 +22,7 @@ import { logAudit } from '@/lib/audit';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { notifyUsers } from '@/lib/system/notifications';
 import {
-  deputyIds, dedupe, holds, idSchema, isFull, isoDateSchema, loadSettings, noteSchema, ownScope, reachableClassIds, resolveTerm, seesAllRegisters,
+  deputyIds, dedupe, holds, idSchema, isoDateSchema, loadSettings, noteSchema, ownScope, reachableClassIds, resolveTerm, seesAllRegisters,
   timeSchema, todayInHarare, toDay, weekdayOf, type Actor,
 } from '@/lib/academics/common';
 import { NO_SCHOOL_TEXT, schoolDayInfo } from '@/lib/academics/school-days';
@@ -153,7 +153,7 @@ async function termOf(tx: Db, schoolId: string, date: string) {
 
 /** May this person mark (or correct) the register of the class: its class teacher, or the Deputy / administrator. */
 function canMarkClass(user: Actor, ownClassIds: string[], classId: string) {
-  return isFull(user) || holds(user, 'academics.attendance.correct') || ownClassIds.includes(classId);
+  return holds(user, 'academics.attendance.correct') || ownClassIds.includes(classId);
 }
 
 /** Registers are read by their class teacher and by the people who look after every class; anyone else gets "not found". */
@@ -185,7 +185,7 @@ export async function dailySheet(user: Actor, classId: string, dateIn: string | 
     if (!klass) throw new ServiceError('Class not found', 404);
     const settings = await loadSettings(tx, user.schoolId);
     const sessions: RegisterSession[] = settings.afternoonRegister ? ['AM', 'PM'] : ['AM'];
-    const own = isFull(user) ? [] : (await ownScope(tx, user, reachTerm.id)).classTeacherOf;
+    const own = (await ownScope(tx, user, reachTerm.id)).classTeacherOf;
     const mayMark = (holds(user, 'academics.attendance.mark') || holds(user, 'academics.attendance.correct')) && canMarkClass(user, own, classId);
     const base: Sheet = {
       kind: 'DAILY', classId, className: klass.name, slotId: null, lesson: null, date, dateLabel: dayLabel(date), session, sessions, term: { id: reachTerm.id, name: reachTerm.name, status: reachTerm.status },
@@ -485,7 +485,7 @@ export async function saveRegister(user: Actor, raw: SaveRegisterInput): Promise
     if (!klass) throw new ServiceError('Class not found', 404);
     const settings = await loadSettings(tx, user.schoolId);
     if (input.session === 'PM' && !settings.afternoonRegister) throw new ServiceError('This school does not take an afternoon register', 409);
-    if (!canMarkClass(user, isFull(user) ? [] : (await ownScope(tx, user, term.id)).classTeacherOf, klass.id)) throw new ServiceError('Class not found', 404);
+    if (!canMarkClass(user, (await ownScope(tx, user, term.id)).classTeacherOf, klass.id)) throw new ServiceError('Class not found', 404);
     const changedAt = parseTime(input.changedAt);
     const edit = editModeFor(input.date, effectiveEditDate(input.changedAt), can(user, 'academics.attendance.correct'), term.status === 'CLOSED');
     if (edit.mode === 'LOCKED') throw new ServiceError(edit.message!, 409);
@@ -571,7 +571,7 @@ export async function lessonSheet(user: Actor, slotId: string, dateIn?: string):
     const settings = await loadSettings(tx, user.schoolId);
     if (!settings.perLessonAttendance) throw new ServiceError('Per-lesson attendance is switched off for this school', 409);
     const { slot, teachers } = await lessonContext(tx, user, slotId, date);
-    const mine = isFull(user) || teachers.includes(user.id);
+    const mine = teachers.includes(user.id);
     if (!mine && !holds(user, 'academics.attendance.view')) throw new ServiceError('Lesson not found', 404);
     const a = slot.assignment;
     const term = await tx.academicTerm.findFirstOrThrow({ where: { id: a.termId } });
@@ -605,7 +605,7 @@ export async function saveLessonRegister(user: Actor, raw: SaveLessonInput): Pro
     const settings = await loadSettings(tx, user.schoolId);
     if (!settings.perLessonAttendance) throw new ServiceError('Per-lesson attendance is switched off for this school', 409);
     const { slot, teachers } = await lessonContext(tx, user, input.slotId, input.date);
-    if (!isFull(user) && !teachers.includes(user.id)) throw new ServiceError('Lesson not found', 404);
+    if (!teachers.includes(user.id)) throw new ServiceError('Lesson not found', 404);
     const a = slot.assignment;
     const term = await tx.academicTerm.findFirstOrThrow({ where: { id: a.termId } });
     if (day.term!.id !== term.id) throw new ServiceError('This lesson belongs to another term', 409);
@@ -640,7 +640,6 @@ export async function myLessons(user: Actor, dateIn?: string) {
     const marked = new Set(regs.map((r) => r.slotId));
     const mine: typeof slots = [];
     for (const s of slots) {
-      if (isFull(user)) { mine.push(s); continue; }
       const { teachers } = await lessonContext(tx, user, s.id, date);
       if (teachers.includes(user.id)) mine.push(s);
     }

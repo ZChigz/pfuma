@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, parseBody, withApi, apiError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canManageLibrary } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import type { SessionUser } from '@/types';
 
 const pick = { libraryFineLimit: true, studentLoanLimit: true, staffLoanLimit: true } as const;
@@ -28,6 +28,7 @@ async function _GET() {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorize(user, 'facilities.library.view');
   return apiSuccess(out(await db.school.findUnique({ where: { id: user.schoolId }, select: pick })));
 }
 
@@ -39,7 +40,7 @@ async function _PATCH(req: Request) {
   const db = getScopedDb(user.schoolId, user.id);
   if (await libraryMoved(db, user.schoolId)) return apiError(LIBRARY_MOVED_MESSAGE, 409);
 
-  try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
+  await authorize(user, 'facilities.library.manage');
 
   const parsed = await parseBody(req, Schema);
   if ('error' in parsed) return parsed.error;

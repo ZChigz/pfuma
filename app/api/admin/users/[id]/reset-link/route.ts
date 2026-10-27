@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiError, apiNotFound, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
-import { canManageUsers } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { createResetToken, resetUrl } from '@/lib/password-reset';
 import type { SessionUser } from '@/types';
 
@@ -13,7 +13,7 @@ async function _POST(_req: Request, { params }: { params: { id: string } }) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageUsers(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'system.users.edit');
 
   const target = await db.user.findUnique({ where: { id: params.id } });
   if (!target) return apiNotFound('User');

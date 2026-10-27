@@ -26,14 +26,14 @@ export function clearSchoolSessionCookie(): string {
 }
 
 export async function supportUser(schoolId: string) {
-  const existing = await prisma.user.findFirst({ where: { schoolId, isSupport: true }, select: { id: true, tokenVersion: true } });
+  const existing = await prisma.user.findFirst({ where: { schoolId, isSupport: true }, select: { id: true, tokenVersion: true, permVersion: true } });
   if (existing) return existing;
   return prisma.user.create({
     data: {
       schoolId, fullName: 'Pfuma support', email: SUPPORT_EMAIL, role: 'ADMIN', isSupport: true, active: true, invitePending: false,
       passwordHash: '!support!never-signs-in-with-a-password',
     },
-    select: { id: true, tokenVersion: true },
+    select: { id: true, tokenVersion: true, permVersion: true },
   });
 }
 
@@ -58,7 +58,7 @@ export async function startSupportAccess(admin: PlatformAdminContext, schoolId: 
     secret, salt: name, maxAge: SUPPORT_SESSION_SECONDS,
     token: {
       id: user.id, schoolId, role: 'ADMIN', fullName: 'Pfuma support', email: SUPPORT_EMAIL, tokenVersion: user.tokenVersion,
-      mustChangePassword: false, checkedAt: Date.now(), support: true, supportAdminId: admin.id,
+      mustChangePassword: false, roles: [], permVersion: user.permVersion, checkedAt: Date.now(), support: true, supportAdminId: admin.id,
     },
   });
   const cookie = `${name}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SUPPORT_SESSION_SECONDS}${name.startsWith('__Secure-') ? '; Secure' : ''}`;

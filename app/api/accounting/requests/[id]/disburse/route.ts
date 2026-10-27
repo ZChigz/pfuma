@@ -3,7 +3,8 @@ import { assertLegacyWritable } from '@/lib/finance/legacy-guard';
 import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { assertCanDisburseExpenseRequest, canDisburseRequest } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
+import { assertCanDisburseExpenseRequest } from '@/lib/permissions';
 import { EXPENSE_CATEGORY_BY_TYPE, REQUEST_INCLUDE, serializeExpenseRequest } from '@/lib/expense-requests';
 import { DisburseExpenseRequestSchema } from '@/lib/validations/accounting';
 import type { SessionUser } from '@/types';
@@ -19,7 +20,7 @@ async function _POST(
   const db = getScopedDb(user.schoolId, user.id);
   await assertLegacyWritable(db, user.schoolId);
 
-  try { await canDisburseRequest(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'finance.requests.disburse');
 
   const existing = await db.expenseRequest.findUnique({
     where: { id: params.id, schoolId: user.schoolId },

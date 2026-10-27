@@ -15,7 +15,7 @@ let prisma: typeof import('@/lib/prisma').prisma;
 beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
-  A = await seedSchool(prisma, 'School A');
+  A = await seedSchool(prisma, 'School A', { operator: true });
 }, 120_000);
 
 afterAll(async () => {
@@ -27,15 +27,15 @@ describe('assets', () => {
   let id: string;
   it('create, list, read, edit, maintain, dispose', async () => {
     const created = await call('assets', 'POST', {
-      as: A.users.HEAD,
+      as: A.users.BURSAR,
       body: { name: 'Projector', categoryId: A.assetCategoryId, tagNumber: 'PRJ-1', acquisitionDate: '2026-02-01', acquisitionCost: 400, currency: 'USD', location: 'Lab', condition: 'GOOD' },
     });
     expect(created.status).toBe(201);
     id = created.json.data.asset.id;
     expect((await call('assets', 'GET', { as: A.users.HEAD })).json.data.assets.map((a: { id: string }) => a.id)).toContain(id);
     expect((await call('assets/[id]', 'GET', { as: A.users.HEAD, params: { id } })).status).toBe(200);
-    expect((await call('assets/[id]', 'PATCH', { as: A.users.HEAD, params: { id }, body: { location: 'Staff room' } })).status).toBe(200);
-    expect((await call('assets/[id]/maintenance', 'POST', { as: A.users.HEAD, params: { id }, body: { maintenanceDate: '2026-05-01', description: 'Lamp replaced', cost: 20, currency: 'USD' } })).status).toBe(201);
+    expect((await call('assets/[id]', 'PATCH', { as: A.users.BURSAR, params: { id }, body: { location: 'Staff room' } })).status).toBe(200);
+    expect((await call('assets/[id]/maintenance', 'POST', { as: A.users.BURSAR, params: { id }, body: { maintenanceDate: '2026-05-01', description: 'Lamp replaced', cost: 20, currency: 'USD' } })).status).toBe(201);
     const disposed = await call('assets/[id]/dispose', 'POST', { as: A.users.DIRECTOR, params: { id }, body: { disposalDate: '2026-09-01', reason: 'Beyond repair', method: 'SCRAPPED' } });
     expect(disposed.status).toBeLessThan(300);
     expect((await prisma.asset.findUniqueOrThrow({ where: { id } })).status).toBe('DISPOSED');
@@ -68,21 +68,21 @@ describe('library', () => {
 
 describe('fees', () => {
   it('create and edit a fee structure, then apply it to a class and to a level', async () => {
-    const fs = await call('accounting/fee-structures', 'POST', { as: A.users.HEAD, body: { levelId: A.levelId, termId: A.termId, label: 'Boarding', currency: 'USD', amount: 80 } });
+    const fs = await call('accounting/fee-structures', 'POST', { as: A.users.BURSAR, body: { levelId: A.levelId, termId: A.termId, label: 'Boarding', currency: 'USD', amount: 80 } });
     expect(fs.status).toBe(201);
     const id = fs.json.data.feeStructure.id;
-    expect((await call('accounting/fee-structures/[id]', 'PATCH', { as: A.users.HEAD, params: { id }, body: { amount: 90 } })).status).toBe(200);
+    expect((await call('accounting/fee-structures/[id]', 'PATCH', { as: A.users.BURSAR, params: { id }, body: { amount: 90 } })).status).toBe(200);
 
-    const byClass = await call('accounting/fees/bulk-apply', 'POST', { as: A.users.HEAD, body: { scope: 'class', classId: A.classId, feeStructureId: id, termId: A.termId } });
+    const byClass = await call('accounting/fees/bulk-apply', 'POST', { as: A.users.BURSAR, body: { scope: 'class', classId: A.classId, feeStructureId: id, termId: A.termId } });
     expect(byClass.status).toBe(200);
     expect(byClass.json.data.applied).toBe(1);
-    const again = await call('accounting/fees/bulk-apply', 'POST', { as: A.users.HEAD, body: { scope: 'level', levelId: A.levelId, feeStructureId: id, termId: A.termId } });
+    const again = await call('accounting/fees/bulk-apply', 'POST', { as: A.users.BURSAR, body: { scope: 'level', levelId: A.levelId, feeStructureId: id, termId: A.termId } });
     expect(again.json.data).toMatchObject({ applied: 0, skipped: 1 });
     expect(await prisma.charge.count({ where: { studentId: A.studentId, label: 'Boarding' } })).toBe(1);
   });
 
   it('charge a student, list students and read an account', async () => {
-    expect((await call('accounting/students/[id]/charges', 'POST', { as: A.users.HEAD, params: { id: A.studentId }, body: { studentId: A.studentId, label: 'Trip', currency: 'USD', amount: 10, termId: A.termId } })).status).toBe(201);
+    expect((await call('accounting/students/[id]/charges', 'POST', { as: A.users.BURSAR, params: { id: A.studentId }, body: { studentId: A.studentId, label: 'Trip', currency: 'USD', amount: 10, termId: A.termId } })).status).toBe(201);
     const list = await call('accounting/students', 'GET', { as: A.users.BURSAR });
     expect(list.status).toBe(200);
     const one = await call('accounting/students/[id]', 'GET', { as: A.users.BURSAR, params: { id: A.studentId } });
@@ -114,28 +114,28 @@ describe('expense request, end to end', () => {
 
 describe('classes, subjects, assignments, settings', () => {
   it('create and edit a class, read it with its roster, change the default capacity', async () => {
-    const c = await call('admin/classes', 'POST', { as: A.users.ADMIN, body: { levelId: A.levelId, stream: 'East', capacity: 30, classTeacherId: A.users.TEACHER.id } });
+    const c = await call('admin/classes', 'POST', { as: A.operator!, body: { levelId: A.levelId, stream: 'East', capacity: 30, classTeacherId: A.users.TEACHER.id } });
     expect(c.status).toBe(201);
     const id = c.json.data.class.id;
-    expect((await call('admin/classes/[id]', 'PATCH', { as: A.users.ADMIN, params: { id }, body: { capacity: 35 } })).status).toBe(200);
-    expect((await call('admin/classes/[id]', 'GET', { as: A.users.ADMIN, params: { id: A.classId } })).json.data.students).toHaveLength(1);
-    expect((await call('admin/classes', 'GET', { as: A.users.ADMIN })).json.data.classes.length).toBeGreaterThanOrEqual(2);
-    expect((await call('admin/settings', 'PATCH', { as: A.users.ADMIN, body: { maxClassSize: 50 } })).status).toBe(200);
-    expect((await call('admin/settings', 'GET', { as: A.users.ADMIN })).json.data.maxClassSize).toBe(50);
+    expect((await call('admin/classes/[id]', 'PATCH', { as: A.operator!, params: { id }, body: { capacity: 35 } })).status).toBe(200);
+    expect((await call('admin/classes/[id]', 'GET', { as: A.operator!, params: { id: A.classId } })).json.data.students).toHaveLength(1);
+    expect((await call('admin/classes', 'GET', { as: A.operator! })).json.data.classes.length).toBeGreaterThanOrEqual(2);
+    expect((await call('admin/settings', 'PATCH', { as: A.operator!, body: { maxClassSize: 50 } })).status).toBe(200);
+    expect((await call('admin/settings', 'GET', { as: A.operator! })).json.data.maxClassSize).toBe(50);
   });
 
   it('create and edit a subject, assign a teacher, list and remove the assignment', async () => {
-    const s = await call('admin/subjects', 'POST', { as: A.users.ADMIN, body: { name: 'Geography', code: 'GEO' } });
+    const s = await call('admin/subjects', 'POST', { as: A.operator!, body: { name: 'Geography', code: 'GEO' } });
     expect(s.status).toBe(201);
     const subjectId = s.json.data.subject.id;
-    expect((await call('admin/subjects/[id]', 'PATCH', { as: A.users.ADMIN, params: { id: subjectId }, body: { maxMark: 80 } })).status).toBe(200);
-    const a = await call('admin/assignments', 'POST', { as: A.users.HEAD, body: { teacherId: A.users.TEACHER.id, subjectId, classId: A.classId, termId: A.termId } });
+    expect((await call('admin/subjects/[id]', 'PATCH', { as: A.operator!, params: { id: subjectId }, body: { maxMark: 80 } })).status).toBe(200);
+    const a = await call('admin/assignments', 'POST', { as: A.operator!, body: { teacherId: A.users.TEACHER.id, subjectId, classId: A.classId, termId: A.termId } });
     expect(a.status).toBe(201);
     const assignmentId = a.json.data.assignment.id;
     expect((await call('admin/assignments', 'GET', { as: A.users.HEAD, query: `?classId=${A.classId}` })).json.data.assignments.length).toBeGreaterThan(1);
-    expect((await call('admin/assignments/teacher-load', 'GET', { as: A.users.ADMIN, query: `?teacherId=${A.users.TEACHER.id}&termId=${A.termId}` })).status).toBe(200);
-    expect((await call('admin/assignments', 'DELETE', { as: A.users.HEAD, query: `?id=${assignmentId}` })).status).toBe(200);
-    expect((await call('admin/subjects', 'GET', { as: A.users.ADMIN })).json.data.subjects.length).toBeGreaterThan(1);
+    expect((await call('admin/assignments/teacher-load', 'GET', { as: A.operator!, query: `?teacherId=${A.users.TEACHER.id}&termId=${A.termId}` })).status).toBe(200);
+    expect((await call('admin/assignments', 'DELETE', { as: A.operator!, query: `?id=${assignmentId}` })).status).toBe(200);
+    expect((await call('admin/subjects', 'GET', { as: A.operator! })).json.data.subjects.length).toBeGreaterThan(1);
   });
 });
 
@@ -147,21 +147,21 @@ describe('students', () => {
       `Farai,Chikwanha,Male,${year}-04-21,Form 1,North,Rudo Chikwanha,Mother,0771234500,"12 Kuwadzana, Harare"`,
       `Nyasha,Dube,Female,${year}-06-02,Form 1,North,Tapiwa Dube,Father,0712345678,"7 Mbare, Harare"`,
     ].join('\n');
-    const r = await call('admin/students/import', 'POST', { as: A.users.ADMIN, rawBody: csv, headers: { 'content-type': 'text/csv' } });
+    const r = await call('admin/students/import', 'POST', { as: A.operator!, rawBody: csv, headers: { 'content-type': 'text/csv' } });
     expect(r.status).toBe(200);
     expect(r.json.data.imported ?? r.json.data.admitted ?? r.json.data.created).toBe(2);
-    const list = await call('admin/students', 'GET', { as: A.users.ADMIN });
+    const list = await call('admin/students', 'GET', { as: A.operator! });
     expect(list.json.data.students.length).toBeGreaterThanOrEqual(3);
     const farai = await prisma.student.findFirstOrThrow({ where: { schoolId: A.schoolId, firstName: 'Farai' } });
     expect(farai.portalTokenHash).toBeNull(); // no plaintext token is created any more
     expect(farai.portalToken).toBeNull();
-    expect((await call('accounting/students/[id]', 'PATCH', { as: A.users.HEAD, params: { id: farai.id }, body: { previousSchool: 'Mbare Primary' } })).status).toBe(200);
+    expect((await call('accounting/students/[id]', 'PATCH', { as: A.operator!, params: { id: farai.id }, body: { previousSchool: 'Mbare Primary' } })).status).toBe(200);
   });
 });
 
 describe('results', () => {
   it('boundaries, marks, verify, unlock, export and report card', async () => {
-    expect((await call('results/grade-boundaries', 'POST', { as: A.users.HEAD, body: { boundaries: [{ minPercent: 50, maxPercent: 100, letterGrade: 'P' }, { minPercent: 0, maxPercent: 49.99, letterGrade: 'F' }] } })).status).toBe(200);
+    expect((await call('results/grade-boundaries', 'POST', { as: A.operator!, body: { boundaries: [{ minPercent: 50, maxPercent: 100, letterGrade: 'P' }, { minPercent: 0, maxPercent: 49.99, letterGrade: 'F' }] } })).status).toBe(200);
     expect((await call('results/grade-boundaries', 'GET', { as: A.users.HEAD })).json.data.boundaries).toHaveLength(2);
 
     const q = `?classId=${A.classId}&subjectId=${A.subjectId}&termId=${A.termId}`;
@@ -171,19 +171,19 @@ describe('results', () => {
     expect(mark.json.data.mark.letterGrade).toBe('P');
 
     // Verifying needs a row for every enrolled student: the others (imported earlier) are marked absent.
-    const refused = await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId } });
+    const refused = await call('results/marks/verify', 'POST', { as: A.operator!, body: { assignmentId: A.assignmentId } });
     expect(refused.status).toBe(422);
     const others = await prisma.enrollment.findMany({ where: { classId: A.classId, termId: A.termId, studentId: { not: A.studentId } } });
     for (const e of others) {
       const abs = await call('results/marks', 'POST', { as: A.users.TEACHER, body: { studentId: e.studentId, subjectId: A.subjectId, classId: A.classId, termId: A.termId, status: 'ABSENT' } });
       expect(abs.status).toBe(200);
     }
-    const verify = await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId } });
+    const verify = await call('results/marks/verify', 'POST', { as: A.operator!, body: { assignmentId: A.assignmentId } });
     expect(verify.status).toBe(200);
     expect((await prisma.subjectAssignment.findUniqueOrThrow({ where: { id: A.assignmentId } })).marksStatus).toBe('VERIFIED');
     expect((await call('results/marks/unverify', 'POST', { as: A.users.HEAD, body: { assignmentId: A.assignmentId } })).status).toBe(200);
     expect((await prisma.subjectAssignment.findUniqueOrThrow({ where: { id: A.assignmentId } })).marksStatus).toBe('IN_PROGRESS');
-    await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId } });
+    await call('results/marks/verify', 'POST', { as: A.operator!, body: { assignmentId: A.assignmentId } });
     expect((await call('results/publish', 'POST', { as: A.users.HEAD, body: { classId: A.classId, termId: A.termId } })).status).toBe(200);
 
     const xlsx = await call('results/export', 'GET', { as: A.users.HEAD, query: `?classId=${A.classId}&termId=${A.termId}` });

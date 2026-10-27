@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
@@ -39,7 +40,7 @@ export default async function AdminDashboard() {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  if (!(['ADMIN', 'DIRECTOR'] as string[]).includes(user.role)) redirect('/');
+  await guardPage(user, 'system.users.view');
   const { schoolId } = user;
 
   const [school, openTerm] = await Promise.all([

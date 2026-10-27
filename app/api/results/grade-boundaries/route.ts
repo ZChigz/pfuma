@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiError, apiNotFound, apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canManageGradeBoundaries } from '@/lib/permissions';
+import { authorize, authorizeAny } from '@/lib/access';
 import { validateBoundaries } from '@/lib/results';
 import { SaveBoundariesSchema } from '@/lib/validations/results';
 import type { SessionUser } from '@/types';
@@ -19,6 +19,7 @@ async function _GET() {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorizeAny(user, ['exams.grading.view', 'system.settings.view']);
 
   // The O Level and A Level scales of Settings → Grading are managed there, not here.
   const boundaries = await db.gradeBoundary.findMany({
@@ -37,11 +38,7 @@ async function _POST(req: Request) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try {
-    canManageGradeBoundaries(user.role);
-  } catch (e) {
-    return e as Response;
-  }
+  await authorize(user, 'system.settings.edit');
 
   const parsed = await parseBody(req, SaveBoundariesSchema);
   if ('error' in parsed) return parsed.error;
@@ -87,11 +84,7 @@ async function _DELETE(req: Request) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try {
-    canManageGradeBoundaries(user.role);
-  } catch (e) {
-    return e as Response;
-  }
+  await authorize(user, 'system.settings.edit');
 
   const q = new URL(req.url).searchParams;
   const levelId = q.get('levelId') || null;

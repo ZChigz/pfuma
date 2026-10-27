@@ -2,6 +2,7 @@
 
 import { CrumbLabel } from '@/components/layout/Breadcrumbs';
 import { useState } from 'react';
+import { useCan } from '@/components/access/AccessProvider';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
@@ -17,7 +18,7 @@ import { MaintenanceModal } from '@/components/assets/MaintenanceModal';
 import { DisposeModal } from '@/components/assets/DisposeModal';
 import { UpdateAssetSchema } from '@/lib/validations/assets';
 import { formatDate, formatUSD, formatZiG } from '@/lib/utils';
-import type { AssetCondition, AssetStatus, UserRole } from '@/types';
+import type { AssetCondition, AssetStatus } from '@/types';
 import type { z } from 'zod';
 
 type UpdateValues = z.infer<typeof UpdateAssetSchema>;
@@ -80,7 +81,6 @@ type Asset = {
 interface Props {
   asset:      Asset;
   categories: { id: string; name: string }[];
-  userRole:   UserRole;
 }
 
 const CONDITION_OPTIONS = [
@@ -119,7 +119,7 @@ function formatAmount(amount: number | null, currency: string | null) {
   return currency === 'ZIG' ? formatZiG(amount) : formatUSD(amount);
 }
 
-export function AssetDetailClient({ asset: initialAsset, categories, userRole }: Props) {
+export function AssetDetailClient({ asset: initialAsset, categories }: Props) {
   const router = useRouter();
   const toast  = useToast();
 
@@ -128,8 +128,8 @@ export function AssetDetailClient({ asset: initialAsset, categories, userRole }:
   const [showMaint,  setShowMaint]  = useState(false);
   const [showDispose, setShowDispose] = useState(false);
 
-  const canManage  = ['DIRECTOR', 'HEAD', 'BURSAR'].includes(userRole);
-  const canDispose = ['DIRECTOR', 'HEAD'].includes(userRole);
+  const canManage  = useCan('facilities.assets.manage');
+  const canDispose = useCan('facilities.assets.dispose');
 
   const {
     register,

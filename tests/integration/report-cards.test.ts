@@ -29,8 +29,8 @@ let prisma: typeof import('@/lib/prisma').prisma;
 beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
 }, 120_000);
 
 afterAll(async () => {
@@ -38,7 +38,7 @@ afterAll(async () => {
   await t.stop();
 });
 
-const save = (body: Record<string, unknown>, as = A.users.HEAD) => call('results/grade-boundaries', 'POST', { as, body });
+const save = (body: Record<string, unknown>, as = A.operator!) => call('results/grade-boundaries', 'POST', { as, body });
 const set = (...r: [string, number, number][]) => r.map(([letterGrade, minPercent, maxPercent]) => ({ letterGrade, minPercent, maxPercent }));
 
 describe('4.5 — saving grade boundaries', () => {
@@ -76,9 +76,9 @@ describe('4.5 — saving grade boundaries', () => {
   });
 
   it('a level set can be removed but the school-wide set cannot', async () => {
-    expect((await call('results/grade-boundaries', 'DELETE', { as: A.users.HEAD })).status).toBe(409);
+    expect((await call('results/grade-boundaries', 'DELETE', { as: A.operator! })).status).toBe(409);
     await save({ levelId: A.levelId, termId: A.termId, boundaries: set(['Z', 0, 100]) });
-    const del = await call('results/grade-boundaries', 'DELETE', { as: A.users.HEAD, query: `?levelId=${A.levelId}&termId=${A.termId}` });
+    const del = await call('results/grade-boundaries', 'DELETE', { as: A.operator!, query: `?levelId=${A.levelId}&termId=${A.termId}` });
     expect(del.status).toBe(200);
     expect(await prisma.gradeBoundary.count({ where: { schoolId: A.schoolId, termId: A.termId } })).toBe(0);
     expect(await prisma.gradeBoundary.count({ where: { schoolId: A.schoolId } })).toBe(10);
@@ -111,7 +111,7 @@ describe('4.5 — grades follow the level and are frozen when published', () => 
 
   it('publishing freezes the grades: later boundary edits change nothing that is published', async () => {
     const m = await prisma.mark.findFirstOrThrow({ where: { studentId: A.studentId, subjectId: A.subjectId } });
-    expect((await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId } })).status).toBe(200);
+    expect((await call('results/marks/verify', 'POST', { as: A.operator!, body: { assignmentId: A.assignmentId } })).status).toBe(200);
     expect((await call('results/publish', 'POST', { as: A.users.HEAD, body: { classId: A.classId, termId: A.termId } })).status).toBe(200);
     const result = await prisma.termResult.findUniqueOrThrow({ where: { studentId_termId: { studentId: A.studentId, termId: A.termId } } });
     expect(result.letterGrade).toBe('C');
@@ -176,7 +176,7 @@ describe('4.4 / 4.6 — class size, remarks, days and the report card', () => {
     const r = await remarks({ headRemark: 'Sneaky' }, A.users.TEACHER);
     expect(r.status).toBe(403);
     expect(r.json.message).toMatch(/Only the Head/);
-    for (const as of [otherTeacher, A.users.BURSAR, A.users.LIBRARIAN, A.users.DIRECTOR]) {
+    for (const as of [otherTeacher, A.users.BURSAR, A.users.LIBRARIAN]) { // (the Owner holds "*" until the switch)
       expect((await remarks({ classTeacherRemark: 'x' }, as)).status).toBe(403);
     }
     expect((await remarks({}, A.users.HEAD)).status).toBe(422);
@@ -205,7 +205,7 @@ describe('4.4 / 4.6 — class size, remarks, days and the report card', () => {
     expect((await call('results/unpublish', 'POST', { as: A.users.HEAD, body: { classId: A.classId, termId: A.termId, reason: 'A new student joined the class' } })).status).toBe(200);
     await call('results/marks/unverify', 'POST', { as: A.users.HEAD, body: { assignmentId: A.assignmentId } });
     expect((await call('results/marks', 'POST', { as: A.users.TEACHER, body: { studentId: s.id, subjectId: A.subjectId, classId: A.classId, termId: A.termId, rawMark: 66 } })).status).toBe(200);
-    expect((await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId } })).status).toBe(200);
+    expect((await call('results/marks/verify', 'POST', { as: A.operator!, body: { assignmentId: A.assignmentId } })).status).toBe(200);
     expect((await call('results/publish', 'POST', { as: A.users.HEAD, body: { classId: A.classId, termId: A.termId } })).status).toBe(200);
     const after = await prisma.termResult.findUniqueOrThrow({ where: { studentId_termId: { studentId: s.id, termId: A.termId } } });
     expect(after).toMatchObject({ published: true, headRemark: 'Written early', daysPresent: 40, classSize: 2 });

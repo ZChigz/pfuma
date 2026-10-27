@@ -1,11 +1,11 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/Badge';
 import { AddUserModal } from '@/components/admin/AddUserModal';
 import { UserRowActions } from '@/components/admin/UserRowActions';
 import { LogoutAllButton } from '@/components/admin/LogoutAllButton';
-import { canManageUsers } from '@/lib/permissions';
 import type { SessionUser } from '@/types';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -23,7 +23,7 @@ export default async function AdminUsersPage() {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageUsers(user.role); } catch { redirect('/accounting'); }
+  await guardPage(user, 'system.users.edit', '/accounting');
 
   const users = await db.user.findMany({
     where: { schoolId: user.schoolId, isSupport: false },

@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canManageStudents } from '@/lib/permissions';
+import { authorize, authorizeAny } from '@/lib/access';
 import { UpdateStudentSchema } from '@/lib/validations/accounting';
 import { normalizeName } from '@/lib/students/registration';
 import type { SessionUser } from '@/types';
@@ -16,6 +16,7 @@ async function _GET(
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorizeAny(user, ['finance.accounts.view', 'finance.payments.record', 'finance.charges.create']);
 
   const student = await db.student.findUnique({
     where: { id: params.id, schoolId: user.schoolId },
@@ -52,12 +53,7 @@ async function _PATCH(
   const parsed = await parseBody(req, UpdateStudentSchema);
   if ('error' in parsed) return parsed.error;
 
-  try {
-    await canManageStudents(user.role);
-  } catch (e) {
-    if (e instanceof Response) return e;
-    throw e;
-  }
+  await authorize(user, 'students.profiles.edit');
 
   const existing = await db.student.findUnique({
     where: { id: params.id, schoolId: user.schoolId },

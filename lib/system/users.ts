@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import type { Prisma, Role } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
+import * as guards from '@/lib/access/guards';
 import { logAudit } from '@/lib/audit';
 import { generateTempPassword, hashPassword } from '@/lib/password';
 import { createResetToken, resetUrl } from '@/lib/password-reset';
@@ -17,6 +18,14 @@ import type { TableQuery } from '@/lib/table-query';
 import { SystemCreateUserSchema } from '@/lib/validations/system';
 
 type Actor = { id: string; schoolId: string };
+
+/** The role keys a person holds now (read in the same transaction as the change they make). */
+export async function roleKeysOf(tx: Db, userId: string): Promise<string[]> {
+  const rows = await tx.userRole.findMany({ where: { userId }, select: { role: { select: { key: true } } } });
+  return Array.from(new Set(rows.map((r) => r.role.key)));
+}
+
+const symmetric = (a: readonly string[], b: readonly string[]) => [...a.filter((k) => !b.includes(k)), ...b.filter((k) => !a.includes(k))];
 
 export const USER_STATUSES = ['invited', 'active', 'deactivated'] as const;
 export type UserStatus = (typeof USER_STATUSES)[number];
@@ -105,7 +114,7 @@ async function holders(tx: Db, schoolId: string, key: string, exceptId: string) 
  * person will be after the change. A school that has none yet (an older one) is not blocked from
  * unrelated changes: only taking away the last one is refused.
  */
-async function assertRequiredRolesRemain(tx: Db, schoolId: string, target: { id: string; active: boolean; roles: readonly string[] }, after: { active: boolean; roles: readonly string[] }) {
+export async function assertRequiredRolesRemain(tx: Db, schoolId: string, target: { id: string; active: boolean; roles: readonly string[] }, after: { active: boolean; roles: readonly string[] }) {
   for (const key of REQUIRED_ROLES) {
     const had = target.active && target.roles.includes(key);
     const keeps = after.active && after.roles.includes(key);
@@ -203,6 +212,7 @@ export async function createUser(db: ScopedDb, actor: Actor, input: NewUser) {
   const now = new Date();
 
   return db.$tx(async (tx) => {
+    guards.protectedRolesNeedOwner({ id: actor.id, roles: await roleKeysOf(tx, actor.id) }, input.roles);
     const user = await createOne(tx, actor, input, passwordHash, now);
     let invite: { url: string; expiresAt: Date } | null = null;
     if (input.signIn === 'INVITE') {
@@ -229,16 +239,17 @@ export async function updateUser(
 
   const sameRoles = input.roles !== undefined && [...input.roles].sort().join() === [...target.roles].sort().join();
   const changingRoles = input.roles !== undefined && !sameRoles;
-  // Nobody can take their own administrator role away (they could lock themselves, and the school, out).
-  if (target.id === actor.id && changingRoles && target.roles.includes('ADMINISTRATOR') && !input.roles!.includes('ADMINISTRATOR')) {
-    throw new ServiceError('You cannot remove your own Administrator role', 409);
-  }
+  // Rule 8: nobody changes their own roles. This also stops a person taking their own Administrator role away and locking the school out.
+  if (changingRoles) guards.cannotChangeOwnAccess(actor, id);
   if (input.email !== undefined && input.email.toLowerCase() !== target.email.toLowerCase() && (await emailTaken(db, input.email, id))) {
     throw new ServiceError('A user with this email already exists', 409);
   }
 
   return db.$tx(async (tx) => {
-    if (changingRoles) await assertRequiredRolesRemain(tx, actor.schoolId, target, { active: target.active, roles: input.roles! });
+    if (changingRoles) {
+      guards.protectedRolesNeedOwner({ id: actor.id, roles: await roleKeysOf(tx, actor.id) }, symmetric(target.roles, input.roles!));
+      await assertRequiredRolesRemain(tx, actor.schoolId, target, { active: target.active, roles: input.roles! });
+    }
 
     await tx.user.update({
       where: { id },
@@ -248,7 +259,7 @@ export async function updateUser(
         ...(input.phone !== undefined ? { phone: input.phone } : {}),
         ...(input.title !== undefined ? { title: input.title } : {}),
         // A change of roles can change what the person may open, so open sessions are ended.
-        ...(changingRoles ? { role: accessFor(input.roles!), tokenVersion: { increment: 1 } } : {}),
+        ...(changingRoles ? { role: accessFor(input.roles!), tokenVersion: { increment: 1 }, permVersion: { increment: 1 } } : {}),
       },
     });
     if (changingRoles) await setRoles(tx, actor.schoolId, id, input.roles!);
@@ -314,7 +325,7 @@ export async function setUserActive(db: ScopedDb, actor: Actor, id: string, acti
     await tx.user.update({
       where: { id },
       // Deactivating ends the person's sessions at once: every open session carries the old tokenVersion.
-      data: { active, ...(active ? {} : { tokenVersion: { increment: 1 } }) },
+      data: { active, permVersion: { increment: 1 }, ...(active ? {} : { tokenVersion: { increment: 1 } }) },
     });
     const updated = shape(await tx.user.findUniqueOrThrow({ where: { id }, select: USER_SELECT }));
     await logAudit(
@@ -415,6 +426,7 @@ export async function importUsers(db: ScopedDb, actor: Actor, csv: string) {
     const invites: { fullName: string; email: string; phone: string; url: string }[] = [];
     let expiresAt = now;
     const roleIds = new Map<string, string>();
+    guards.protectedRolesNeedOwner({ id: actor.id, roles: await roleKeysOf(tx, actor.id) }, valid.flatMap((v) => v.input.roles));
     for (const v of valid) {
       const user = await createOne(tx, actor, v.input, unusablePassword(), now, roleIds);
       const t = await createResetToken(tx, actor.schoolId, actor.id, user.id, now, { kind: 'INVITE' });

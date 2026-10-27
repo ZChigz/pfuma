@@ -3,7 +3,7 @@ import { assertLegacyWritable } from '@/lib/finance/legacy-guard';
 import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canCreateExpenseRequest } from '@/lib/permissions';
+import { authorize, authorizeAny, can, schoolWide } from '@/lib/access';
 import { generateRequestNumber } from '@/lib/request-number';
 import { REQUEST_INCLUDE, serializeExpenseRequest } from '@/lib/expense-requests';
 import { CreateExpenseRequestSchema } from '@/lib/validations/accounting';
@@ -17,6 +17,7 @@ async function _GET(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  const access = await authorizeAny(user, ['finance.requests.create', 'finance.requests.view', 'finance.requests.approve', 'finance.requests.disburse']);
 
   const { searchParams } = req.nextUrl;
   const status = searchParams.get('status') || undefined;
@@ -37,10 +38,11 @@ async function _GET(req: NextRequest) {
       : {}),
   };
 
-  if (user.role === 'TEACHER') {
+  // Whoever may only raise requests sees their own; whoever pays them out sees the ones that are ready to pay; whoever approves sees all.
+  if (!schoolWide(access, 'finance.requests.view') && !can(access, 'finance.requests.approve') && !can(access, 'finance.requests.disburse')) {
     where.requestedById = user.id;
     if (status) where.status = status as never;
-  } else if (user.role === 'BURSAR') {
+  } else if (can(access, 'finance.requests.disburse') && !can(access, 'finance.requests.approve')) {
     where.status =
       status && BURSAR_STATUSES.includes(status)
         ? (status as never)
@@ -65,7 +67,7 @@ async function _POST(req: NextRequest) {
   const db = getScopedDb(user.schoolId, user.id);
   await assertLegacyWritable(db, user.schoolId);
 
-  try { await canCreateExpenseRequest(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'finance.requests.create');
 
   const parsed = await parseBody(req, CreateExpenseRequestSchema);
   if ('error' in parsed) return parsed.error;

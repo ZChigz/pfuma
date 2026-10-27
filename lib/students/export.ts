@@ -34,7 +34,7 @@ export async function exportStudents(
   return db.$tx(async (tx) => {
     const termRow = await selectedTerm(tx, user.schoolId, query.termId);
     const term = termRow ? { id: termRow.id, startDate: termRow.startDate } : null;
-    const base = listWhere({ ...query, q: query.q }, user, term);
+    const base = await listWhere({ ...query, q: query.q }, user, term, tx);
     const where: Prisma.StudentWhereInput = opts.ids ? { AND: [base, { id: { in: opts.ids } }] } : base;
 
     const students = await tx.student.findMany({

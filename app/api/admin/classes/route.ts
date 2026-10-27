@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canManageClasses } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { CreateClassSchema } from '@/lib/validations/admin';
 import { classDisplayName, normalizeStream } from '@/lib/academic/rules';
 import { getOpenTerm } from '@/lib/academic/terms';
@@ -14,6 +14,7 @@ async function _GET() {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorize(user, 'academics.classes.view');
 
   const term = await getOpenTerm(user.schoolId, db);
   const classes = await db.schoolClass.findMany({
@@ -47,7 +48,7 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageClasses(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'academics.classes.manage');
 
   const parsed = await parseBody(req, CreateClassSchema);
   if ('error' in parsed) return parsed.error;

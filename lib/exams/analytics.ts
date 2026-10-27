@@ -20,7 +20,8 @@ import { logAudit } from '@/lib/audit';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { classStats, gradeOf, round2 } from '@/lib/results';
 import { ownScope } from '@/lib/academics/common';
-import { holds, idSchema, isFull, num, resolveTerm, previousTerm, type Actor } from '@/lib/exams/common';
+import { heldAt } from '@/lib/access-core';
+import { holds, idSchema, num, resolveTerm, previousTerm, type Actor } from '@/lib/exams/common';
 import { scaleFor, type LevelScale } from '@/lib/exams/scales';
 
 export const PANELS = ['overview', 'subjects', 'teachers', 'grades', 'trend', 'top', 'atRisk', 'valueAdded', 'board'] as const;
@@ -31,17 +32,21 @@ export const PANEL_TITLE: Record<PanelKey, string> = {
   top: 'Top students', atRisk: 'At-risk students', valueAdded: 'Value added', board: 'ZIMSEC results',
 };
 
-const has = (u: Actor, ...keys: string[]) => (u.roles ?? []).some((r) => keys.includes(r));
-
-/** Which panels a person sees. Everything also needs exams.analytics.view. */
+/**
+ * Which panels a person sees: they follow the scope of exams.analytics.view. Held school-wide together with academics.analytics.view
+ * (the Head, the Deputy, the Owner) it is every panel; school-wide without it (the Exams Officer) it is the exam-office panels. Held for a
+ * department it is the subject panels; for a class, trend and at-risk; for the classes taught, trend. Everything needs the key.
+ */
 export function panelsFor(u: Actor): PanelKey[] {
   if (!holds(u, 'exams.analytics.view')) return [];
-  if (isFull(u) || has(u, 'OWNER', 'ADMINISTRATOR', 'HEAD', 'DEPUTY_HEAD')) return [...PANELS];
   const out = new Set<PanelKey>();
-  if (has(u, 'EXAMS_OFFICER')) ['overview', 'grades', 'top', 'trend', 'board', 'subjects'].forEach((p) => out.add(p as PanelKey));
-  if (has(u, 'HOD')) ['subjects', 'teachers', 'grades', 'trend', 'top'].forEach((p) => out.add(p as PanelKey));
-  if (has(u, 'CLASS_TEACHER')) ['trend', 'atRisk'].forEach((p) => out.add(p as PanelKey));
-  if (has(u, 'TEACHER')) out.add('trend');
+  if (heldAt(u, 'exams.analytics.view', 'SCHOOL')) {
+    if (holds(u, 'academics.analytics.view')) return [...PANELS];
+    ['overview', 'grades', 'top', 'trend', 'board', 'subjects'].forEach((p) => out.add(p as PanelKey));
+  }
+  if (heldAt(u, 'exams.analytics.view', 'DEPARTMENT')) ['subjects', 'teachers', 'grades', 'trend', 'top'].forEach((p) => out.add(p as PanelKey));
+  if (heldAt(u, 'exams.analytics.view', 'CLASS')) ['trend', 'atRisk'].forEach((p) => out.add(p as PanelKey));
+  if (heldAt(u, 'exams.analytics.view', 'ASSIGNED')) out.add('trend');
   return PANELS.filter((p) => out.has(p));
 }
 
@@ -395,7 +400,7 @@ async function board(c: Ctx): Promise<Pick<PanelResult, 'columns' | 'rows' | 'no
 export async function analyticsPanel(user: Actor, panel: PanelKey, rawFilters: Filters = {}): Promise<PanelResult> {
   const filters = FiltersSchema.parse(rawFilters);
   if (!panelsFor(user).includes(panel)) throw new ServiceError('Forbidden', 403);
-  const mayVerified = isFull(user) || has(user, 'HEAD') || holds(user, 'exams.results.publish');
+  const mayVerified = holds(user, 'exams.results.publish') || holds(user, 'exams.marks.unlock');
   if (filters.source === 'verified' && !mayVerified) throw new ServiceError('Only the Head can look at results that are not yet published', 403);
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const sid = user.schoolId;
@@ -404,11 +409,11 @@ export async function analyticsPanel(user: Actor, panel: PanelKey, rawFilters: F
     const people = await tx.user.findMany({ where: { schoolId: sid, teachingAssignments: { some: { termId: term.id } } }, select: { id: true, fullName: true } });
     const c: Ctx = {
       tx, user, schoolId: sid, termId: term.id, termName: term.name, filters,
-      scope: { all: isFull(user) || has(user, 'HEAD', 'DEPUTY_HEAD', 'EXAMS_OFFICER', 'OWNER', 'ADMINISTRATOR'), departmentIds: own.departmentIds, assignmentIds: own.assignmentIds, classIds: Array.from(new Set([...own.classTeacherOf, ...(panel === 'trend' ? own.taughtClasses : [])])) },
+      scope: { all: heldAt(user, 'exams.analytics.view', 'SCHOOL'), departmentIds: own.departmentIds, assignmentIds: own.assignmentIds, classIds: Array.from(new Set([...own.classTeacherOf, ...(panel === 'trend' ? own.taughtClasses : [])])) },
       scales: new Map(), teachers: new Map(people.map((p) => [p.id, p.fullName])),
     };
     // A class teacher's own class reaches the at-risk panel; a HOD is narrowed to the department by the panel itself.
-    if (!c.scope.all && panel === 'atRisk' && !has(user, 'CLASS_TEACHER')) throw new ServiceError('Forbidden', 403);
+    if (!c.scope.all && panel === 'atRisk' && !heldAt(user, 'exams.analytics.view', 'CLASS')) throw new ServiceError('Forbidden', 403);
     const body = panel === 'overview' ? await overview(c) : panel === 'subjects' ? await subjects(c) : panel === 'teachers' ? await teachers(c) : panel === 'grades' ? await gradeDistribution(c)
       : panel === 'top' ? await top(c) : panel === 'trend' ? await trend(c) : panel === 'atRisk' ? await atRisk(c) : panel === 'valueAdded' ? await valueAdded(c) : await board(c);
     const notYet = filters.source === 'verified';

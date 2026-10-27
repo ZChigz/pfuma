@@ -19,7 +19,7 @@ import { writeCells } from '@/lib/exams/marks';
 import { openForEntry } from '@/lib/exams/entry';
 import { EVIDENCE_TYPES, keyBelongs } from '@/lib/exams/keys';
 import {
-  assertOwnAssignment, classNameOf, ensureDefaultTypes, holds, idSchema, isFull, isoDateSchema, levelIdOf, loadAssignment, num, rosterOf, toDay, type Actor,
+  assertOwnAssignment, classNameOf, ensureDefaultTypes, holds, idSchema, isoDateSchema, levelIdOf, loadAssignment, num, rosterOf, toDay, type Actor,
 } from '@/lib/exams/common';
 
 const need = (user: Actor, permission: Parameters<typeof holds>[1]) => {
@@ -89,7 +89,7 @@ const viewOf = (t: TemplateRow, inUse: boolean): TemplateView => ({
 });
 
 export async function listTemplates(user: Actor, filter: { subjectId?: string; levelId?: string } = {}): Promise<TemplateView[]> {
-  if (!holds(user, 'exams.projects.manage') && !holds(user, 'exams.assessments.create') && !isFull(user)) throw new ServiceError('Forbidden', 403);
+  if (!holds(user, 'exams.projects.manage') && !holds(user, 'exams.assessments.create')) throw new ServiceError('Forbidden', 403);
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const rows = await tx.projectTemplate.findMany({
       where: { schoolId: user.schoolId, ...(filter.subjectId ? { subjectId: filter.subjectId } : {}), ...(filter.levelId ? { levelId: filter.levelId } : {}) },
@@ -286,7 +286,7 @@ export interface RubricView {
 export async function rubricFor(user: Actor, assignmentId: string, assessmentId: string, stageId: string, studentId: string): Promise<RubricView> {
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const a = await loadAssignment(tx, user.schoolId, assignmentId);
-    if (!isFull(user) && !holds(user, 'exams.marks.view') && !holds(user, 'exams.marks.verify')) assertOwnAssignment(user, a, 'exams.marks.enter');
+    if (!holds(user, 'exams.marks.view') && !holds(user, 'exams.marks.verify')) assertOwnAssignment(user, a, 'exams.marks.enter');
     const stage = await tx.projectStage.findFirst({
       where: { id: stageId, schoolId: user.schoolId, template: { assessments: { some: { id: assessmentId } } } },
       include: { rubric: { include: { criteria: { orderBy: { sortOrder: 'asc' }, include: { levels: { orderBy: { sortOrder: 'asc' } } } } } } },
@@ -382,13 +382,13 @@ export async function evidenceLink(user: Actor, evidenceId: string, sign: (key: 
     const e = await tx.markEvidence.findFirst({ where: { id: evidenceId, schoolId: user.schoolId }, include: { mark: { select: { assignmentId: true } } } });
     if (!e || !keyBelongs(e.fileKey, user.schoolId, 'mev')) throw new ServiceError('File not found', 404);
     const a = await loadAssignment(tx, user.schoolId, e.mark.assignmentId);
-    if (!isFull(user) && !holds(user, 'exams.marks.view') && !holds(user, 'exams.marks.verify')) assertOwnAssignment(user, a, 'exams.marks.enter');
+    if (!holds(user, 'exams.marks.view') && !holds(user, 'exams.marks.verify')) assertOwnAssignment(user, a, 'exams.marks.enter');
     return { url: await sign(e.fileKey, '10m'), expiresIn: '10m', fileName: e.fileName };
   });
 }
 
 export async function briefLink(user: Actor, templateId: string, sign: (key: string, expiresIn: string) => Promise<string> = signStudentFile) {
-  if (!holds(user, 'exams.projects.manage') && !holds(user, 'exams.assessments.create') && !isFull(user)) throw new ServiceError('Forbidden', 403);
+  if (!holds(user, 'exams.projects.manage') && !holds(user, 'exams.assessments.create')) throw new ServiceError('Forbidden', 403);
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const t = await tx.projectTemplate.findFirst({ where: { id: templateId, schoolId: user.schoolId } });
     if (!t?.briefFileKey || !keyBelongs(t.briefFileKey, user.schoolId, 'mbf')) throw new ServiceError('This project has no brief', 404);

@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
@@ -27,7 +28,7 @@ export default async function TeacherMarksPage() {
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
-  if (user.role !== 'TEACHER') redirect('/');
+  await guardPage(user, 'exams.marks.enter');
 
   const openTerm = await getOpenTerm(user.schoolId, db);
   const currentTerm = openTerm?.name ?? '';

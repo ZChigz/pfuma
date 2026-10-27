@@ -214,12 +214,12 @@ export async function cashUp(user: Actor, f: { from?: string; to?: string; fundI
       const amounts = fallback.map((r) => formatMoney(r._sum.amountCents ?? 0, r.currency)).join(' and ');
       warnings.push({
         code: 'OWNER_VERIFIED', severity: 'warning',
-        message: `${count} payment${count === 1 ? ' was' : 's were'} verified by the Owner or an Administrator (${amounts}) because the school has no other finance person to verify. `
+        message: `${count} payment${count === 1 ? ' was' : 's were'} verified by the Owner (${amounts}) because the school has no other finance person to verify. `
           + 'Appoint a Bursar or the Head to verify payments, so that the person who records money and the person who checks it are always two different people.',
       });
     }
     if (verifiers === 0) {
-      warnings.push({ code: 'NO_VERIFIER', severity: 'warning', message: 'Nobody holds the permission to verify payments except the Owner and Administrators. Give it to the Bursar or the Head in System, Roles.' });
+      warnings.push({ code: 'NO_VERIFIER', severity: 'warning', message: 'Nobody holds the permission to verify payments. Give it to the Bursar or the Head in System, Roles.' });
     }
     const pendingCount = pending.reduce((s, r) => s + r._count._all, 0);
     if (pendingCount) {

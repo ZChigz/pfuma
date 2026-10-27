@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, parseBody, withApi } from '@/lib/api';
-import { canManageSubjects } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { completeLegacySubject } from '@/lib/academics/subjects';
 import { CreateSubjectSchema } from '@/lib/validations/results';
 import type { SessionUser } from '@/types';
@@ -12,6 +12,7 @@ async function _GET() {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorize(user, 'academics.subjects.view');
 
   const subjects = await db.subject.findMany({
     where: { schoolId: user.schoolId },
@@ -27,7 +28,7 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageSubjects(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'academics.subjects.manage');
 
   const parsed = await parseBody(req, CreateSubjectSchema);
   if ('error' in parsed) return parsed.error;

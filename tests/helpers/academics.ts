@@ -44,16 +44,11 @@ export async function sessionFor(prisma: PrismaClient, userId: string) {
   return { id: u.id, email: u.email, schoolId: u.schoolId, role: u.role, fullName: u.fullName };
 }
 
-/** The permission context a service call needs (what requirePermission builds from the database). */
+/** The permission context a service call needs: exactly what requirePermission builds from the database (roles, grants with their scopes, exceptions). */
 export async function actorOf(prisma: PrismaClient, userId: string) {
-  const u = await prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { userRoles: { include: { role: { include: { permissions: true } } } } } });
-  const mods = await prisma.schoolModule.findMany({ where: { schoolId: u.schoolId, enabled: false } });
-  return {
-    id: u.id, schoolId: u.schoolId, role: u.role, fullName: u.fullName, email: u.email,
-    roles: Array.from(new Set(u.userRoles.map((r) => r.role.key))),
-    grants: Array.from(new Set(u.userRoles.flatMap((r) => r.role.permissions.map((p) => p.permissionKey)))),
-    disabledModules: mods.map((m) => m.module),
-  };
+  const u = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  const { loadAccessContext } = await import('@/lib/access');
+  return loadAccessContext({ user: { id: u.id, schoolId: u.schoolId, role: u.role, email: u.email, fullName: u.fullName } });
 }
 
 /** Forms 1-3, four classes, three departments, seven subjects, four teachers, a Monday-Friday bell schedule and two rooms. */

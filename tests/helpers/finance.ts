@@ -11,9 +11,12 @@ export type Actor = Awaited<ReturnType<typeof actorOf>>;
 export interface FinanceWorld {
   bursar: Actor;     // BURSAR: records payments, verifies other people's, pays out
   clerk: Actor;      // ACCOUNTS_CLERK: records payments only
-  head: Actor;       // HEAD: verifies, approves
-  owner: Actor;      // DIRECTOR user -> OWNER role: "*"
-  admin: Actor;      // ADMIN user -> ADMINISTRATOR role: "*"
+  head: Actor;       // HEAD: approves (fees, discounts, spending); does not verify or void money
+  bursar2: Actor;    // a second BURSAR: the other person who verifies, reads the reports and runs the funds
+  owner: Actor;      // DIRECTOR user -> OWNER role
+  admin: Actor;      // ADMIN user -> ADMINISTRATOR role
+  operator: Actor;   // holds every permission (seedSchool(..., { operator: true }))
+  operator2: Actor;  // a second person who holds every permission
   teacher: Actor;    // TEACHER: may only raise expense requests
   outsider: Actor;   // TEACHER of another colleague, to be the second requester
   funds: Record<string, string>; // code -> id
@@ -23,14 +26,17 @@ export interface FinanceWorld {
 export async function financeWorld(prisma: PrismaClient, S: SeededSchool): Promise<FinanceWorld> {
   const clerkId = await addTeacher(prisma, S, 'Clerk Chipo', ['ACCOUNTS_CLERK']);
   const outsiderId = await addTeacher(prisma, S, 'Mr Outsider');
-  const [bursar, clerk, head, owner, admin, teacher, outsider] = await Promise.all([
+  const bursar2Id = await addTeacher(prisma, S, 'Bursar Two', ['BURSAR']);
+  const [bursar, clerk, head, owner, admin, teacher, outsider, bursar2] = await Promise.all([
     actorOf(prisma, S.users.BURSAR.id), actorOf(prisma, clerkId), actorOf(prisma, S.users.HEAD.id), actorOf(prisma, S.users.DIRECTOR.id),
-    actorOf(prisma, S.users.ADMIN.id), actorOf(prisma, S.users.TEACHER.id), actorOf(prisma, outsiderId),
+    actorOf(prisma, S.users.ADMIN.id), actorOf(prisma, S.users.TEACHER.id), actorOf(prisma, outsiderId), actorOf(prisma, bursar2Id),
   ]);
   const day1 = await addStudent(prisma, S, { firstName: 'Tendai', surname: 'Moyo' });
   const day2 = await addStudent(prisma, S, { firstName: 'Rufaro', surname: 'Dube' });
   const boarder = await addStudent(prisma, S, { firstName: 'Tino', surname: 'Ncube', boarding: 'BOARDER' });
-  return { bursar, clerk, head, owner, admin, teacher, outsider, funds: {}, students: { day1: day1.id, day2: day2.id, boarder: boarder.id } };
+  const operator = S.operator ? await actorOf(prisma, S.operator.id) : admin;
+  const operator2 = S.operator2 ? await actorOf(prisma, S.operator2.id) : owner;
+  return { bursar, clerk, head, owner, admin, operator, operator2, teacher, outsider, bursar2, funds: {}, students: { day1: day1.id, day2: day2.id, boarder: boarder.id } };
 }
 
 /** An error thrown by a service or a database rule must carry this status (and say this). */

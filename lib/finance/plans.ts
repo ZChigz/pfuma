@@ -120,7 +120,7 @@ export async function runPlanSchedule(tx: Db, schoolId: string, today: string = 
   let alerted = 0;
   const fresh = await tx.paymentPlanInstalment.findMany({ where: { schoolId, status: 'MISSED', missedAlertAt: null, plan: { status: 'ACTIVE' } }, include: { plan: true } });
   if (fresh.length) {
-    const staff = await tx.user.findMany({ where: { schoolId, active: true, isSupport: false, userRoles: { some: { role: { permissions: { some: { permissionKey: { in: ['finance.plans.manage', '*'] } } } } } } }, select: { id: true } });
+    const staff = await tx.user.findMany({ where: { schoolId, active: true, isSupport: false, userRoles: { some: { role: { permissions: { some: { permissionKey: 'finance.plans.manage' } } } } } }, select: { id: true } });
     for (const i of fresh) {
       await notifyUsers(tx, schoolId, staff.map((s) => s.id), { type: 'FINANCE', title: 'A payment plan instalment was missed', body: `${formatMoney(i.amountCents, i.plan.currency)} due ${ymd(i.dueDate)}`, link: '/finance/plans', dedupeKey: `plan-missed:${i.id}` });
       await tx.paymentPlanInstalment.update({ where: { id: i.id }, data: { missedAlertAt: new Date() } });

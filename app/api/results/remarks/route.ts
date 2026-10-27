@@ -2,6 +2,7 @@ import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiError, apiForbidden, apiNotFound, apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
+import { authorizeAny, can, schoolWide } from '@/lib/access';
 import { logAudit } from '@/lib/audit';
 import { ReportCardDetailsSchema } from '@/lib/validations/results';
 import { requireTerm } from '@/lib/academic/terms';
@@ -18,6 +19,7 @@ async function _PATCH(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  const access = await authorizeAny(user, ['exams.comments.head', 'exams.comments.class']);
 
   const parsed = await parseBody(req, ReportCardDetailsSchema);
   if ('error' in parsed) return parsed.error;
@@ -32,8 +34,8 @@ async function _PATCH(req: NextRequest) {
   if (!enrollment) return apiError(`${student.fullName} was not in a class in ${term.name}`, 422);
   const klass = await db.schoolClass.findFirst({ where: { id: enrollment.classId, schoolId: user.schoolId }, select: { classTeacherId: true } });
 
-  const isHead = user.role === 'HEAD';
-  const isClassTeacher = klass?.classTeacherId === user.id;
+  const isHead = can(access, 'exams.comments.head');
+  const isClassTeacher = can(access, 'exams.comments.class') && (schoolWide(access, 'exams.comments.class') || klass?.classTeacherId === user.id);
   if (!isHead && !isClassTeacher) return apiForbidden();
   if (fields.headRemark !== undefined && !isHead) return apiError("Only the Head can write the Head's remark", 403);
 

@@ -117,7 +117,7 @@ export async function startLeavingTx(tx: Db, user: Actor, rawInput: StartLeaving
   const input = StartLeavingSchema.parse(rawInput);
   const { schoolId } = user;
   const open = await tx.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } });
-  const [student] = await loadReachable(tx, user, [input.studentId], open?.id);
+  const [student] = await loadReachable(tx, user, [input.studentId], open?.id, 'students.leavers.manage');
   if (!student) throw new ServiceError('Student not found', 404);
   if (!canStartLeaving(student.status)) throw new ServiceError(`${student.fullName} is not at the school (status ${student.status.toLowerCase()})`, 409);
   const admitted = await tx.student.findUniqueOrThrow({ where: { id: student.id }, select: { admissionDate: true, currentClassId: true } });

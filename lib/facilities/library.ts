@@ -376,7 +376,7 @@ export async function returnBook(user: Actor, raw: unknown): Promise<ReturnResul
 
 async function deskHolders(tx: Db, schoolId: string): Promise<string[]> {
   const rows = await tx.user.findMany({
-    where: { schoolId, active: true, isSupport: false, userRoles: { some: { role: { permissions: { some: { permissionKey: { in: ['facilities.library.desk', '*'] } } } } } } },
+    where: { schoolId, active: true, isSupport: false, userRoles: { some: { role: { permissions: { some: { permissionKey: 'facilities.library.desk' } } } } } },
     select: { id: true },
   });
   return rows.map((r) => r.id);

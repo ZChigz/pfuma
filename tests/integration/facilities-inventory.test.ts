@@ -5,7 +5,7 @@
 // sees or changes school B's stores.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startTestDb, type TestDb } from '../helpers/test-db';
-import { grantPermission, seedSchool, type SeededSchool } from '../helpers/seed';
+import { grantPermission, seedSchool, userWithRoles, type SeededSchool } from '../helpers/seed';
 import { actorOf } from '../helpers/academics';
 import { addStudent } from '../helpers/students';
 import { call } from '../helpers/route';
@@ -37,14 +37,14 @@ beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
   [inv, settings, scoped] = await Promise.all([import('@/lib/facilities/inventory'), import('@/lib/facilities/settings'), import('@/lib/scoped-db')]);
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   await prisma.finSettings.create({ data: { schoolId: A.schoolId, legacyRetired: true } });
   await prisma.schoolModule.create({ data: { schoolId: B.schoolId, module: 'finance', enabled: false } });
   for (const k of ['view', 'receive', 'issue', 'count']) await grantPermission(prisma, A.schoolId, 'LIBRARIAN', `facilities.inventory.${k}`);
   await grantPermission(prisma, A.schoolId, 'HEAD', 'facilities.inventory.writeoff');
   await grantPermission(prisma, A.schoolId, 'HEAD', 'facilities.inventory.view');
-  [admin, keeper, head, adminB] = await Promise.all([actorOf(prisma, A.users.ADMIN.id), actorOf(prisma, A.users.LIBRARIAN.id), actorOf(prisma, A.users.HEAD.id), actorOf(prisma, B.users.ADMIN.id)]);
+  [admin, keeper, head, adminB] = await Promise.all([actorOf(prisma, A.operator!.id), actorOf(prisma, A.users.LIBRARIAN.id), actorOf(prisma, A.users.HEAD.id), actorOf(prisma, B.operator!.id)]);
   stores = Object.fromEntries((await inv.listStores(admin)).stores.map((s) => [s.name, s.id]));
   bStores = Object.fromEntries((await inv.listStores(adminB)).stores.map((s) => [s.name, s.id]));
   learner = (await addStudent(prisma, A, { firstName: 'Tino', surname: 'Ncube' })).id;
@@ -381,11 +381,11 @@ describe('one school never sees another', () => {
 describe('a part switched off', () => {
   it('refuses every inventory call for that school', async () => {
     await prisma.schoolModule.create({ data: { schoolId: B.schoolId, module: 'facilities.inventory', enabled: false } });
-    const off = await actorOf(prisma, B.users.ADMIN.id);
+    const off = await actorOf(prisma, B.operator!.id);
     await fails(inv.stockTable(off), 403);
     await fails(inv.receiveStock(off, { storeId: bStores['Main store'], reason: 'Gift', lines: [{ itemId: item['Pens'], qty: 1, unitCostCents: 1 }] }), 403);
     await fails(inv.saveStore(off, { name: 'Hut' }), 403);
-    expect((await call('facilities/inventory/items', 'GET', { as: B.users.ADMIN })).status).toBe(403);
+    expect((await call('facilities/inventory/items', 'GET', { as: B.operator! })).status).toBe(403);
   });
 });
 
@@ -401,7 +401,7 @@ describe('the routes', () => {
     it(`${method} /api/facilities/${file}: 401 without a session, 403 for a teacher`, async () => {
       const body = method === 'GET' ? undefined : {};
       expect((await call(`facilities/${file}`, method, { as: null, params, body })).status).toBe(401);
-      expect((await call(`facilities/${file}`, method, { as: A.users.TEACHER, params, body })).status).toBe(403);
+      expect((await call(`facilities/${file}`, method, { as: await userWithRoles(prisma, A, ['TEACHER'], 'plain'), params, body })).status).toBe(403);
     });
   }
 
@@ -425,8 +425,8 @@ describe('the routes', () => {
     const c = await prisma.facStockCount.findFirstOrThrow({ where: { schoolId: A.schoolId } });
     const w = await prisma.facWriteoffRequest.findFirstOrThrow({ where: { schoolId: A.schoolId } });
     await prisma.schoolModule.deleteMany({ where: { schoolId: B.schoolId, module: 'facilities.inventory' } });
-    expect((await call('facilities/inventory/counts/[id]', 'GET', { as: B.users.ADMIN, params: { id: c.id } })).status).toBe(404);
-    expect((await call('facilities/inventory/counts/[id]/submit', 'POST', { as: B.users.ADMIN, params: { id: c.id } })).status).toBe(404);
-    expect((await call('facilities/inventory/writeoffs/[id]/decide', 'POST', { as: B.users.ADMIN, params: { id: w.id }, body: { decision: 'REJECT', reason: 'Nope nope' } })).status).toBe(404);
+    expect((await call('facilities/inventory/counts/[id]', 'GET', { as: B.operator!, params: { id: c.id } })).status).toBe(404);
+    expect((await call('facilities/inventory/counts/[id]/submit', 'POST', { as: B.operator!, params: { id: c.id } })).status).toBe(404);
+    expect((await call('facilities/inventory/writeoffs/[id]/decide', 'POST', { as: B.operator!, params: { id: w.id }, body: { decision: 'REJECT', reason: 'Nope nope' } })).status).toBe(404);
   });
 });

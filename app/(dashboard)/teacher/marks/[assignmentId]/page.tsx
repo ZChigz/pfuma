@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect, notFound } from 'next/navigation';
 import { MarkEntryGrid } from '@/components/results/MarkEntryGrid';
@@ -9,7 +10,7 @@ export default async function TeacherMarkEntryPage({ params }: { params: { assig
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
-  if (user.role !== 'TEACHER') redirect('/');
+  await guardPage(user, 'exams.marks.enter');
 
   const assignment = await db.subjectAssignment.findFirst({
     where: { id: params.assignmentId, schoolId: user.schoolId, teacherId: user.id },

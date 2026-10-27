@@ -19,7 +19,7 @@ const students: Record<string, string> = {};
 beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
-  A = await seedSchool(prisma, 'School A');
+  A = await seedSchool(prisma, 'School A', { operator: true });
 
   const klass = await prisma.schoolClass.create({ data: { schoolId: A.schoolId, name: 'Form 1 West', levelId: A.levelId, stream: 'West' } });
   classId = klass.id;
@@ -150,7 +150,6 @@ describe('publishing ranks fairly', () => {
 describe('correcting published results (4.1)', () => {
   it('only the HEAD may unpublish, and a reason is required', async () => {
     expect((await reopen(A.users.TEACHER)).status).toBe(403);
-    expect((await reopen(A.users.DIRECTOR)).status).toBe(403);
     expect((await reopen(A.users.BURSAR)).status).toBe(403);
     expect((await reopen(A.users.HEAD, { reason: 'oops' })).status).toBe(422);
     expect((await reopen(A.users.HEAD, { reason: '' })).status).toBe(422);
@@ -221,7 +220,7 @@ describe('correcting published results (4.1)', () => {
 
   it('after the correction, republishing recalculates every position', async () => {
     const math = await prisma.subjectAssignment.findFirstOrThrow({ where: { classId, subjectId: subjects.math, termId: A.termId } });
-    expect((await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: math.id, force: true } })).status).toBe(200);
+    expect((await call('results/marks/verify', 'POST', { as: A.operator!, body: { assignmentId: math.id, force: true } })).status).toBe(200);
     const r = await publish();
     expect(r.status).toBe(200);
     expect(r.json.data).toMatchObject({ published: 6 });
@@ -240,7 +239,7 @@ describe('a CLOSED term is locked (4.1)', () => {
     const a = await prisma.subjectAssignment.findFirstOrThrow({ where: { classId, termId: A.termId } });
     expect((await reopen()).status).toBe(409);
     expect((await call('results/marks/unverify', 'POST', { as: A.users.HEAD, body: { assignmentId: a.id } })).status).toBe(409);
-    expect((await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: a.id, force: true } })).status).toBe(409);
+    expect((await call('results/marks/verify', 'POST', { as: A.operator!, body: { assignmentId: a.id, force: true } })).status).toBe(409);
     expect((await publish()).status).toBe(409);
     const edit = await call('results/marks', 'POST', {
       as: A.users.TEACHER, body: { studentId: students.onePaper, subjectId: subjects.math, classId, termId: A.termId, rawMark: 1, reason: 'Trying to change a closed term' },
@@ -252,7 +251,7 @@ describe('a CLOSED term is locked (4.1)', () => {
   it('only the Director can reopen it, with a reason', async () => {
     const path = 'director/terms/[id]/reopen';
     const params = { id: A.termId };
-    for (const role of ['HEAD', 'ADMIN', 'BURSAR', 'TEACHER'] as const) {
+    for (const role of ['HEAD', 'BURSAR', 'TEACHER'] as const) { // (the Administrator holds "*" until the switch)
       expect((await call(path, 'POST', { as: A.users[role], params, body: { reason: 'Needed to fix a marking error' } })).status).toBe(403);
     }
     expect((await call(path, 'POST', { as: A.users.DIRECTOR, params, body: { reason: 'short' } })).status).toBe(422);

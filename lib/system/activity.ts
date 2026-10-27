@@ -2,6 +2,8 @@
 // "T. Moyo added 42 students, 2 hours ago".
 import type { ScopedDb } from '@/lib/scoped-db';
 
+import type { AccessUser } from '@/lib/access-core';
+import { auditFinanceFilter } from '@/lib/access/serializers/audit';
 export const FEED_SIZE = 10;
 /** Rows read to build the feed; bulk actions (an import writes one row per student) collapse into one line. */
 const FETCH = 300;
@@ -86,9 +88,9 @@ export function buildFeed(rows: AuditRow[], limit = FEED_SIZE): FeedItem[] {
   });
 }
 
-export async function loadFeed(db: ScopedDb, schoolId: string): Promise<FeedItem[]> {
+export async function loadFeed(db: ScopedDb, schoolId: string, user: AccessUser): Promise<FeedItem[]> {
   const rows = await db.auditLog.findMany({
-    where: { schoolId, action: { notIn: ['DATA_CREATE', 'DATA_UPDATE', 'DATA_DELETE'] } },
+    where: { schoolId, action: { notIn: ['DATA_CREATE', 'DATA_UPDATE', 'DATA_DELETE'] }, ...(auditFinanceFilter(user) as object) },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: FETCH,
     select: { id: true, action: true, detail: true, entityType: true, createdAt: true, actor: { select: { fullName: true } } },

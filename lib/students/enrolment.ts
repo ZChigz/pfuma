@@ -103,7 +103,7 @@ export async function moveClass(user: Actor, rawInput: MoveClassInput, opts: { d
     if (!target) throw new ServiceError('Class not found', 404);
     if (!target.active || !target.level.active) throw new ServiceError(`${target.name} is not in use`, 409);
 
-    const students = await loadReachable(tx, user, input.studentIds, term.id);
+    const students = await loadReachable(tx, user, input.studentIds, term.id, 'students.enrolment.manage');
     const away = students.filter((s) => !isAtSchool(s.status));
     if (away.length) throw new ServiceError(`Only students at the school can change class: ${away.map((s) => s.fullName).join(', ')}`, 409);
 

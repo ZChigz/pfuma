@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, apiNotFound, parseBody, withApi } from '@/lib/api';
-import { canManageSubjects } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { CreateAssignmentSchema } from '@/lib/validations/results';
 import { requireTerm } from '@/lib/academic/terms';
 import { createAssignment, endAssignment, removeAssignment } from '@/lib/academics/assignments';
@@ -13,6 +13,7 @@ async function _GET(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorize(user, 'academics.assignments.view');
 
   const { searchParams } = new URL(req.url);
   const classId   = searchParams.get('classId')   ?? undefined;
@@ -44,7 +45,7 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageSubjects(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  const access = await authorize(user, 'academics.assignments.manage');
 
   const parsed = await parseBody(req, CreateAssignmentSchema);
   if ('error' in parsed) return parsed.error;
@@ -72,7 +73,7 @@ async function _POST(req: NextRequest) {
   }
 
   // The Academics module owns teacher assignments; the marks pages' own row (SubjectAssignment) is made by it.
-  await createAssignment({ id: user.id, schoolId: user.schoolId, role: user.role }, { teacherId, subjectId, classId, termId, periodsPerWeek: 4 });
+  await createAssignment(access, { teacherId, subjectId, classId, termId, periodsPerWeek: 4 });
   const assignment = await db.subjectAssignment.findUniqueOrThrow({
     where: { subjectId_classId_termId: { subjectId, classId, termId } },
     include: {
@@ -91,7 +92,7 @@ async function _DELETE(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageSubjects(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  const access = await authorize(user, 'academics.assignments.manage');
 
   let id = new URL(req.url).searchParams.get('id');
   if (!id) {
@@ -104,7 +105,7 @@ async function _DELETE(req: NextRequest) {
   if (!existing || existing.schoolId !== user.schoolId) return apiNotFound('Assignment');
 
   // Remove the teacher assignment in the Academics module (or end it, once it has lessons or a scheme), then the marks row.
-  const actor = { id: user.id, schoolId: user.schoolId, role: user.role };
+  const actor = access;
   const live = await db.teacherAssignment.findFirst({ where: { termId: existing.termId, subjectId: existing.subjectId, classId: existing.classId, status: 'ACTIVE' }, select: { id: true } });
   if (live) {
     try { await removeAssignment(actor, live.id); } catch { await endAssignment(actor, live.id, {}); }

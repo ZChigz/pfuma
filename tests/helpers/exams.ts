@@ -16,6 +16,12 @@ export async function examWorld(prisma: PrismaClient, S: SeededSchool): Promise<
   await prisma.gradeBoundary.deleteMany({ where: { schoolId: S.schoolId } });
   const hod = await addTeacher(prisma, S, 'Mrs Hodge', ['HOD']);
   await prisma.department.update({ where: { id: W.dept.sciences }, data: { hodUserId: hod } });
+  // The departments without a head have the test operator as their alternate verifier (only a Head of Department or the alternate may verify a sheet).
+  if (S.operator) {
+    for (const departmentId of [W.dept.languages, W.dept.humanities]) {
+      await prisma.examDepartmentVerifier.create({ data: { schoolId: S.schoolId, departmentId, userId: S.operator.id } });
+    }
+  }
   const examsOfficer = await addTeacher(prisma, S, 'Mr Exams Officer', ['EXAMS_OFFICER']);
   return { ...W, hod, examsOfficer, types: {} };
 }

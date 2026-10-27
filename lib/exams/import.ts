@@ -7,7 +7,7 @@ import { getScopedDb } from '@/lib/scoped-db';
 import { markKey } from '@/lib/results';
 import { cellText, parseCell } from '@/lib/exams/cell';
 import { TEMPLATE_HEADERS, type ImportReview, type ReviewRow } from '@/lib/exams/import-table';
-import { assertOwnAssignment, holds, idSchema, isFull, loadAssignment, rosterOf, assessmentsOf, num, type Actor } from '@/lib/exams/common';
+import { assertOwnAssignment, holds, idSchema, loadAssignment, rosterOf, assessmentsOf, num, type Actor } from '@/lib/exams/common';
 
 
 export type { ImportReview, ReviewRow, RowStatus } from '@/lib/exams/import-table';
@@ -22,7 +22,7 @@ async function targetOf(user: Actor, raw: unknown) {
   const db = getScopedDb(user.schoolId, user.id);
   return db.$tx(async (tx) => {
     const a = await loadAssignment(tx, user.schoolId, input.assignmentId);
-    if (!isFull(user) && !holds(user, 'exams.marks.view')) assertOwnAssignment(user, a, 'exams.marks.enter');
+    if (!holds(user, 'exams.marks.view')) assertOwnAssignment(user, a, 'exams.marks.enter');
     const assessments = await assessmentsOf(tx, user.schoolId, a);
     const asm = assessments.find((x) => x.id === input.assessmentId);
     if (!asm) throw new ServiceError('Assessment not found', 404);

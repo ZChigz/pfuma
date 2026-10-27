@@ -8,6 +8,9 @@ import type { Prisma } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { proofKeyBelongsTo } from '@/lib/proof-of-payment';
+import { grantsFor } from '@/lib/access/effective';
+import { scopeWhere } from '@/lib/access/where';
+import { effectiveOf } from '@/lib/access/user';
 import { rateFor } from '@/lib/exchange-rate';
 import {
   activeFund, amountSchema, assertCurrencyOn, audit, currencySchema, dayOf, holds, idSchema, isoDateSchema, loadFinSettings, nameMap, nameOf, need, nextReceiptNumber, nextSerial,
@@ -246,8 +249,8 @@ export async function verifyPaymentTx(tx: Db, user: Actor, id: string, opts: { s
   const byGateway = opts.gateway === true && p.method === 'PAYNOW';
   if (!byGateway && p.recordedById === user.id) throw new ServiceError('You recorded this payment, so someone else must verify it.', 403);
   if (opts.splits?.length && !holds(user, 'finance.payments.allocate')) throw new ServiceError('Forbidden', 403);
-  // Held only through "*": the school has no separate finance person for this step. The cash-up report says so.
-  const fallback = !byGateway && !(user.grants ?? []).includes('finance.payments.verify');
+  // Held only through the single-person-finance rule: the school has no separate finance person for this step. The cash-up report says so.
+  const fallback = !byGateway && effectiveOf(user).viaRule?.has('finance.payments.verify') === true;
   const year = Number(ymd(p.receivedOn).slice(0, 4));
   const receiptNumber = p.receiptNumber ?? (await nextReceiptNumber(tx, user.schoolId, year, p.fund?.receiptPrefix ?? 'RCP'));
   const moved = await tx.finPayment.updateMany({
@@ -412,12 +415,26 @@ export interface PaymentFilter {
   pageSize?: number;
 }
 
+const PAYMENT_READ_KEYS = ['finance.payments.view', 'finance.payments.verify', 'finance.payments.record'] as const;
+
+/**
+ * The payments this person may see. A school-wide grant of any of the three keys sees them all; a clerk, whose payments.view and
+ * payments.record are held at RECORDED_BY_ME, sees only the ones they recorded.
+ */
+async function visiblePayments(tx: Db, user: Actor): Promise<Prisma.FinPaymentWhereInput> {
+  const eff = effectiveOf(user);
+  if (PAYMENT_READ_KEYS.some((k) => grantsFor(eff, k).some((g) => g.scope === 'SCHOOL'))) return {};
+  const branches: Prisma.FinPaymentWhereInput[] = [];
+  for (const key of PAYMENT_READ_KEYS) if (grantsFor(eff, key).length) branches.push((await scopeWhere(user, key, 'FinPayment', tx)) as Prisma.FinPaymentWhereInput);
+  return branches.length ? { OR: branches } : { id: { in: [] } };
+}
+
 export async function listPayments(user: Actor, f: PaymentFilter = {}) {
   need(user, 'finance.payments.view', 'finance.payments.verify', 'finance.payments.record');
   const page = Math.max(1, f.page ?? 1);
   const pageSize = Math.min(5000, Math.max(1, f.pageSize ?? 50));
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
-    const and: Prisma.FinPaymentWhereInput[] = [{ schoolId: user.schoolId }];
+    const and: Prisma.FinPaymentWhereInput[] = [{ schoolId: user.schoolId }, await visiblePayments(tx, user)];
     if (f.status === 'VOIDED') and.push({ voidRow: { isNot: null } });
     else if (f.status === 'PENDING' || f.status === 'WAITING') and.push({ status: { in: [...WAITING] }, voidRow: null });
     else if (f.status) and.push({ status: f.status, voidRow: null });
@@ -468,7 +485,7 @@ export async function getReceipt(user: Actor, id: string): Promise<ReceiptView> 
   need(user, 'finance.payments.view', 'finance.payments.record', 'finance.payments.verify');
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const p = await tx.finPayment.findFirst({
-      where: { id, schoolId: user.schoolId },
+      where: { id, schoolId: user.schoolId, ...(await visiblePayments(tx, user)) },
       include: {
         student: { select: { fullName: true, admissionNumber: true, currentClass: { select: { name: true } } } }, fund: { select: { name: true } }, voidRow: { select: { reason: true } },
         allocations: { select: { amountCents: true, charge: { select: { description: true, student: { select: { fullName: true } } } } } },

@@ -35,7 +35,7 @@ export async function UpcomingEvents({ user }: { user: AccessUser }) {
 
 export async function RecentActivity({ user }: { user: AccessUser }) {
   if (!can(user, 'system.audit.view')) return null;
-  const feed = await loadFeed(getScopedDb(user.schoolId, user.id), user.schoolId);
+  const feed = await loadFeed(getScopedDb(user.schoolId, user.id), user.schoolId, user);
   const now = new Date();
   return (
     <ChartPanel title="Recent activity" subtitle="The last ten things done in the system">

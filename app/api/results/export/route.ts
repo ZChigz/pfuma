@@ -3,7 +3,7 @@ import ExcelJS from 'exceljs';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
-import { canExportResults } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { requireTerm } from '@/lib/academic/terms';
 import { classRoster } from '@/lib/academic/roster';
 import type { SessionUser } from '@/types';
@@ -26,8 +26,7 @@ async function _GET(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canExportResults(user.role); }
-  catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'exams.results.view');
 
   const { searchParams } = new URL(req.url);
   const classId = searchParams.get('classId');

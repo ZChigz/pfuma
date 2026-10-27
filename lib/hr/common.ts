@@ -4,13 +4,13 @@ import { z } from 'zod';
 import type { AuditAction, Employee, HrSettings, Prisma, SensitiveKind } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { WILDCARD, type PermissionKey } from '@/lib/access-core';
+import type { PermissionKey } from '@/lib/access-core';
 import type { Db } from '@/lib/scoped-db';
-import { holds, isFull, type Actor } from '@/lib/academics/common';
+import { holds, type Actor } from '@/lib/academics/common';
 import { notifyUsers } from '@/lib/system/notifications';
 import { approverIds } from '@/lib/students/common';
 
-export { holds, isFull };
+export { holds };
 export type { Actor };
 export { idSchema, isoDateSchema, reasonSchema, noteSchema } from '@/lib/students/common';
 export { todayInHarare, toDay, isoOf } from '@/lib/academics/common';
@@ -26,13 +26,10 @@ export const centsSchema = z.number().int('Amounts are whole cents').min(0, 'The
 
 // ─── Who may do what ─────────────────────────────────────────────────────────
 
-/** Owner of the school: the OWNER role, or the older DIRECTOR access level. */
-export const isOwner = (user: Pick<Actor, 'role' | 'roles'>): boolean => (user.roles ?? []).includes('OWNER') || user.role === 'DIRECTOR';
-
 /**
  * Personal and pay data (ID numbers, medical notes, salary, bank details, payroll, disciplinary records) is for HR, the Owner and the
- * employee only. An Administrator holds "*" for everything else, but "*" alone does not open these: the key must be granted to a role
- * (HR Officer) or the person must be the Owner.
+ * employee only. "*" alone never opens these, not even for the Owner: the key must be granted to a role the person holds (the HR Officer
+ * holds the managing keys; the Owner holds hr.pay.view, hr.payroll.approve and the view keys).
  */
 export const RESTRICTED_KEYS: ReadonlySet<PermissionKey> = new Set<PermissionKey>([
   'hr.employees.view', 'hr.employees.manage', 'hr.pay.view', 'hr.pay.manage', 'hr.payroll.prepare', 'hr.payroll.approve', 'hr.payroll.view',
@@ -41,8 +38,7 @@ export const RESTRICTED_KEYS: ReadonlySet<PermissionKey> = new Set<PermissionKey
 
 export function hrHolds(user: Actor, key: PermissionKey): boolean {
   if (!RESTRICTED_KEYS.has(key)) return holds(user, key);
-  if ((user.grants ?? []).includes(key)) return true;
-  return (user.grants ?? []).includes(WILDCARD) && isOwner(user);
+  return (user.grants ?? []).includes(key);
 }
 
 /** Throws 403 unless the person holds at least one of the permissions. */

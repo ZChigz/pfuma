@@ -3,7 +3,7 @@ import { libraryMoved, LIBRARY_MOVED_MESSAGE } from '@/lib/library';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiError, apiNotFound, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canManageLibrary } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import type { SessionUser } from '@/types';
 
 // Marks the fine on a returned book as paid, so it no longer counts towards the unpaid-fine limit.
@@ -14,7 +14,7 @@ async function _POST(_req: Request, { params }: { params: { id: string } }) {
   const db = getScopedDb(user.schoolId, user.id);
   if (await libraryMoved(db, user.schoolId)) return apiError(LIBRARY_MOVED_MESSAGE, 409);
 
-  try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
+  await authorize(user, 'facilities.library.desk');
 
   const b = await db.borrowing.findFirst({ where: { id: params.id, schoolId: user.schoolId } });
   if (!b) return apiNotFound('Borrowing');

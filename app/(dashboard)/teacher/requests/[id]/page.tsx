@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { CrumbLabel } from '@/components/layout/Breadcrumbs';
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect, notFound } from 'next/navigation';
 import { formatUSD, formatZiG, formatDateTime } from '@/lib/utils';
@@ -16,7 +17,7 @@ export default async function TeacherRequestDetailPage({ params }: { params: { i
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
-  if (user.role !== 'TEACHER') redirect('/');
+  await guardPage(user, 'finance.requests.create');
 
   const request = await db.expenseRequest.findUnique({
     where: { id: params.id, schoolId: user.schoolId, requestedById: user.id },

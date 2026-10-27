@@ -3,7 +3,9 @@ import { assertLegacyWritable } from '@/lib/finance/legacy-guard';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { assertCanVoid, canVoidExpense } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
+import { peopleWith } from '@/lib/academics/common';
+import { assertCanVoid } from '@/lib/permissions';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -17,12 +19,7 @@ async function _POST(
   const db = getScopedDb(user.schoolId, user.id);
   await assertLegacyWritable(db, user.schoolId);
 
-  try {
-    await canVoidExpense(user.role);
-  } catch (e) {
-    if (e instanceof Response) return e;
-    throw e;
-  }
+  await authorize(user, 'finance.expenses.void');
 
   const body = (await req.json().catch(() => ({}))) as { reason?: unknown };
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
@@ -34,10 +31,11 @@ async function _POST(
   if (!expense) return apiNotFound('Expense');
   if (expense.status === 'VOIDED') return apiError('Expense is already voided', 409);
 
-  // Separation of duties: not the person who recorded it, unless this school has
-  // only one director — then a written reason is required and audited.
-  const activeDirectors = await db.user.count({ where: { role: 'DIRECTOR', active: true } });
-  const usedException = assertCanVoid(user, expense, 'expense', { activeDirectors, reason });
+  // Rule 2: not the person who recorded it, unless this school has switched on single-person finance and nobody else can void —
+  // then a written reason is required and audited.
+  const school = await db.school.findUnique({ where: { id: user.schoolId }, select: { singlePersonFinance: true } });
+  const voiders = (await peopleWith(db, user.schoolId, 'finance.payments.void')).length;
+  const usedException = assertCanVoid(user, expense, 'expense', { singlePersonFinance: school?.singlePersonFinance ?? false, voiders, reason });
 
   const updated = await db.$tx(async (tx) => {
     const e = await tx.expense.update({

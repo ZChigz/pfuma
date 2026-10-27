@@ -3,7 +3,7 @@ import { assertLegacyWritable } from '@/lib/finance/legacy-guard';
 import { getScopedDb } from '@/lib/scoped-db';
 import { parseBody, apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canRecordExpense } from '@/lib/permissions';
+import { authorize, authorizeAny } from '@/lib/access';
 import { CreateExpenseSchema } from '@/lib/validations/accounting';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
@@ -13,6 +13,7 @@ async function _GET(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorizeAny(user, ['finance.expenses.view', 'finance.expenses.record', 'finance.reports.view']);
 
   const { searchParams } = req.nextUrl;
   const currency = searchParams.get('currency') || undefined;
@@ -51,7 +52,7 @@ async function _POST(req: NextRequest) {
   const db = getScopedDb(user.schoolId, user.id);
   await assertLegacyWritable(db, user.schoolId);
 
-  try { await canRecordExpense(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'finance.expenses.record');
 
   const parsed = await parseBody(req, CreateExpenseSchema);
   if ('error' in parsed) return parsed.error;

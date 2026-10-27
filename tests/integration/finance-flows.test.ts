@@ -38,8 +38,8 @@ beforeAll(async () => {
     import('@/lib/finance/setup'), import('@/lib/finance/fees'), import('@/lib/finance/structures'), import('@/lib/finance/billing'), import('@/lib/finance/payments'), import('@/lib/finance/adjustments'), import('@/lib/finance/refunds'),
     import('@/lib/finance/requests'), import('@/lib/finance/expenses'), import('@/lib/finance/accounts'), import('@/lib/finance/reports'), import('@/lib/finance/legacy-guard'), import('@/lib/scoped-db'),
   ]);
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await financeWorld(prisma, A);
   W.funds = Object.fromEntries((await setup.listFunds(W.bursar)).map((f) => [f.code, f.id]));
 }, 240_000);
@@ -144,9 +144,9 @@ describe('a payment reduces a balance only once verified by someone else', () =>
     await fails(payments.verifyPayment(W.clerk, ids.p1), 403); // no permission at all
     const mine = (await payments.recordPayment(W.bursar, { studentId: W.students.day2, currency: 'USD', method: 'CASH', lines: [{ fundId: W.funds.TUITION, amount: '10.00' }] })).payments[0]!.id;
     await fails(payments.verifyPayment(W.bursar, mine), 403, /You recorded this payment/);
-    const adminRecorded = (await payments.recordPayment(W.admin, { studentId: W.students.day2, currency: 'USD', method: 'SWIPE', reference: 'POS-0001', lines: [{ fundId: W.funds.TUITION, amount: '10.00' }] })).payments[0]!.id;
-    await fails(payments.verifyPayment(W.admin, adminRecorded), 403, /You recorded this payment/);
-    await fails(payments.rejectPayment(W.admin, adminRecorded, 'not mine to judge'), 403);
+    const adminRecorded = (await payments.recordPayment(W.operator2, { studentId: W.students.day2, currency: 'USD', method: 'SWIPE', reference: 'POS-0001', lines: [{ fundId: W.funds.TUITION, amount: '10.00' }] })).payments[0]!.id;
+    await fails(payments.verifyPayment(W.operator2, adminRecorded), 403, /You recorded this payment/);
+    await fails(payments.rejectPayment(W.operator2, adminRecorded, 'not mine to judge'), 403);
     // Nothing moved, and nothing was written to the audit log for the refused attempts.
     expect((await prisma.finPayment.findMany({ where: { id: { in: [mine, adminRecorded] } } })).every((p) => p.status === 'PENDING' || p.status === 'RECEIVED')).toBe(true);
     expect(await audits('VERIFY_PAYMENT', mine)).toHaveLength(0);
@@ -155,7 +155,7 @@ describe('a payment reduces a balance only once verified by someone else', () =>
   });
 
   it('is verified by a second person; then the oldest charge of the same fund is settled', async () => {
-    const r = await payments.verifyPayment(W.head, ids.p1);
+    const r = await payments.verifyPayment(W.bursar2, ids.p1);
     expect(r.allocatedCents).toBe(10000);
     expect(r.verifierFallback).toBe(false); // the Head holds the verify permission through a role
     const b = await owed(W.students.day1);
@@ -165,17 +165,21 @@ describe('a payment reduces a balance only once verified by someone else', () =>
     const allocs = await prisma.finPaymentAllocation.findMany({ where: { paymentId: ids.p1 }, include: { charge: true } });
     expect(allocs).toHaveLength(1);
     expect(allocs[0]!.charge.description).toBe('Tuition'); // never the SDC levy
-    await fails(payments.verifyPayment(W.head, ids.p1), 409, /already verified/);
+    await fails(payments.verifyPayment(W.bursar2, ids.p1), 409, /already verified/);
   });
 
   it('can be verified by the Owner when nobody else can, and the cash-up report says so', async () => {
     const sdc = (await payments.recordPayment(W.bursar, { studentId: W.students.day1, currency: 'USD', method: 'CASH', lines: [{ fundId: W.funds.SDC, amount: '50.00' }] })).payments[0]!.id;
-    const r = await payments.verifyPayment(W.owner, sdc);
+    // A school with one finance person lets the Owner be the second (Settings, single-person finance); nobody else can stand in.
+    await fails(payments.verifyPayment(W.owner, sdc), 403);
+    await prisma.school.update({ where: { id: A.schoolId }, data: { singlePersonFinance: true } });
+    const r = await payments.verifyPayment(await actorOf(prisma, W.owner.id), sdc);
+    await prisma.school.update({ where: { id: A.schoolId }, data: { singlePersonFinance: false } });
     expect(r.verifierFallback).toBe(true);
     expect((await owed(W.students.day1)).USD.outstanding).toBe(20000);
-    const cu = await reports.cashUp(W.head);
+    const cu = await reports.cashUp(W.bursar2);
     const warn = cu.warnings.find((w) => w.code === 'OWNER_VERIFIED');
-    expect(warn?.message).toMatch(/verified by the Owner or an Administrator/);
+    expect(warn?.message).toMatch(/verified by the Owner/);
     expect(warn?.message).toContain('US$50.00');
     expect((await prisma.finPayment.findUniqueOrThrow({ where: { id: sdc } })).verifierFallback).toBe(true);
     // a payment the Head verified carries no such warning
@@ -183,25 +187,25 @@ describe('a payment reduces a balance only once verified by someone else', () =>
   });
 
   it('an Administrator may verify what someone else recorded', async () => {
-    await payments.verifyPayment(W.admin, ids.bursarPays);
-    await payments.verifyPayment(W.owner, ids.adminPays);
+    await payments.verifyPayment(W.operator2, ids.bursarPays);
+    await payments.verifyPayment(W.operator, ids.adminPays);
     expect((await owed(W.students.day2)).USD.paid).toBe(2000);
   });
 
   it('a rejected payment counts for nothing, and needs a reason', async () => {
     const p = (await payments.recordPayment(W.clerk, { studentId: W.students.day2, currency: 'USD', method: 'CASH', lines: [{ fundId: W.funds.TUITION, amount: '20.00' }] })).payments[0]!.id;
-    await fails(payments.rejectPayment(W.head, p, ''), 422);
-    await payments.rejectPayment(W.head, p, 'The cash was not in the envelope');
+    await fails(payments.rejectPayment(W.bursar2, p, ''), 422);
+    await payments.rejectPayment(W.bursar2, p, 'The cash was not in the envelope');
     expect((await owed(W.students.day2)).USD.paid).toBe(2000);
-    await fails(payments.verifyPayment(W.owner, p), 409, /rejected/);
+    await fails(payments.verifyPayment(W.operator, p), 409, /rejected/);
     const [a] = await audits('REJECT_PAYMENT', p);
     expect(a?.before).toMatchObject({ status: 'RECEIVED' });
-    expect(a?.after).toMatchObject({ status: 'REJECTED', rejectedById: W.head.id });
+    expect(a?.after).toMatchObject({ status: 'REJECTED', rejectedById: W.bursar2.id });
   });
 
   it('money beyond the charges stays as credit, and is used when a new charge arrives', async () => {
     const p = (await payments.recordPayment(W.bursar, { studentId: W.students.day2, currency: 'USD', method: 'CASH', lines: [{ fundId: W.funds.TUITION, amount: '500.00' }] })).payments[0]!.id;
-    const v = await payments.verifyPayment(W.head, p);
+    const v = await payments.verifyPayment(W.bursar2, p);
     expect(v.allocatedCents).toBe(28000); // 300 tuition less the 20 already paid
     expect(v.creditCents).toBe(22000);
     let b = await owed(W.students.day2);
@@ -219,7 +223,7 @@ describe('a payment reduces a balance only once verified by someone else', () =>
     const r = await payments.recordPayment(W.clerk, { studentId: W.students.boarder, currency: 'USD', method: 'CASH', lines: [{ fundId: W.funds.TUITION, amount: '300.00' }, { fundId: W.funds.SDC, amount: '50.00' }] });
     expect(r.payments).toHaveLength(2);
     expect(new Set(r.payments.map((p) => p.receiptNumber)).size).toBe(2);
-    for (const p of r.payments) await payments.verifyPayment(W.head, p.id);
+    for (const p of r.payments) await payments.verifyPayment(W.bursar2, p.id);
     const a = await accounts.getAccount(W.bursar, W.students.boarder);
     const byFund = Object.fromEntries(a.byFund.map((f) => [f.fundName, f.byCurrency.USD.outstanding]));
     expect(byFund).toEqual({ Tuition: 0, 'SDC levy': 0, Boarding: 40000 });
@@ -236,20 +240,20 @@ describe('a payment reduces a balance only once verified by someone else', () =>
 describe('mistakes are fixed with a new row, never an edit', () => {
   it('voids a payment: the row stays, the balance comes back, and not by the person who recorded it', async () => {
     const p = (await payments.recordPayment(W.clerk, { studentId: W.students.day1, currency: 'USD', method: 'CASH', lines: [{ fundId: W.funds.TUITION, amount: '40.00' }] })).payments[0]!.id;
-    await payments.verifyPayment(W.head, p);
+    await payments.verifyPayment(W.bursar2, p);
     await fails(payments.voidPayment(W.clerk, p, 'Entered against the wrong student'), 403); // no permission
-    await fails(payments.voidPayment(W.owner, p, 'short'), 422);
-    const mine = (await payments.recordPayment(W.owner, { studentId: W.students.day1, currency: 'USD', method: 'CASH', lines: [{ fundId: W.funds.TUITION, amount: '1.00' }] })).payments[0]!.id;
-    await payments.verifyPayment(W.head, mine);
-    await fails(payments.voidPayment(W.owner, mine, 'I recorded this one myself'), 403, /someone else must void/);
+    await fails(payments.voidPayment(W.operator, p, 'short'), 422);
+    const mine = (await payments.recordPayment(W.operator, { studentId: W.students.day1, currency: 'USD', method: 'CASH', lines: [{ fundId: W.funds.TUITION, amount: '1.00' }] })).payments[0]!.id;
+    await payments.verifyPayment(W.bursar2, mine);
+    await fails(payments.voidPayment(W.operator, mine, 'I recorded this one myself'), 403, /someone else must void/);
     const before = (await owed(W.students.day1)).USD.outstanding;
-    await payments.voidPayment(W.owner, p, 'Entered against the wrong student');
+    await payments.voidPayment(W.operator, p, 'Entered against the wrong student');
     expect((await owed(W.students.day1)).USD.outstanding).toBe(before + 4000);
     expect(await prisma.finPayment.findUnique({ where: { id: p } })).not.toBeNull(); // the original stays
     expect(await prisma.finVoid.count({ where: { paymentId: p } })).toBe(1);
-    await fails(payments.voidPayment(W.admin, p, 'Void it again please'), 409, /already voided/);
-    expect((await payments.listPayments(W.head, { status: 'VOIDED' })).rows.map((r) => r.id)).toContain(p);
-    expect((await payments.listPayments(W.head, { status: 'VERIFIED' })).rows.map((r) => r.id)).not.toContain(p);
+    await fails(payments.voidPayment(W.operator2, p, 'Void it again please'), 409, /already voided/);
+    expect((await payments.listPayments(W.bursar2, { status: 'VOIDED' })).rows.map((r) => r.id)).toContain(p);
+    expect((await payments.listPayments(W.bursar2, { status: 'VERIFIED' })).rows.map((r) => r.id)).not.toContain(p);
     const [a] = await audits('VOID_PAYMENT', p);
     expect(a?.after).toMatchObject({ voided: true, reason: 'Entered against the wrong student' });
     ids.voided = p;
@@ -257,12 +261,12 @@ describe('mistakes are fixed with a new row, never an edit', () => {
 
   it('voids a charge that nothing was paid against; otherwise a credit note is the way', async () => {
     // the lab fee was settled at once by the credit day2 held, so a payment is against it
-    await fails(fees.voidCharge(W.owner, ids.labCharge, 'Charged to the wrong student'), 409, /credit note/);
+    await fails(fees.voidCharge(W.operator, ids.labCharge, 'Charged to the wrong student'), 409, /credit note/);
     const wrong = await fees.addCharge(W.bursar, W.students.day2, { fundId: W.funds.GENERAL, description: 'Wrong student charge', currency: 'USD', amount: '25.00' });
-    await fees.voidCharge(W.owner, wrong.id, 'Charged to the wrong student'); // another fund: the Tuition credit does not touch it
+    await fees.voidCharge(W.operator, wrong.id, 'Charged to the wrong student'); // another fund: the Tuition credit does not touch it
     const lone = await fees.addCharge(W.bursar, W.students.day1, { fundId: W.funds.GENERAL, description: 'Duplicate bus fee', currency: 'ZIG', amount: '100.00' });
     await fails(fees.voidCharge(W.bursar, lone.id, 'I made it myself'), 403);
-    await fees.voidCharge(W.owner, lone.id, 'Charged twice by mistake');
+    await fees.voidCharge(W.operator, lone.id, 'Charged twice by mistake');
     expect(await prisma.finCharge.findUnique({ where: { id: lone.id } })).not.toBeNull();
     expect((await owed(W.students.day1)).ZIG.outstanding).toBe(200000); // the void charge is left out
   });
@@ -274,8 +278,8 @@ describe('mistakes are fixed with a new row, never an edit', () => {
     expect((await owed(W.students.day1)).USD.outstanding).toBe(before); // pending counts for nothing
     await fails(adjustments.decideAdjustment(W.bursar, adj.id, 'approve'), 403); // no permission
     await fails(adjustments.requestAdjustment(W.bursar, { chargeId: tuition.chargeId, kind: 'DISCOUNT', amount: '9999.00', reason: 'Far too large' }), 409);
-    const own = await adjustments.requestAdjustment(W.owner, { chargeId: tuition.chargeId, kind: 'WAIVER', amount: '1.00', reason: 'Owner waives a dollar' });
-    await fails(adjustments.decideAdjustment(W.owner, own.id, 'approve'), 403, /You asked for this adjustment/);
+    const own = await adjustments.requestAdjustment(W.operator, { chargeId: tuition.chargeId, kind: 'WAIVER', amount: '1.00', reason: 'Owner waives a dollar' });
+    await fails(adjustments.decideAdjustment(W.operator, own.id, 'approve'), 403, /You asked for this adjustment/);
     await adjustments.decideAdjustment(W.head, adj.id, 'approve');
     expect((await owed(W.students.day1)).USD.outstanding).toBe(before - 6000);
     await fails(adjustments.decideAdjustment(W.head, adj.id, 'approve'), 409, /already approved/);
@@ -295,30 +299,30 @@ describe('refunds are asked, approved and paid by three different people', () =>
     await fails(refunds.requestRefund(W.bursar, { paymentId: pay.id, chargeId: paid.chargeId, amount: '60.00', reason: 'More than was paid' }), 409);
     const r = await refunds.requestRefund(W.bursar, { paymentId: pay.id, chargeId: paid.chargeId, amount: '20.00', reason: 'Student left the school' });
     await fails(refunds.decideRefund(W.bursar, r.id, 'approve'), 403); // no permission
-    await refunds.decideRefund(W.admin, r.id, 'approve');
-    await fails(refunds.payRefund(W.admin, r.id, { method: 'CASH' }), 403, /You approved/);
+    await refunds.decideRefund(W.operator2, r.id, 'approve');
+    await fails(refunds.payRefund(W.operator2, r.id, { method: 'CASH' }), 403, /You approved/);
     await fails(refunds.payRefund(W.bursar, r.id, { method: 'CASH' }), 403, /You asked for/);
     const before = (await owed(W.students.boarder)).USD.outstanding;
     expect(before).toBe(40000);
-    await refunds.payRefund(W.owner, r.id, { method: 'CASH' });
+    await refunds.payRefund(W.operator, r.id, { method: 'CASH' });
     expect((await owed(W.students.boarder)).USD.outstanding).toBe(before + 2000);
-    await fails(refunds.payRefund(W.owner, r.id, { method: 'CASH' }), 409, /already paid/);
+    await fails(refunds.payRefund(W.operator, r.id, { method: 'CASH' }), 409, /already paid/);
     expect(await audits('REQUEST_REFUND', r.id)).toHaveLength(1);
     expect(await audits('APPROVE_REFUND', r.id)).toHaveLength(1);
     const [paidAudit] = await audits('PAY_REFUND', r.id);
     expect(paidAudit?.before).toMatchObject({ status: 'APPROVED' });
-    expect(paidAudit?.after).toMatchObject({ status: 'PAID', paidById: W.owner.id });
+    expect(paidAudit?.after).toMatchObject({ status: 'PAID', paidById: W.operator.id });
     // the payment with a refund against it cannot be voided
-    await fails(payments.voidPayment(W.admin, pay.id, 'Voiding after a refund'), 409, /refund/);
+    await fails(payments.voidPayment(W.operator2, pay.id, 'Voiding after a refund'), 409, /refund/);
   });
 
   it('returns unallocated credit, never more than there is', async () => {
     const pay = ids.creditPayment!;
     const r1 = await refunds.requestRefund(W.bursar, { paymentId: pay, amount: '30.00', reason: 'Overpayment returned' });
     await fails(refunds.requestRefund(W.bursar, { paymentId: pay, amount: '41.00', reason: 'More than the credit' }), 409);
-    await refunds.decideRefund(W.admin, r1.id, 'approve');
+    await refunds.decideRefund(W.operator2, r1.id, 'approve');
     const reserved = (await owed(W.students.day2)).USD; // the credit being returned is already set aside, so nothing else can use it
-    await refunds.payRefund(W.owner, r1.id, { method: 'BANK_TRANSFER', reference: 'TT-77' });
+    await refunds.payRefund(W.operator, r1.id, { method: 'BANK_TRANSFER', reference: 'TT-77' });
     const after = (await owed(W.students.day2)).USD;
     expect(after.outstanding).toBe(reserved.outstanding); // returning credit does not make the student owe anything
     expect(after.credit).toBe(reserved.credit);
@@ -345,10 +349,10 @@ describe('spending goes out along its own path', () => {
   it('is approved by someone else (an Administrator included), and the requester can never approve', async () => {
     await fails(requests.decideRequest(W.teacher, ids.req, 'approve'), 403); // no permission
     // an Owner who raises a request cannot approve it either
-    const mine = await requests.createRequest(W.owner, { title: 'New projector', type: 'PURCHASE_ORDER', department: 'Admin', justification: 'The old one failed', fundId: W.funds.GENERAL, currency: 'USD', items: [{ description: 'Projector', quantity: 1, unit: '450.00' }], submit: true });
-    await fails(requests.decideRequest(W.owner, mine.id, 'approve'), 403, /You raised this request/);
-    await fails(requests.decideRequest(W.owner, mine.id, 'reject', 'Rejecting my own request'), 403);
-    await requests.decideRequest(W.admin, mine.id, 'approve');
+    const mine = await requests.createRequest(W.operator, { title: 'New projector', type: 'PURCHASE_ORDER', department: 'Admin', justification: 'The old one failed', fundId: W.funds.GENERAL, currency: 'USD', items: [{ description: 'Projector', quantity: 1, unit: '450.00' }], submit: true });
+    await fails(requests.decideRequest(W.operator, mine.id, 'approve'), 403, /You raised this request/);
+    await fails(requests.decideRequest(W.operator, mine.id, 'reject', 'Rejecting my own request'), 403);
+    await requests.decideRequest(W.operator2, mine.id, 'approve');
     ids.ownerReq = mine.id;
     await requests.decideRequest(W.head, ids.req, 'approve');
     const [a] = await audits('APPROVE_EXPENSE_REQUEST', ids.req);
@@ -358,8 +362,8 @@ describe('spending goes out along its own path', () => {
 
   it('is paid by a third person: not the requester, not the approver, whoever they are', async () => {
     await fails(requests.disburseRequest(W.teacher, ids.req, { method: 'CASH' }), 403); // no permission
-    await fails(requests.disburseRequest(W.owner, ids.ownerReq, { method: 'CASH' }), 403, /You raised/);
-    await fails(requests.disburseRequest(W.admin, ids.ownerReq, { method: 'CASH' }), 403, /You approved/);
+    await fails(requests.disburseRequest(W.operator, ids.ownerReq, { method: 'CASH' }), 403, /You raised/);
+    await fails(requests.disburseRequest(W.operator2, ids.ownerReq, { method: 'CASH' }), 403, /You approved/);
     expect(await requests.disburseRequest(W.bursar, ids.req, { method: 'CASH', amount: '99.00' })).toMatchObject({ needsApproval: true }); // over the margin: an approver must agree first
     expect(await prisma.finExpense.count({ where: { schoolId: A.schoolId, source: 'REQUEST' } })).toBe(0);
     const paid = await requests.disburseRequest(W.bursar, ids.req, { method: 'CASH', amount: '35.00', payee: 'Stationery World' });
@@ -367,7 +371,7 @@ describe('spending goes out along its own path', () => {
     const e = await prisma.finExpense.findUniqueOrThrow({ where: { id: paid.expenseId! } });
     expect(e).toMatchObject({ amountCents: 3500, currency: 'USD', source: 'REQUEST', requestId: ids.req, recordedById: W.bursar.id });
     expect((await requests.getRequest(W.bursar, ids.req)).status).toBe('DISBURSED');
-    await fails(requests.disburseRequest(W.owner, ids.req, { method: 'CASH' }), 409, /already paid/);
+    await fails(requests.disburseRequest(W.operator, ids.req, { method: 'CASH' }), 409, /already paid/);
     const [a] = await audits('DISBURSE_EXPENSE_REQUEST', ids.req);
     expect(a?.after).toMatchObject({ status: 'DISBURSED', disbursedById: W.bursar.id, amountCents: 3500, approvedCents: 3700 });
   });
@@ -379,20 +383,20 @@ describe('spending goes out along its own path', () => {
     await fails(expenses.recordDirectExpense(W.bursar, { ...e, amount: '12.345' }), 422);
     ids.direct = (await expenses.recordDirectExpense(W.bursar, e)).id;
     await fails(setup.saveControls(W.bursar, { directLimitUsdCents: 5000 }), 403);
-    await setup.saveControls(W.owner, { directLimitUsdCents: 5000 });
+    await setup.saveControls(W.operator, { directLimitUsdCents: 5000 });
     await fails(expenses.recordDirectExpense(W.bursar, { ...e, amount: '50.01' }), 422, /Raise an expense request/);
     await expenses.recordDirectExpense(W.bursar, { ...e, amount: '50.00' });
-    await setup.saveControls(W.owner, { directLimitUsdCents: null });
+    await setup.saveControls(W.operator, { directLimitUsdCents: null });
   });
 
   it('takes the direct-expense limit as dollars typed by a person, and clears it with null', async () => {
-    await setup.saveControls(W.owner, { directLimitUsd: '75.50', directLimitZig: '1,000.00' });
-    let c = await setup.getControls(W.owner);
+    await setup.saveControls(W.operator, { directLimitUsd: '75.50', directLimitZig: '1,000.00' });
+    let c = await setup.getControls(W.operator);
     expect(c.directLimitUsdCents).toBe(7550);
     expect(c.directLimitZigCents).toBe(100000);
-    await fails(setup.saveControls(W.owner, { directLimitUsd: '10.005' }), 422);
-    await setup.saveControls(W.owner, { directLimitUsd: null, directLimitZig: null });
-    c = await setup.getControls(W.owner);
+    await fails(setup.saveControls(W.operator, { directLimitUsd: '10.005' }), 422);
+    await setup.saveControls(W.operator, { directLimitUsd: null, directLimitZig: null });
+    c = await setup.getControls(W.operator);
     expect(c.directLimitUsdCents).toBeNull();
     expect(c.directLimitZigCents).toBeNull();
     const [a] = await audits('SAVE_FINANCE_CONTROLS');
@@ -402,22 +406,22 @@ describe('spending goes out along its own path', () => {
 
   it('voids an expense by someone else, keeping the row and leaving it out of the totals', async () => {
     await fails(expenses.voidExpense(W.bursar, ids.direct, 'Recorded in the wrong fund'), 403); // no permission
-    const mine = (await expenses.recordDirectExpense(W.owner, { fundId: W.funds.GENERAL, category: 'Misc', description: 'Owner recorded this one', currency: 'USD', amount: '1.00', method: 'CASH' })).id;
-    await fails(expenses.voidExpense(W.owner, mine, 'I recorded this myself'), 403, /someone else/);
-    const before = await reports.expenditure(W.head, { from: '2026-01-01', to: '2026-12-31' });
-    await expenses.voidExpense(W.owner, ids.direct, 'Recorded in the wrong fund');
-    const after = await reports.expenditure(W.head, { from: '2026-01-01', to: '2026-12-31' });
+    const mine = (await expenses.recordDirectExpense(W.operator, { fundId: W.funds.GENERAL, category: 'Misc', description: 'Owner recorded this one', currency: 'USD', amount: '1.00', method: 'CASH' })).id;
+    await fails(expenses.voidExpense(W.operator, mine, 'I recorded this myself'), 403, /someone else/);
+    const before = await reports.expenditure(W.bursar2, { from: '2026-01-01', to: '2026-12-31' });
+    await expenses.voidExpense(W.operator, ids.direct, 'Recorded in the wrong fund');
+    const after = await reports.expenditure(W.bursar2, { from: '2026-01-01', to: '2026-12-31' });
     expect(after.totals.USD).toBe(before.totals.USD - 1200);
     expect(await prisma.finExpense.findUnique({ where: { id: ids.direct } })).not.toBeNull();
-    expect((await expenses.listExpenses(W.head, { includeVoided: true })).rows.find((r) => r.id === ids.direct)?.voided).toBe(true);
+    expect((await expenses.listExpenses(W.bursar2, { includeVoided: true })).rows.find((r) => r.id === ids.direct)?.voided).toBe(true);
   });
 
   it('shows a person only their own requests unless they may see them all', async () => {
     expect((await requests.listRequests(W.teacher)).rows.every((r) => r.requestedById === W.teacher.id)).toBe(true);
     expect((await requests.listRequests(W.bursar)).rows.length).toBeGreaterThanOrEqual(2);
     const draft = await requests.createRequest(W.teacher, { title: 'A private draft', type: 'OTHER', department: 'Science', justification: 'Not yet submitted', fundId: W.funds.GENERAL, currency: 'USD', items: [{ description: 'x', quantity: 1, unit: '1' }] });
-    expect((await requests.listRequests(W.head)).rows.map((r) => r.id)).not.toContain(draft.id);
-    await fails(requests.getRequest(W.head, draft.id), 404);
+    expect((await requests.listRequests(W.bursar2)).rows.map((r) => r.id)).not.toContain(draft.id);
+    await fails(requests.getRequest(W.bursar2, draft.id), 404);
     await fails(requests.updateDraft(W.outsider, draft.id, { title: 'Hijack the draft', type: 'OTHER', department: 'x', justification: 'not mine to edit', fundId: W.funds.GENERAL, currency: 'USD', items: [{ description: 'x', quantity: 1, unit: '1' }] }), 403);
     await requests.deleteDraft(W.teacher, draft.id);
   });
@@ -425,11 +429,11 @@ describe('spending goes out along its own path', () => {
 
 describe('funds are kept apart in every report', () => {
   it('summarises per fund and currency, and filters to one fund', async () => {
-    const all = await reports.fundSummary(W.head, { from: '2026-01-01', to: '2026-12-31' });
+    const all = await reports.fundSummary(W.bursar2, { from: '2026-01-01', to: '2026-12-31' });
     const tuition = all.rows.filter((r) => r.fundName === 'Tuition');
     expect(tuition.map((r) => r.currency).sort()).toEqual(['USD', 'ZIG']);
     expect(all.rows.filter((r) => r.fundName === 'SDC levy').every((r) => r.currency === 'USD')).toBe(true);
-    const only = await reports.fundSummary(W.head, { from: '2026-01-01', to: '2026-12-31', fundId: W.funds.SDC });
+    const only = await reports.fundSummary(W.bursar2, { from: '2026-01-01', to: '2026-12-31', fundId: W.funds.SDC });
     expect(new Set(only.rows.map((r) => r.fundName))).toEqual(new Set(['SDC levy']));
     expect(only.totals.USD.collected).toBe(10000); // the SDC levies of day1 (50) and the boarder (50), less nothing (the refund was against SDC: 20)
     expect(only.totals.USD.refunded).toBe(2000);
@@ -438,20 +442,20 @@ describe('funds are kept apart in every report', () => {
   });
 
   it('filters the cash-up and the arrears by fund, and never adds the currencies', async () => {
-    const cu = await reports.cashUp(W.head, { fundId: W.funds.SDC });
+    const cu = await reports.cashUp(W.bursar2, { fundId: W.funds.SDC });
     expect(new Set(cu.receiptsByFund.map((r) => r.fundName))).toEqual(new Set(['SDC levy']));
     expect(cu.expectedCash.ZIG).toBe(0);
-    const arrears = await reports.arrears(W.head, { fundId: W.funds.BOARDING });
+    const arrears = await reports.arrears(W.bursar2, { fundId: W.funds.BOARDING });
     expect(arrears.rows.map((r) => r.name)).toEqual(['Tino Ncube']);
     expect(arrears.totals.USD.outstanding).toBe(40000);
     expect(arrears.totals.ZIG.outstanding).toBe(0);
-    const everyone = await reports.arrears(W.head, {});
+    const everyone = await reports.arrears(W.bursar2, {});
     expect(everyone.totals.ZIG.outstanding).toBeGreaterThan(0);
     expect(everyone.totals.USD.outstanding).not.toBe(everyone.totals.ZIG.outstanding);
   });
 
   it('adds up the till for the day: cash receipts less cash spending and refunds, per currency', async () => {
-    const cu = await reports.cashUp(W.head);
+    const cu = await reports.cashUp(W.bursar2);
     const cashIn = cu.receipts.filter((r) => r.method === 'CASH' && r.currency === 'USD').reduce((s, r) => s + r.cents, 0);
     const cashOut = cu.expenses.filter((r) => r.method === 'CASH' && r.currency === 'USD').reduce((s, r) => s + r.cents, 0) + cu.refundsPaid.filter((r) => r.method === 'CASH' && r.currency === 'USD').reduce((s, r) => s + r.cents, 0);
     expect(cu.expectedCash.USD).toBe(cashIn - cashOut);
@@ -471,11 +475,11 @@ describe('a closed term is locked for billing, but payments are still received',
     await fails(fees.addCharge(W.bursar, W.students.day1, { termId: term.id, fundId: W.funds.TUITION, description: 'Late charge', currency: 'USD', amount: '5.00' }), 409, /closed/);
     await fails(structures.createStructure(W.bursar, { termId: term.id }), 409, /closed/);
     await fails(billing.runBilling(W.bursar, { termId: term.id }), 409, /closed/);
-    await fails(fees.voidCharge(W.owner, old.id, 'Voiding a closed term charge'), 409, /closed/);
+    await fails(fees.voidCharge(W.operator, old.id, 'Voiding a closed term charge'), 409, /closed/);
 
     const before = (await owed(W.students.day1)).USD.outstanding;
     const p = (await payments.recordPayment(W.clerk, { studentId: W.students.day1, currency: 'USD', method: 'CASH', lines: [{ fundId: W.funds.TUITION, amount: '30.00' }] })).payments[0]!.id;
-    await payments.verifyPayment(W.head, p);
+    await payments.verifyPayment(W.bursar2, p);
     // oldest first: the closed term's charge is settled before this term's
     const line = (await accounts.getAccount(W.bursar, W.students.day1)).charges.find((c) => c.chargeId === old.id)!;
     expect(line.paidCents).toBe(3000);
@@ -493,7 +497,7 @@ describe('every financial action writes its own audit entry in the same transact
     const kinds = ['SAVE_FUND', 'SAVE_FEE_ITEM', 'SAVE_FEE_STRUCTURE', 'SUBMIT_FEE_STRUCTURE', 'APPROVE_FEE_STRUCTURE', 'RUN_BILLING', 'APPLY_CHARGE', 'VOID_CHARGE', 'RECORD_PAYMENT', 'VERIFY_PAYMENT', 'REJECT_PAYMENT', 'VOID_PAYMENT',
       'REQUEST_ADJUSTMENT', 'APPROVE_ADJUSTMENT', 'REJECT_ADJUSTMENT', 'REQUEST_REFUND', 'APPROVE_REFUND', 'PAY_REFUND', 'CREATE_EXPENSE_REQUEST', 'SUBMIT_EXPENSE_REQUEST',
       'APPROVE_EXPENSE_REQUEST', 'DISBURSE_EXPENSE_REQUEST', 'RECORD_EXPENSE', 'VOID_EXPENSE', 'SAVE_FINANCE_CONTROLS'];
-    await setup.createFund(W.head, { code: 'LIBRARY', name: 'Library fund', kind: 'OTHER' });
+    await setup.createFund(W.bursar2, { code: 'LIBRARY', name: 'Library fund', kind: 'OTHER' });
     for (const k of kinds) expect((await audits(k)).length, k).toBeGreaterThan(0);
     for (const k of ['VERIFY_PAYMENT', 'REJECT_PAYMENT', 'VOID_PAYMENT', 'APPROVE_ADJUSTMENT', 'APPROVE_REFUND', 'PAY_REFUND', 'APPROVE_EXPENSE_REQUEST', 'DISBURSE_EXPENSE_REQUEST', 'VOID_EXPENSE', 'VOID_CHARGE', 'SAVE_FINANCE_CONTROLS']) {
       for (const row of await audits(k)) {
@@ -508,7 +512,7 @@ describe('every financial action writes its own audit entry in the same transact
     const rows = await prisma.auditLog.findMany({ where: { schoolId: A.schoolId, entityType: 'FinPayment', action: 'DATA_UPDATE', entityId: ids.p1 } });
     expect(rows.length).toBeGreaterThan(0);
     expect(rows[0]!.module).toBe('finance');
-    expect(rows[0]!.actorId).toBe(W.head.id);
+    expect(rows[0]!.actorId).toBe(W.bursar2.id);
     expect((rows[0]!.before as { status: string }).status).toBe('RECEIVED');
     expect((rows[0]!.after as { status: string }).status).toBe('VERIFIED');
   });
@@ -517,7 +521,7 @@ describe('every financial action writes its own audit entry in the same transact
     const p = (await payments.recordPayment(W.clerk, { studentId: W.students.day2, currency: 'USD', method: 'CASH', lines: [{ fundId: W.funds.TUITION, amount: '3.00' }] })).payments[0]!.id;
     const verifies = (await audits('VERIFY_PAYMENT')).length;
     await fails(payments.verifyPayment(W.clerk, p), 403);
-    await fails(payments.verifyPayment(W.head, 'no-such-payment'), 404);
+    await fails(payments.verifyPayment(W.bursar2, 'no-such-payment'), 404);
     expect((await audits('VERIFY_PAYMENT')).length).toBe(verifies);
     // the audit table itself cannot be rewritten (asserted on the raw connection: a refused statement ends a Prisma connection over the test socket)
     await expect(t.pg.query("UPDATE \"AuditLog\" SET \"detail\" = 'edited' WHERE \"action\" = 'VERIFY_PAYMENT'")).rejects.toThrow(/cannot be changed or deleted/);
@@ -528,7 +532,7 @@ describe('one school never sees another', () => {
   it('hides payments, accounts and requests of another school, and refuses to act on them', async () => {
     const bBursar = await actorOf(prisma, B.users.BURSAR.id);
     expect((await payments.listPayments(bBursar)).rows).toHaveLength(0);
-    await fails(payments.verifyPayment(await actorOf(prisma, B.users.HEAD.id), ids.p1), 404);
+    await fails(payments.verifyPayment(await actorOf(prisma, B.users.BURSAR.id), ids.p1), 404);
     await fails(accounts.getAccount(bBursar, W.students.day1), 404);
     await fails(requests.getRequest(bBursar, ids.req), 404);
     await fails(fees.voidCharge(await actorOf(prisma, B.users.DIRECTOR.id), ids.labCharge, 'Trying another school'), 404);
@@ -583,7 +587,7 @@ describe('the rest of Pfuma follows Finance', () => {
     await fails(payments.recordPayment(W.clerk, { studentId: W.students.day2, currency: 'USD', method: 'CASH', chargeId: exam.id, lines: [{ fundId: W.funds.TUITION, amount: '45.00' }] }), 422, /another fund/);
     await fails(payments.recordPayment(W.clerk, { studentId: W.students.day1, currency: 'USD', method: 'CASH', chargeId: exam.id, lines: [{ fundId: W.funds.GENERAL, amount: '45.00' }] }), 404);
     const p = (await payments.recordPayment(W.clerk, { studentId: W.students.day2, currency: 'USD', method: 'CASH', chargeId: exam.id, lines: [{ fundId: W.funds.EXAMS, amount: '45.00' }] })).payments[0]!.id;
-    await payments.verifyPayment(W.head, p);
+    await payments.verifyPayment(W.bursar2, p);
     settled = await db.$tx((tx) => ext.feeSettled(tx, A.schoolId, [W.students.day2], 'ZIMSEC November 2026 entry'));
     expect(settled.get(W.students.day2)).toEqual({ charged: true, paid: true });
 
@@ -618,7 +622,7 @@ describe('the parent portal shows the balance Finance calculates', () => {
     expect(fees.recentPayments.length).toBeGreaterThan(0);
     expect(fees.recentPayments.every((p) => p.zig === null)).toBe(true);
     // a pending payment is not shown to parents
-    expect(fees.recentPayments.length).toBe((await payments.listPayments(W.head, { studentId: W.students.day1, status: 'VERIFIED', pageSize: 100 })).rows.length > 10 ? 10 : (await payments.listPayments(W.head, { studentId: W.students.day1, status: 'VERIFIED', pageSize: 100 })).rows.length);
+    expect(fees.recentPayments.length).toBe((await payments.listPayments(W.bursar2, { studentId: W.students.day1, status: 'VERIFIED', pageSize: 100 })).rows.length > 10 ? 10 : (await payments.listPayments(W.bursar2, { studentId: W.students.day1, status: 'VERIFIED', pageSize: 100 })).rows.length);
 
     const dbB = scoped.getScopedDb(B.schoolId);
     const legacyRows = { charges: [{ currency: 'USD' as const, amount: { toNumber: () => 100 } }], payments: [{ recordedAt: new Date(), method: 'CASH', amount: { toNumber: () => 40 }, currency: 'USD' as const, paidInZig: false, zigAmountPaid: null, exchangeRateUsed: null }] };
@@ -630,8 +634,8 @@ describe('the parent portal shows the balance Finance calculates', () => {
 describe('the finance dashboard', () => {
   it('shows each figure per currency and agrees with the other reports', async () => {
     const { financeDashboard } = await import('@/lib/finance/dashboard');
-    const d = await financeDashboard(W.head, { termId: A.termId });
-    const o = await reports.overview(W.head, A.termId);
+    const d = await financeDashboard(W.bursar2, { termId: A.termId });
+    const o = await reports.overview(W.bursar2, A.termId);
     expect(d.billed.USD).toBe(o.charges.USD.charged - o.charges.USD.adjusted);
     expect(d.billed.ZIG).toBe(o.charges.ZIG.charged - o.charges.ZIG.adjusted);
     expect(d.outstanding.thisTerm.USD).toBe(o.charges.USD.outstanding);
@@ -652,12 +656,12 @@ describe('the finance dashboard', () => {
     const { financeDashboard } = await import('@/lib/finance/dashboard');
     const term2025 = await prisma.academicTerm.findFirstOrThrow({ where: { schoolId: A.schoolId, name: 'Term 1 2025' } });
     // viewed from the open term, the 2025 charge is arrears; viewed from 2025 itself it is that term's balance
-    const now = await financeDashboard(W.head, { termId: A.termId });
+    const now = await financeDashboard(W.bursar2, { termId: A.termId });
     expect(now.outstanding.earlier.USD).toBeGreaterThan(0);
-    const old = await financeDashboard(W.head, { termId: term2025.id });
+    const old = await financeDashboard(W.bursar2, { termId: term2025.id });
     expect(old.outstanding.earlier.USD).toBe(0);
     expect(old.billed.USD).toBeGreaterThan(0);
-    const sdc = await financeDashboard(W.head, { termId: A.termId, fundId: W.funds.SDC });
+    const sdc = await financeDashboard(W.bursar2, { termId: A.termId, fundId: W.funds.SDC });
     expect(sdc.fund?.name).toBe('SDC levy');
     expect(sdc.billed.USD).toBeLessThan(now.billed.USD);
     expect(sdc.billed.ZIG).toBe(0);

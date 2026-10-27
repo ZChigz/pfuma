@@ -1,4 +1,4 @@
-// The 13 system roles every school has (created in the database for each school: see
+// The 14 system roles every school has (created in the database for each school: see
 // prisma/migrations/20261030000000_roles_audit_platform), and the access level that goes with each
 // for the pages written before roles were data. A person with several roles gets the highest level.
 import type { UserRole } from '@/types';
@@ -17,6 +17,7 @@ export const STAFF_ROLES = [
   { key: 'EXAMS_OFFICER',   label: 'Exams Officer',      access: 'TEACHER',   description: 'Runs internal and ZIMSEC examinations and their results.' },
   { key: 'LIBRARIAN',       label: 'Librarian',          access: 'LIBRARIAN', description: 'Runs the library: books, borrowing and fines.' },
   { key: 'BOARDING_MASTER', label: 'Boarding Master',    access: 'TEACHER',   description: 'Looks after the boarding hostels and the boarders.' },
+  { key: 'MATRON',          label: 'Matron',             access: 'TEACHER',   description: 'Looks after the sick bay and the medical notes of the boarders.' },
 ] as const satisfies readonly { key: string; label: string; access: UserRole; description: string }[];
 
 export type StaffRoleKey = (typeof STAFF_ROLES)[number]['key'];

@@ -38,14 +38,14 @@ beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
   [lib, settings, leavers, scoped] = await Promise.all([import('@/lib/facilities/library'), import('@/lib/facilities/settings'), import('@/lib/students/leavers'), import('@/lib/scoped-db')]);
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   await prisma.finSettings.create({ data: { schoolId: A.schoolId, legacyRetired: true } });
   await prisma.schoolModule.create({ data: { schoolId: B.schoolId, module: 'finance', enabled: false } });
   for (const k of ['library.view', 'library.manage', 'library.desk', 'textbooks.issue']) await grantPermission(prisma, A.schoolId, 'LIBRARIAN', `facilities.${k}`);
   await grantPermission(prisma, A.schoolId, 'HEAD', 'facilities.library.waive');
   await grantPermission(prisma, A.schoolId, 'HEAD', 'facilities.library.view');
-  [admin, librarian, head, adminB] = await Promise.all([actorOf(prisma, A.users.ADMIN.id), actorOf(prisma, A.users.LIBRARIAN.id), actorOf(prisma, A.users.HEAD.id), actorOf(prisma, B.users.ADMIN.id)]);
+  [admin, librarian, head, adminB] = await Promise.all([actorOf(prisma, A.operator!.id), actorOf(prisma, A.users.LIBRARIAN.id), actorOf(prisma, A.users.HEAD.id), actorOf(prisma, B.operator!.id)]);
   for (const [k, first, last] of [['tino', 'Tino', 'Ncube'], ['rudo', 'Rudo', 'Dube'], ['farai', 'Farai', 'Moyo']] as const) st[k] = (await addStudent(prisma, A, { firstName: first, surname: last })).id;
   st.bela = (await addStudent(prisma, B, { firstName: 'Bela', surname: 'Beta' })).id;
   await settings.updateFacSettings(admin, { lateFinePerDayCents: 25, lateFineCurrency: 'USD' });
@@ -156,7 +156,7 @@ describe('lending and taking back', () => {
   });
 
   it('waiving needs its own permission and a reason, and voids the Finance charge', async () => {
-    await fails(lib.waiveFine(librarian, { loanId, reason: 'Strike' }), 403);
+    await fails(lib.waiveFine(await actorOf(prisma, A.users.TEACHER.id), { loanId, reason: 'Strike' }), 403);
     await fails(lib.waiveFine(head, { loanId, reason: ' ' }), 422);
     await fails(lib.waiveFine(head, { loanId: 'nope', reason: 'Strike on the roads' }), 404);
     await lib.waiveFine(head, { loanId, reason: 'The school bus broke down that week' });
@@ -176,7 +176,7 @@ describe('lending and taking back', () => {
     await lib.returnBook(librarian, { barcode: 'ACC-00001' });
     const loan = await prisma.facLoan.findUniqueOrThrow({ where: { id: r.loanId } });
     expect(loan.fineCents).toBe(50);
-    await fails(lib.waiveFine(librarian, { loanId: r.loanId, reason: 'x y z' }), 403);
+    await fails(lib.waiveFine(await actorOf(prisma, A.users.TEACHER.id), { loanId: r.loanId, reason: 'x y z' }), 403);
   });
 });
 
@@ -389,7 +389,7 @@ describe('the older library screens', () => {
     const body = { title: 'Old way', author: 'Someone', copies: 1 };
     expect((await call('library/books', 'POST', { as: A.users.LIBRARIAN, body })).status).toBe(409);
     expect((await call('library/books', 'POST', { as: B.users.LIBRARIAN, body })).status).toBe(409);
-    const C = await seedSchool(prisma, 'School C');
+    const C = await seedSchool(prisma, 'School C', { operator: true });
     expect((await call('library/books', 'POST', { as: C.users.LIBRARIAN, body })).status).toBe(201);
     // Reading them still works.
     expect((await call('library/books', 'GET', { as: A.users.LIBRARIAN })).status).toBe(200);
@@ -399,12 +399,12 @@ describe('the older library screens', () => {
 describe('a part switched off', () => {
   it('refuses every library call for that school', async () => {
     await prisma.schoolModule.create({ data: { schoolId: B.schoolId, module: 'facilities.library', enabled: false } });
-    const off = await actorOf(prisma, B.users.ADMIN.id);
+    const off = await actorOf(prisma, B.operator!.id);
     await fails(lib.listTitles(off, {}), 403);
     await fails(lib.saveTitle(off, { title: 'X' }), 403);
     await fails(lib.issueTextbooks(off, { studentId: st.bela, barcodes: ['A'] }), 403);
     await fails(lib.libraryReports(off), 403);
-    expect((await call('facilities/library/titles', 'GET', { as: B.users.ADMIN })).status).toBe(403);
+    expect((await call('facilities/library/titles', 'GET', { as: B.operator! })).status).toBe(403);
     await prisma.schoolModule.deleteMany({ where: { schoolId: B.schoolId, module: 'facilities.library' } });
   });
 });
@@ -436,17 +436,17 @@ describe('the routes', () => {
     expect(m.json.data.name).toBe('Farai Moyo');
     expect((await call('facilities/library/members', 'GET', { as: A.users.LIBRARIAN, query: '?code=NOBODY' })).status).toBe(404);
     expect((await call('facilities/library/titles', 'POST', { as: A.users.LIBRARIAN, rawBody: '{nope' })).status).toBe(400);
-    const waive = await call('facilities/library/loans/[id]/waive', 'POST', { as: A.users.LIBRARIAN, params: { id: 'x' }, body: { reason: 'Because' } });
+    const waive = await call('facilities/library/loans/[id]/waive', 'POST', { as: A.users.TEACHER, params: { id: 'x' }, body: { reason: 'Because' } });
     expect(waive.status).toBe(403);
   });
 
   it('school B\'s administrator gets nothing of school A through the routes', async () => {
     const loan = await prisma.facLoan.findFirstOrThrow({ where: { schoolId: A.schoolId } });
-    expect((await call('facilities/library/titles/[id]', 'GET', { as: B.users.ADMIN, params: { id: title['Physics Form 3']! } })).status).toBe(404);
-    expect((await call('facilities/library/loans/[id]/renew', 'POST', { as: B.users.ADMIN, params: { id: loan.id } })).status).toBe(404);
-    expect((await call('facilities/library/loans/[id]/waive', 'POST', { as: B.users.ADMIN, params: { id: loan.id }, body: { reason: 'Not yours' } })).status).toBe(404);
-    expect((await call('facilities/library/stocktakes/[id]', 'GET', { as: B.users.ADMIN, params: { id: (await prisma.facStocktake.findFirstOrThrow({ where: { schoolId: A.schoolId } })).id } })).status).toBe(404);
-    const titles = await call('facilities/library/titles', 'GET', { as: B.users.ADMIN });
+    expect((await call('facilities/library/titles/[id]', 'GET', { as: B.operator!, params: { id: title['Physics Form 3']! } })).status).toBe(404);
+    expect((await call('facilities/library/loans/[id]/renew', 'POST', { as: B.operator!, params: { id: loan.id } })).status).toBe(404);
+    expect((await call('facilities/library/loans/[id]/waive', 'POST', { as: B.operator!, params: { id: loan.id }, body: { reason: 'Not yours' } })).status).toBe(404);
+    expect((await call('facilities/library/stocktakes/[id]', 'GET', { as: B.operator!, params: { id: (await prisma.facStocktake.findFirstOrThrow({ where: { schoolId: A.schoolId } })).id } })).status).toBe(404);
+    const titles = await call('facilities/library/titles', 'GET', { as: B.operator! });
     expect(JSON.stringify(titles.json)).not.toContain('Physics Form 3');
   });
 });

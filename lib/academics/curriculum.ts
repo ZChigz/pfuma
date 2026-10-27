@@ -5,6 +5,7 @@
 // Who may do what: a teacher writes the scheme and the record for their own assignments only; the HOD of the subject's
 // department (or an administrator) approves schemes; syllabus topics are entered by the HOD or an administrator.
 import { z } from 'zod';
+import { heldAt } from '@/lib/access-core';
 import type { Prisma, SchemeStatus } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
@@ -12,7 +13,7 @@ import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { notifyUsers } from '@/lib/system/notifications';
 import { parseCsv } from '@/lib/students/csv';
 import {
-  dedupe, holds, idSchema, isFull, isoOf, loadSettings, noteSchema, peopleWith, resolveTerm, todayInHarare, toDay, writableTerm, type Actor,
+  dedupe, holds, idSchema, isoOf, loadSettings, noteSchema, peopleWith, resolveTerm, todayInHarare, toDay, writableTerm, type Actor,
 } from '@/lib/academics/common';
 import { weeksOfTerm } from '@/lib/academics/school-days';
 
@@ -23,8 +24,7 @@ import { weeksOfTerm } from '@/lib/academics/school-days';
  * the departments they head for a head of department.
  */
 export async function departmentScope(tx: Db, user: Actor): Promise<'ALL' | string[]> {
-  if (isFull(user)) return 'ALL';
-  if (user.roles?.some((r) => r === 'HEAD' || r === 'DEPUTY_HEAD' || r === 'OWNER' || r === 'ADMINISTRATOR')) return 'ALL';
+  if (heldAt(user, 'academics.syllabus.manage', 'SCHOOL') || heldAt(user, 'academics.schemes.approve', 'SCHOOL')) return 'ALL';
   const heads = await tx.department.findMany({ where: { hodUserId: user.id }, select: { id: true } });
   return heads.length ? heads.map((h) => h.id) : 'ALL';
 }
@@ -284,7 +284,7 @@ async function ownAssignment(tx: Db, user: Actor, assignmentId: string) {
     include: { subject: { select: { id: true, name: true, shortName: true, departmentId: true } }, class: { select: { name: true, levelId: true } }, group: { select: { name: true, levelId: true } }, teacher: { select: { id: true, fullName: true } } },
   });
   if (!a) throw new ServiceError('Assignment not found', 404);
-  if (!isFull(user) && a.teacherId !== user.id && a.coTeacherId !== user.id) throw new ServiceError('Assignment not found', 404);
+  if (a.teacherId !== user.id && a.coTeacherId !== user.id) throw new ServiceError('Assignment not found', 404);
   return a;
 }
 
@@ -295,7 +295,7 @@ async function readableAssignment(tx: Db, user: Actor, assignmentId: string) {
     include: { subject: { select: { id: true, name: true, shortName: true, departmentId: true } }, class: { select: { name: true, levelId: true } }, group: { select: { name: true, levelId: true } }, teacher: { select: { id: true, fullName: true } } },
   });
   if (!a) throw new ServiceError('Assignment not found', 404);
-  if (a.teacherId === user.id || a.coTeacherId === user.id || isFull(user)) return a;
+  if (a.teacherId === user.id || a.coTeacherId === user.id) return a;
   if (holds(user, 'academics.schemes.approve') || holds(user, 'academics.analytics.view')) {
     const scope = await departmentScope(tx, user);
     if (scope === 'ALL' || (a.subject.departmentId && scope.includes(a.subject.departmentId))) return a;
@@ -338,7 +338,7 @@ export async function getScheme(user: Actor, assignmentId: string) {
         due: start <= today, current: start <= today && today < nextStart,
       };
     });
-    const mine = a.teacherId === user.id || a.coTeacherId === user.id || isFull(user);
+    const mine = a.teacherId === user.id || a.coTeacherId === user.id;
     const dueDate = term.schemeDueDate ? isoOf(term.schemeDueDate) : null;
     const status = scheme?.status ?? 'NONE';
     return {
@@ -497,7 +497,7 @@ export interface SchemeRow {
 export async function listSchemes(user: Actor, opts: { termId?: string; departmentId?: string; status?: string } = {}) {
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const term = await resolveTerm(tx, user.schoolId, opts.termId);
-    const wide = holds(user, 'academics.schemes.approve') || isFull(user);
+    const wide = holds(user, 'academics.schemes.approve');
     const scope = wide ? await departmentScope(tx, user) : null;
     const where: Prisma.TeacherAssignmentWhereInput = {
       termId: term.id, status: 'ACTIVE',

@@ -45,8 +45,8 @@ beforeAll(async () => {
   marks = await import('@/lib/exams/marks');
   assessments = await import('@/lib/exams/assessments');
   setup = await import('@/lib/exams/setup');
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await examWorld(prisma, A);
   const maths = await classWith(prisma, A, { classId: W.f2East, subjectId: W.subjects.maths, teacherId: W.teachers.chikore, count: 6, prefix: 'Sit' });
   kids = maths.kids; mathsAssignment = maths.assignmentId;
@@ -340,7 +340,7 @@ describe('changing a paper after marks exist', () => {
 
 describe('school isolation', () => {
   it('shows nothing of another school\'s exam timetable', async () => {
-    const outsider = await actorOf(prisma, B.users.ADMIN.id);
+    const outsider = await actorOf(prisma, B.operator!.id);
     expect(await tt.listPeriods(outsider)).toEqual([]);
     await fails(tt.getPeriod(outsider, periodId), 404);
     await fails(inv.seatingFor(outsider, mathsPaper), 404);

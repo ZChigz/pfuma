@@ -44,8 +44,8 @@ beforeAll(async () => {
   projects = await import('@/lib/exams/projects');
   marks = await import('@/lib/exams/marks');
   sheets = await import('@/lib/exams/sheets');
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await examWorld(prisma, A);
   const room = await classWith(prisma, A, { classId: W.f2East, subjectId: W.subjects.maths, teacherId: W.teachers.chikore, count: 3, prefix: 'Proj' });
   kids = room.kids; assignmentId = room.assignmentId;
@@ -95,7 +95,7 @@ describe('project templates', () => {
   });
 
   it('is not reachable from another school', async () => {
-    const outsider = await actorOf(prisma, B.users.ADMIN.id);
+    const outsider = await actorOf(prisma, B.operator!.id);
     expect((await projects.listTemplates(outsider)).length).toBe(0);
     await fails(projects.updateTemplate(outsider, templateId, { title: 'hijack' }), 404);
   });

@@ -56,7 +56,7 @@ export async function updateStudent(user: AccessUser, studentId: string, rawInpu
 
   return getScopedDb(schoolId, user.id).$tx(async (tx) => {
     const open = await tx.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } });
-    await loadReachable(tx, user, [studentId], open?.id);
+    await loadReachable(tx, user, [studentId], open?.id, 'students.profiles.edit');
     const before = await tx.student.findUniqueOrThrow({ where: { id: studentId } });
 
     const data: Prisma.StudentUncheckedUpdateInput = {};

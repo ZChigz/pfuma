@@ -338,10 +338,10 @@ describe('grading scales', () => {
   it('is left alone by the older grade-boundaries page, and leaves it alone', async () => {
     const legacy = await call('results/grade-boundaries', 'GET', { as: A.users.HEAD });
     expect(legacy.json.data.boundaries.every((b: { category: unknown }) => b.category === null)).toBe(true);
-    const saved = await call('results/grade-boundaries', 'POST', { as: A.users.HEAD, body: { boundaries: [{ minPercent: 0, maxPercent: 100, letterGrade: 'Z' }] } });
+    const saved = await call('results/grade-boundaries', 'POST', { as: A.users.ADMIN, body: { boundaries: [{ minPercent: 0, maxPercent: 100, letterGrade: 'Z' }] } });
     expect(saved.status).toBe(200);
     expect(await prisma.gradeBoundary.count({ where: { schoolId: A.schoolId, category: 'O_LEVEL' } })).toBe(O.length);
-    await call('results/grade-boundaries', 'POST', { as: A.users.HEAD, body: { boundaries: [{ minPercent: 0, maxPercent: 100, letterGrade: 'A' }] } });
+    await call('results/grade-boundaries', 'POST', { as: A.users.ADMIN, body: { boundaries: [{ minPercent: 0, maxPercent: 100, letterGrade: 'A' }] } });
   });
 
   it('is what grades marks for that category, ahead of the school-wide set', async () => {

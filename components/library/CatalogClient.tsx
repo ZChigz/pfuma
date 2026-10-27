@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useCan } from '@/components/access/AccessProvider';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -8,7 +9,7 @@ import { Table } from '@/components/ui/Table';
 import { Badge } from '@/components/ui/Badge';
 import { AddBookModal } from '@/components/library/AddBookModal';
 import { BookCopiesModal } from '@/components/library/BookCopiesModal';
-import type { CopyCondition, CopyStatus, UserRole } from '@/types';
+import type { CopyCondition, CopyStatus } from '@/types';
 
 type Copy = {
   id: string;
@@ -34,16 +35,15 @@ type BookRow = {
 
 interface Props {
   initialBooks: BookRow[];
-  userRole:     UserRole;
 }
 
-export function CatalogClient({ initialBooks, userRole }: Props) {
+export function CatalogClient({ initialBooks }: Props) {
   const router = useRouter();
 
   const [q,            setQ]            = useState('');
   const [selectedBook, setSelectedBook] = useState<BookRow | null>(null);
 
-  const canManage = ['DIRECTOR', 'HEAD', 'LIBRARIAN'].includes(userRole);
+  const canManage = useCan('facilities.library.manage');
 
   const filtered = useMemo(() => {
     if (!q) return initialBooks;

@@ -98,8 +98,8 @@ function enrolledIn(termId: string | null, klass: Prisma.SchoolClassWhereInput):
   return { enrollments: { some: { ...(termId ? { termId } : {}), status: 'ACTIVE', class: klass } } };
 }
 
-export function listWhere(query: StudentListQuery, user: AccessUser, term: { id: string; startDate: Date } | null): Prisma.StudentWhereInput {
-  const and: Prisma.StudentWhereInput[] = [studentScope(user, term?.id)];
+export async function listWhere(query: StudentListQuery, user: AccessUser, term: { id: string; startDate: Date } | null, db?: Db): Promise<Prisma.StudentWhereInput> {
+  const and: Prisma.StudentWhereInput[] = [await studentScope(user, term?.id, undefined, db)];
   const search = searchWhere(query.q);
   if (search) and.push(search);
 
@@ -143,7 +143,7 @@ export interface StudentCounts { active: number; boarders: number; day: number; 
 
 /** The five numbers above the table, for the students at the school in the selected term. */
 export async function studentCounts(db: Db, user: AccessUser, term: { id: string; startDate: Date } | null): Promise<StudentCounts> {
-  const scope = studentScope(user, term?.id);
+  const scope = await studentScope(user, term?.id, undefined, db);
   const atSchool: Prisma.StudentWhereInput = { AND: [scope, { status: { in: ['ACTIVE', 'SUSPENDED'] } }, ...(term ? [enrolledIn(term.id, {})] : [])] };
   const [active, suspended, boarders, day, fresh] = await Promise.all([
     db.student.count({ where: { AND: [atSchool, { status: 'ACTIVE' }] } }),
@@ -213,7 +213,7 @@ export async function listStudents(user: AccessUser, query: StudentListQuery): P
   const access = studentAccess(user);
   const termRow = await selectedTerm(db, user.schoolId, query.termId);
   const term = termRow ? { id: termRow.id, startDate: termRow.startDate } : null;
-  const where = listWhere(query, user, term);
+  const where = await listWhere(query, user, term, db);
 
   const [total, students, counts] = await Promise.all([
     db.student.count({ where }),
@@ -271,7 +271,7 @@ export async function searchStudentsLite(user: AccessUser, q: string, opts: { in
   const search = searchWhere(q);
   if (!search) return [];
   const rows = await db.student.findMany({
-    where: { AND: [studentScope(user, open?.id), search, opts.includeLeft ? {} : { status: { in: ['ACTIVE', 'SUSPENDED'] } }] },
+    where: { AND: [await studentScope(user, open?.id, undefined, db), search, opts.includeLeft ? {} : { status: { in: ['ACTIVE', 'SUSPENDED'] } }] },
     select: { id: true, fullName: true, admissionNumber: true, status: true, currentClass: { select: { name: true } } },
     orderBy: [{ surname: 'asc' }, { firstName: 'asc' }],
     take: 10,

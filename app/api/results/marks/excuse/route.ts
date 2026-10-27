@@ -2,7 +2,7 @@ import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiError, apiNotFound, apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
-import { canExcuseAbsence } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { logAudit } from '@/lib/audit';
 import { ExcuseAbsenceSchema } from '@/lib/validations/results';
 import type { SessionUser } from '@/types';
@@ -16,8 +16,7 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canExcuseAbsence(user.role); }
-  catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'exams.marks.unlock');
 
   const parsed = await parseBody(req, ExcuseAbsenceSchema);
   if ('error' in parsed) return parsed.error;

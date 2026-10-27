@@ -13,7 +13,7 @@ import { logAudit } from '@/lib/audit';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { round2 } from '@/lib/results';
 import {
-  LOCKED, assertLive, assertOwnAssignment, assessmentsOf, ensureDefaultTypes, holds, idSchema, isFull, isoDateSchema, levelIdOf, loadAssignment,
+  LOCKED, assertLive, assertOwnAssignment, assessmentsOf, ensureDefaultTypes, holds, idSchema, isoDateSchema, levelIdOf, loadAssignment,
   num, toDay, type Actor,
 } from '@/lib/exams/common';
 
@@ -88,7 +88,7 @@ async function viewsOf(tx: Db, schoolId: string, rows: Awaited<ReturnType<typeof
 export async function listAssessments(user: Actor, assignmentId: string): Promise<AssessmentView[]> {
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const a = await loadAssignment(tx, user.schoolId, assignmentId);
-    if (!isFull(user) && !holds(user, 'exams.marks.view') && !holds(user, 'exams.marks.verify')) assertOwnAssignment(user, a, 'exams.marks.enter');
+    if (!holds(user, 'exams.marks.view') && !holds(user, 'exams.marks.verify')) assertOwnAssignment(user, a, 'exams.marks.enter');
     return viewsOf(tx, user.schoolId, await assessmentsOf(tx, user.schoolId, a));
   });
 }
@@ -198,7 +198,7 @@ async function loadForChange(tx: Db, user: Actor, id: string, permission: 'exams
   if (row.term.status === 'CLOSED') throw new ServiceError(`${row.term.name} is closed`, 409);
   if (row.assignmentId === null) {
     if (!holds(user, 'exams.setup.manage')) throw new ServiceError('Only the Exams Officer can change a paper set for every class', 403);
-  } else if (!isFull(user) && !(holds(user, permission) && (row.assignment!.teacherId === user.id || row.assignment!.coTeacherId === user.id))) {
+  } else if (!(holds(user, permission) && (row.assignment!.teacherId === user.id || row.assignment!.coTeacherId === user.id))) {
     throw new ServiceError('Assessment not found', 404);
   }
   return row;

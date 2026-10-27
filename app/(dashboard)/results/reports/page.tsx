@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Permission } from '@/lib/permissions';
+import { can, guardPage } from '@/lib/access';
 import { ResultsFilters } from '@/components/results/ResultsFilters';
 import { listTerms } from '@/lib/academic/terms';
 import { boundariesFor, gradeFor } from '@/lib/results';
@@ -17,6 +17,7 @@ export default async function ReportsPage({
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  const access = await guardPage(user, 'exams.results.view');
 
   const levelId = searchParams.levelId ?? '';
   const termId  = searchParams.termId  ?? '';
@@ -27,7 +28,7 @@ export default async function ReportsPage({
   const grade = levels.find((l) => l.id === levelId)?.name ?? '';
   const term  = terms.find((t) => t.id === termId)?.name ?? '';
 
-  const canPublish = Permission.publishResults.includes(user.role);
+  const canPublish = can(access, 'exams.results.publish');
 
   // Fetch results only when both filters are set
   type ResultRow = {

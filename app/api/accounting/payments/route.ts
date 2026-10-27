@@ -5,7 +5,7 @@ import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi 
 import { proofKeyBelongsTo } from '@/lib/proof-of-payment';
 import { rateFor } from '@/lib/exchange-rate';
 import { logAudit } from '@/lib/audit';
-import { canRecordPayment } from '@/lib/permissions';
+import { authorize, authorizeAny, schoolWide } from '@/lib/access';
 import { CreatePaymentSchema } from '@/lib/validations/accounting';
 import { PRIMARY_GUARDIAN_INCLUDE } from '@/lib/students/guardians';
 import type { SessionUser } from '@/types';
@@ -16,6 +16,7 @@ async function _GET(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  const access = await authorizeAny(user, ['finance.payments.view', 'finance.payments.record', 'finance.payments.verify']);
 
   const { searchParams } = req.nextUrl;
   const status    = searchParams.get('status')    || undefined;
@@ -26,6 +27,7 @@ async function _GET(req: NextRequest) {
   const payments = await db.payment.findMany({
     where: {
       schoolId: user.schoolId,
+      ...(schoolWide(access, 'finance.payments.view') || schoolWide(access, 'finance.payments.verify') ? {} : { recordedBy: user.id }),
       ...(status    ? { status:    status    as never } : {}),
       ...(method    ? { method:    method    as never } : {}),
       ...(currency  ? { currency:  currency  as never } : {}),
@@ -50,7 +52,7 @@ async function _POST(req: NextRequest) {
   const db = getScopedDb(user.schoolId, user.id);
   await assertLegacyWritable(db, user.schoolId);
 
-  try { await canRecordPayment(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'finance.payments.record');
 
   const parsed = await parseBody(req, CreatePaymentSchema);
   if ('error' in parsed) return parsed.error;

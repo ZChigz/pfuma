@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
-import { canManageLibrary } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { parseBody, apiSuccess, apiError, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { ReturnSchema } from '@/lib/validations/library';
 import { getDaysOverdue } from '@/lib/utils';
@@ -19,7 +19,7 @@ async function _POST(
   const db = getScopedDb(user.schoolId, user.id);
   if (await libraryMoved(db, user.schoolId)) return apiError(LIBRARY_MOVED_MESSAGE, 409);
 
-  try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
+  await authorize(user, 'facilities.library.desk');
 
   const existing = await db.borrowing.findFirst({
     where:   { id: params.id, schoolId: user.schoolId },

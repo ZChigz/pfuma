@@ -1,10 +1,10 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/Badge';
 import { AddClassModal } from '@/components/admin/AddClassModal';
-import { canManageClasses } from '@/lib/permissions';
 import { getOpenTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 
@@ -14,7 +14,7 @@ export default async function AdminClassesPage() {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageClasses(user.role); } catch { redirect('/accounting'); }
+  await guardPage(user, 'academics.classes.manage', '/accounting');
 
   const [openTerm, levels, school] = await Promise.all([
     getOpenTerm(user.schoolId, db),

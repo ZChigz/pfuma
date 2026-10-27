@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { authorize } from '@/lib/access';
 import { assertLegacyWritable } from '@/lib/finance/legacy-guard';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiNotFound, apiForbidden, apiError, withApi } from '@/lib/api';
@@ -16,6 +17,7 @@ async function _POST(
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
   await assertLegacyWritable(db, user.schoolId);
+  await authorize(user, 'finance.requests.create');
 
   const existing = await db.expenseRequest.findUnique({
     where: { id: params.id, schoolId: user.schoolId },

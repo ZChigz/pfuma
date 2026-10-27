@@ -15,7 +15,7 @@ async function _GET(req: Request) {
   const db = getScopedDb(user.schoolId, user.id);
   const q = parseTableQuery(params, { sortable: AUDIT_SORTABLE, filterKeys: AUDIT_FILTER_KEYS, defaultSort: 'createdAt', defaultDir: 'desc' });
 
-  const { total, rows } = await listAuditLog(db, q, { all: wantsCsv });
+  const { total, rows } = await listAuditLog(db, q, { all: wantsCsv, user });
   if (wantsCsv) {
     return csvResponse(
       'audit-log.csv',

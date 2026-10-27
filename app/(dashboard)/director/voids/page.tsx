@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
@@ -19,7 +20,7 @@ export default async function VoidsPage({
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
-  if (user.role !== 'DIRECTOR') redirect('/');
+  await guardPage(user, 'finance.payments.void');
 
   const tab: Tab = searchParams.tab === 'expenses' ? 'expenses' : 'payments';
   const q = searchParams.q?.trim() ?? '';

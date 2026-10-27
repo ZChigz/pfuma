@@ -3,7 +3,7 @@ import { libraryMoved, LIBRARY_MOVED_MESSAGE } from '@/lib/library';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
-import { canManageLibrary } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { getOpenTerm } from '@/lib/academic/terms';
 import { raiseCharge } from '@/lib/finance/external';
 import { parseBody, apiSuccess, apiError, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
@@ -28,7 +28,7 @@ async function _PATCH(
   const db = getScopedDb(user.schoolId, user.id);
   if (await libraryMoved(db, user.schoolId)) return apiError(LIBRARY_MOVED_MESSAGE, 409);
 
-  try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
+  await authorize(user, 'facilities.library.manage');
 
   const existing = await db.bookCopy.findFirst({
     where:   { id: params.id, schoolId: user.schoolId },

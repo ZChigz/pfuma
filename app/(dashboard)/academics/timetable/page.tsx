@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getAccess } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
-import { isFull, reachableClassIds } from '@/lib/academics/common';
+import { reachableClassIds } from '@/lib/academics/common';
 import { timetableState } from '@/lib/academics/timetable';
 import { lessonSuspensions } from '@/lib/exams/timetable';
 import { getViewTerm } from '@/lib/system/view-term';
@@ -20,7 +20,7 @@ export default async function TimetablePage() {
   const { term } = await getViewTerm(user.schoolId, db);
   const edit = can('academics.timetable.edit');
   const approve = can('academics.timetable.approve');
-  const seesAll = isFull(user) || edit || approve;
+  const seesAll = edit || approve;
   const header = (
     <PageHeader
       title="Timetable" description="Build the week from the teacher assignments. The system refuses clashes, so a published timetable can always be taught."

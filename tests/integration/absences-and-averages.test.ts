@@ -16,8 +16,8 @@ let prisma: typeof import('@/lib/prisma').prisma;
 beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
 }, 120_000);
 
 afterAll(async () => {
@@ -39,7 +39,7 @@ describe('4.2 — a subject cannot be verified while a student has no row', () =
   });
 
   it('refuses, names the students with no mark, and does not accept "submit anyway"', async () => {
-    const r = await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId, force: true } });
+    const r = await call('results/marks/verify', 'POST', { as: A.operator!, body: { assignmentId: A.assignmentId, force: true } });
     expect(r.status).toBe(422);
     expect(r.json.message).toMatch(/1 student has no mark: Second Student/);
     expect(r.json.message).toMatch(/Absent or Exempt/);
@@ -50,7 +50,7 @@ describe('4.2 — a subject cannot be verified while a student has no row', () =
     const absent = await enter(second, { status: 'ABSENT', absenceReason: 'Sick' });
     expect(absent.status).toBe(200);
     expect(absent.json.data.mark).toMatchObject({ status: 'ABSENT', rawMark: 0, percentage: null, letterGrade: null, absenceReason: 'Sick', excused: false });
-    const ok = await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: A.assignmentId } });
+    const ok = await call('results/marks/verify', 'POST', { as: A.operator!, body: { assignmentId: A.assignmentId } });
     expect(ok.status).toBe(200);
     expect((await prisma.subjectAssignment.findUniqueOrThrow({ where: { id: A.assignmentId } })).marksStatus).toBe('VERIFIED');
     // absences are marked as verified once, like scores
@@ -98,7 +98,7 @@ describe('4.2 — ABSENT counts as 0 unless the Head excuses it', () => {
     const abs = await enter(student, { status: 'ABSENT', absenceReason: 'Sick' }, A.users.TEACHER, ids(math));
     absentMark = abs.json.data.mark.id;
     for (const a of await prisma.subjectAssignment.findMany({ where: { classId } })) {
-      expect((await call('results/marks/verify', 'POST', { as: A.users.TEACHER, body: { assignmentId: a.id } })).status).toBe(200);
+      expect((await call('results/marks/verify', 'POST', { as: A.operator!, body: { assignmentId: a.id } })).status).toBe(200);
     }
   });
 
@@ -115,7 +115,8 @@ describe('4.2 — ABSENT counts as 0 unless the Head excuses it', () => {
 
   it('only the Head may excuse, with a reason, and only an absence', async () => {
     const body = { markId: absentMark, excused: true, reason: 'Medical certificate seen' };
-    for (const role of ['TEACHER', 'DIRECTOR', 'ADMIN', 'BURSAR'] as const) {
+    // (The Owner and the Administrator hold "*" until the switch, so they are not listed; the Head's key is exams.marks.unlock.)
+    for (const role of ['TEACHER', 'BURSAR', 'LIBRARIAN'] as const) {
       expect((await call('results/marks/excuse', 'POST', { as: A.users[role], body })).status).toBe(403);
     }
     expect((await call('results/marks/excuse', 'POST', { as: A.users.HEAD, body: { ...body, reason: 'no' } })).status).toBe(422);
@@ -237,15 +238,15 @@ describe('4.3 — pass grade and O Level ranking setting', () => {
     for (const role of ['TEACHER', 'BURSAR', 'LIBRARIAN'] as const) {
       expect((await call('results/settings', 'PATCH', { as: A.users[role], body: { oLevelRanking: 'PASSES_THEN_AVERAGE' } })).status).toBe(403);
     }
-    expect((await call('results/settings', 'PATCH', { as: A.users.HEAD, body: { oLevelRanking: 'BY_HEIGHT' } })).status).toBe(422);
-    expect((await call('results/settings', 'PATCH', { as: A.users.HEAD, body: {} })).status).toBe(422);
-    const unknown = await call('results/settings', 'PATCH', { as: A.users.HEAD, body: { passGrade: 'Z' } });
+    expect((await call('results/settings', 'PATCH', { as: A.operator!, body: { oLevelRanking: 'BY_HEIGHT' } })).status).toBe(422);
+    expect((await call('results/settings', 'PATCH', { as: A.operator!, body: {} })).status).toBe(422);
+    const unknown = await call('results/settings', 'PATCH', { as: A.operator!, body: { passGrade: 'Z' } });
     expect(unknown.status).toBe(422);
     expect(unknown.json.message).toMatch(/No grade "Z"/);
   });
 
   it('PASSES_THEN_AVERAGE ranks the steady student first, then the higher average', async () => {
-    const set = await call('results/settings', 'PATCH', { as: A.users.ADMIN, body: { oLevelRanking: 'PASSES_THEN_AVERAGE' } });
+    const set = await call('results/settings', 'PATCH', { as: A.operator!, body: { oLevelRanking: 'PASSES_THEN_AVERAGE' } });
     expect(set.status).toBe(200);
     expect(await prisma.auditLog.count({ where: { action: 'UPDATE_SCHOOL_SETTINGS', detail: { contains: 'passes then average' } } })).toBe(1);
     expect((await unpublish()).status).toBe(200);
@@ -257,7 +258,7 @@ describe('4.3 — pass grade and O Level ranking setting', () => {
   });
 
   it('a different pass grade changes how many subjects count as passed', async () => {
-    expect((await call('results/settings', 'PATCH', { as: A.users.HEAD, body: { passGrade: 'D' } })).status).toBe(200);
+    expect((await call('results/settings', 'PATCH', { as: A.operator!, body: { passGrade: 'D' } })).status).toBe(200);
     expect((await unpublish()).status).toBe(200);
     expect((await publish()).status).toBe(200);
     // D starts at 50 %: steady 3, high 3 (95, 59, 59), spiky 1
@@ -286,7 +287,7 @@ describe('4.3 — pass grade and O Level ranking setting', () => {
     const passes = await mk('passes', [60, 60]); // 2 passes, average 60
     const spike = await mk('spike', [95, 20]);   // 1 pass, average 57.5
     const high = await mk('high', [90, 40]);     // 1 pass, average 65 → first by average
-    await call('results/settings', 'PATCH', { as: A.users.HEAD, body: { passGrade: 'D', oLevelRanking: 'PASSES_THEN_AVERAGE' } });
+    await call('results/settings', 'PATCH', { as: A.operator!, body: { passGrade: 'D', oLevelRanking: 'PASSES_THEN_AVERAGE' } });
     expect((await call('results/publish', 'POST', { as: A.users.HEAD, body: { classId: klass.id, termId: A.termId } })).status).toBe(200);
     const pos = async (id: string) => (await prisma.termResult.findUniqueOrThrow({ where: { studentId_termId: { studentId: id, termId: A.termId } } })).classPosition;
     expect([await pos(high), await pos(passes), await pos(spike)]).toEqual([1, 2, 3]); // by average, not by passes

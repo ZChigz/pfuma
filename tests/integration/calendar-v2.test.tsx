@@ -315,11 +315,11 @@ describe('PDF for the notice board', () => {
     expect((await call('system/calendar/pdf', 'GET', { as: admin() })).status).toBe(400);
     expect((await call('system/calendar/pdf', 'GET', { as: admin(), query: `?termId=${B.termId}` })).status).toBe(404);
     expect((await call('system/calendar/pdf', 'GET', { as: admin(), query: '?termId=nope' })).status).toBe(404);
-    expect((await call('system/calendar/pdf', 'GET', { as: A.users.HEAD, query: `?termId=${A.termId}` })).status).toBe(403);
+    expect((await call('system/calendar/pdf', 'GET', { as: A.users.BURSAR, query: `?termId=${A.termId}` })).status).toBe(403);
     expect((await call('system/calendar/pdf', 'GET', { as: null, query: `?termId=${A.termId}` })).status).toBe(401);
-    await grantPermission(prisma, A.schoolId, 'HEAD', 'system.calendar.export');
-    expect((await call('system/calendar/pdf', 'GET', { as: A.users.HEAD, query: `?termId=${A.termId}` })).status).toBe(200);
-    await revokePermission(prisma, A.schoolId, 'HEAD', 'system.calendar.export');
+    await grantPermission(prisma, A.schoolId, 'BURSAR', 'system.calendar.export');
+    expect((await call('system/calendar/pdf', 'GET', { as: A.users.BURSAR, query: `?termId=${A.termId}` })).status).toBe(200);
+    await revokePermission(prisma, A.schoolId, 'BURSAR', 'system.calendar.export');
   });
 });
 
@@ -338,9 +338,11 @@ describe('the calendar page', () => {
     const { session } = await import('../helpers/session');
     session.current = { ...A.users.TEACHER };
     await revokePermission(prisma, A.schoolId, 'TEACHER', 'system.calendar.view');
+    await revokePermission(prisma, A.schoolId, 'CLASS_TEACHER', 'system.calendar.view'); // the seeded teacher is also a class teacher
     const mod = await import('@/app/(dashboard)/system/calendar/page');
     const tree = (await mod.default({ searchParams: {} })) as { type: { name: string } };
     await grantPermission(prisma, A.schoolId, 'TEACHER', 'system.calendar.view');
+    await grantPermission(prisma, A.schoolId, 'CLASS_TEACHER', 'system.calendar.view');
     expect(tree.type.name).toBe('AccessDenied');
   });
 

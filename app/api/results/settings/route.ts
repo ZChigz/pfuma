@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiError, apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canManageGradeBoundaries } from '@/lib/permissions';
+import { authorize, authorizeAny } from '@/lib/access';
 import { ResultsSettingsSchema } from '@/lib/validations/results';
 import type { SessionUser } from '@/types';
 
@@ -13,6 +13,7 @@ async function _GET() {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorizeAny(user, ['exams.grading.view', 'system.settings.view']);
   const school = await db.school.findUnique({ where: { id: user.schoolId }, select: pick });
   return apiSuccess({ passGrade: school?.passGrade ?? 'C', oLevelRanking: school?.oLevelRanking ?? 'AVERAGE' });
 }
@@ -24,7 +25,7 @@ async function _PATCH(req: Request) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { canManageGradeBoundaries(user.role); } catch (e) { return e as Response; }
+  await authorize(user, 'system.settings.edit');
 
   const parsed = await parseBody(req, ResultsSettingsSchema);
   if ('error' in parsed) return parsed.error;

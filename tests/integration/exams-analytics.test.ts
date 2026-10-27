@@ -45,8 +45,8 @@ beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
   an = await import('@/lib/exams/analytics');
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await examWorld(prisma, A);
   const e = await classWith(prisma, A, { classId: W.f2East, subjectId: W.subjects.maths, teacherId: W.teachers.chikore, count: 5, prefix: 'East' });
   east = e.kids; mathsEast = e.assignmentId;
@@ -82,7 +82,7 @@ beforeAll(async () => {
   officer = await actorOf(prisma, W.examsOfficer);
   teacher = await actorOf(prisma, W.teachers.chikore);
   classTeacher = await actorOf(prisma, W.teachers.moyo);
-  admin = await actorOf(prisma, A.users.ADMIN.id);
+  admin = await actorOf(prisma, A.operator!.id);
   deputy = await actorOf(prisma, await addTeacher(prisma, A, 'Mrs Deputy', ['DEPUTY_HEAD']));
 }, 240_000);
 
@@ -317,7 +317,7 @@ describe('exports and the one-page summary', () => {
 
 describe('school isolation', () => {
   it('shows another school nothing', async () => {
-    const outsider = await actorOf(prisma, B.users.ADMIN.id);
+    const outsider = await actorOf(prisma, B.operator!.id);
     const p = await an.analyticsPanel(outsider, 'overview');
     expect(p.rows).toEqual([]);
     await fails(an.analyticsPanel(outsider, 'subjects', { assessmentId: 'nope' }), 404);

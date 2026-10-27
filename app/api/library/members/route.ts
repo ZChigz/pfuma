@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
+import { authorizeAny } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { memberName } from '@/lib/library';
@@ -10,6 +11,7 @@ async function _GET(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorizeAny(user, ['facilities.library.desk', 'facilities.library.view']);
 
   const { searchParams } = req.nextUrl;
   const q = searchParams.get('q') || undefined;

@@ -97,7 +97,7 @@ export async function recordIncident(user: Actor, rawInput: RecordIncidentInput)
 
   return getScopedDb(schoolId, user.id).$tx(async (tx) => {
     const open = await tx.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } });
-    const students = await loadReachable(tx, user, input.studentIds, open?.id);
+    const students = await loadReachable(tx, user, input.studentIds, open?.id, 'students.discipline.create');
     const away = students.filter((s) => !isAtSchool(s.status));
     if (away.length) throw new ServiceError(`Incidents are recorded for students at the school: ${away.map((s) => s.fullName).join(', ')}`, 409);
     const byId = new Map(students.map((s) => [s.id, s]));
@@ -264,7 +264,7 @@ export async function recordGuardianMeeting(user: Actor, actionId: string, rawIn
   return getScopedDb(schoolId, user.id).$tx(async (tx) => {
     const action = await tx.disciplineAction.findFirst({ where: { id: actionId, schoolId }, include: { student: { select: { id: true, fullName: true } } } });
     if (!action) throw new ServiceError('Discipline action not found', 404);
-    await loadReachable(tx, user, [action.studentId]);
+    await loadReachable(tx, user, [action.studentId], undefined, 'students.discipline.create');
     if (action.type !== 'GUARDIAN_CALLED_IN') throw new ServiceError('Meetings are recorded against a "guardian called in" action', 409);
     const updated = await tx.disciplineAction.update({
       where: { id: actionId },
@@ -346,7 +346,7 @@ export async function syncSuspensions(schoolId: string, actorId: string, today =
 export async function studentDiscipline(user: AccessUser, studentId: string) {
   const db = getScopedDb(user.schoolId, user.id);
   const open = await db.academicTerm.findFirst({ where: { status: 'OPEN' }, select: { id: true } });
-  const s = await db.student.findFirst({ where: { AND: [studentScope(user, open?.id), { id: studentId }] }, select: { id: true } });
+  const s = await db.student.findFirst({ where: { AND: [await studentScope(user, open?.id, 'students.discipline.view'), { id: studentId }] }, select: { id: true } });
   if (!s) throw new ServiceError('Student not found', 404);
   const rows = await db.incidentStudent.findMany({
     where: { studentId },
@@ -391,7 +391,7 @@ export async function disciplineReport(user: AccessUser, termId?: string): Promi
     ? await db.academicTerm.findFirst({ where: { id: termId } })
     : await db.academicTerm.findFirst({ where: { status: 'OPEN' } });
   if (!term) return { byCategory: [], byClass: [], byMonth: [], repeaters: [], openSuspensions: [] };
-  const scope = studentScope(user, term.status === 'OPEN' ? term.id : null);
+  const scope = await studentScope(user, term.status === 'OPEN' ? term.id : null, 'students.discipline.view');
   const rows = await db.incidentStudent.findMany({
     where: {
       student: scope,

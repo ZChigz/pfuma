@@ -6,7 +6,7 @@ import type { Employee, LeaveRequest, LeaveType, Prisma } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import {
-  audit, daysBetween, fullName, hrHolds, idSchema, isFull, isoDateSchema, isoOf, loadHrSettings, need, optText, ownEmployee, reasonSchema, requireOwnEmployee, tellEmployee,
+  audit, daysBetween, fullName, hrHolds, idSchema, isoDateSchema, isoOf, loadHrSettings, need, optText, ownEmployee, reasonSchema, requireOwnEmployee, tellEmployee,
   toDay, todayInHarare, type Actor,
 } from '@/lib/hr/common';
 import { ensureHrDefaults } from '@/lib/hr/defaults';
@@ -183,7 +183,8 @@ export const DecideLeaveSchema = z.object({ decision: z.enum(['APPROVE', 'REJECT
 
 /** May this approver decide on this employee's leave? The Head (and Owner/Administrator); the Deputy only for teaching staff the Head delegated. */
 async function mayDecideFor(tx: Db, user: Actor, e: Employee): Promise<boolean> {
-  if (isFull(user) || (user.roles ?? []).includes('HEAD')) return true;
+  // Whoever sees every request and may approve (the Head) decides for anyone; the Deputy only for the teaching staff the Head delegated.
+  if (hrHolds(user, 'hr.leave.view_all')) return true;
   const s = await loadHrSettings(tx, user.schoolId);
   return s.leaveDelegateUserId === user.id && e.category === 'TEACHING';
 }

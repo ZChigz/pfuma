@@ -68,7 +68,7 @@ export async function uploadDocument(user: Actor, studentId: string, rawInput: U
   if (!documentKeyBelongsTo(input.fileKey, schoolId)) throw new ServiceError('That file does not belong to this school', 422);
   return getScopedDb(schoolId, user.id).$tx(async (tx) => {
     const open = await tx.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } });
-    const [student] = await loadReachable(tx, user, [studentId], open?.id);
+    const [student] = await loadReachable(tx, user, [studentId], open?.id, 'students.documents.upload');
     const doc = await tx.studentDocument.create({
       data: {
         schoolId, studentId, type: input.type, title: input.title, fileKey: input.fileKey, mimeType: input.mimeType, sizeBytes: input.sizeBytes,
@@ -108,7 +108,7 @@ const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 export async function listDocuments(user: AccessUser, studentId: string): Promise<{ documents: DocumentRow[]; checklist: ChecklistItem[] }> {
   const db = getScopedDb(user.schoolId, user.id);
   const open = await db.academicTerm.findFirst({ where: { status: 'OPEN' }, select: { id: true } });
-  const reach = await db.student.findFirst({ where: { AND: [studentScope(user, open?.id), { id: studentId }] }, select: { id: true } });
+  const reach = await db.student.findFirst({ where: { AND: [await studentScope(user, open?.id, 'students.documents.view'), { id: studentId }] }, select: { id: true } });
   if (!reach) throw new ServiceError('Student not found', 404);
   const [rows, school] = await Promise.all([
     db.studentDocument.findMany({ where: { studentId }, orderBy: { createdAt: 'desc' } }),
@@ -159,7 +159,7 @@ export async function documentLink(
     const doc = await tx.studentDocument.findFirst({ where: { id: documentId, schoolId } });
     if (!doc || !doc.studentId) throw new ServiceError('Document not found', 404);
     const open = await tx.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } });
-    await loadReachable(tx, user, [doc.studentId], open?.id);
+    await loadReachable(tx, user, [doc.studentId], open?.id, 'students.documents.view');
     if (!canOpenDocumentType(user, doc.type)) throw new ServiceError('Forbidden', 403);
     if (!doc.fileKey) throw new ServiceError('This letter is printed from the system, not from a file', 409);
     if (!documentKeyBelongsTo(doc.fileKey, schoolId)) throw new ServiceError('Document not found', 404);
@@ -322,7 +322,7 @@ export async function generateLetterTx(tx: Db, user: Actor, rawInput: GenerateLe
 export async function generateLetter(user: Actor, input: GenerateLetterInput) {
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const open = await tx.academicTerm.findFirst({ where: { schoolId: user.schoolId, status: 'OPEN' }, select: { id: true } });
-    await loadReachable(tx, user, [(input as { studentId: string }).studentId], open?.id);
+    await loadReachable(tx, user, [(input as { studentId: string }).studentId], open?.id, 'students.documents.generate');
     return generateLetterTx(tx, user, input);
   });
 }
@@ -336,7 +336,7 @@ export async function letterSnapshot(user: AccessUser, documentId: string): Prom
     if (!canOpenDocumentType(user, doc.type)) throw new ServiceError('Forbidden', 403);
     if (doc.studentId) {
       const open = await tx.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } });
-      await loadReachable(tx, user, [doc.studentId], open?.id);
+      await loadReachable(tx, user, [doc.studentId], open?.id, 'students.documents.view');
     }
     await logAudit({ schoolId, actorId: user.id, action: 'VIEW_DOCUMENT', entityType: 'StudentDocument', entityId: doc.id, detail: `${doc.title} printed` }, tx);
     return doc.snapshot as unknown as LetterSnapshot;

@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, apiNotFound, parseBody, withApi } from '@/lib/api';
-import { canManageSubjects } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { UpdateSubjectSchema } from '@/lib/validations/results';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
@@ -12,7 +12,7 @@ async function _PATCH(req: NextRequest, ctx: { params: { id: string } }) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageSubjects(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'academics.subjects.manage');
 
   const existing = await db.subject.findUnique({ where: { id: ctx.params.id } });
   if (!existing || existing.schoolId !== user.schoolId) return apiNotFound('Subject');

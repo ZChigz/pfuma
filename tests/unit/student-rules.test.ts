@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PERMISSION_KEYS } from '@/lib/access-core';
 import type { AccessUser } from '@/lib/access-core';
 import { PERMISSIONS } from '@/lib/access-core';
 import {
@@ -8,7 +9,7 @@ import {
 } from '@/lib/students/rules';
 
 const user = (grants: string[], extra: Partial<AccessUser> = {}): AccessUser => ({ id: 'u1', schoolId: 's1', role: 'TEACHER', grants, ...extra });
-const ADMIN = user(['*']);
+const ADMIN = user([...PERMISSION_KEYS]);
 const NOBODY = user([]);
 
 describe('permission keys', () => {
@@ -27,7 +28,7 @@ describe('permission keys', () => {
   it('exist in the catalogue, and the owner and administrator (*) hold every one', () => {
     for (const k of KEYS) {
       expect(k in PERMISSIONS, k).toBe(true);
-      expect(ADMIN.grants).toContain('*');
+      expect(ADMIN.grants).toContain('students.profiles.view');
     }
     const a = studentAccess(ADMIN);
     expect(Object.values(a).every(Boolean)).toBe(true);
@@ -50,7 +51,7 @@ describe('permission keys', () => {
   });
 
   it('make a suspended school or a support session read-only: looking is allowed, changing is not', () => {
-    const a = studentAccess(user(['*'], { readOnly: true }));
+    const a = studentAccess(user([...PERMISSION_KEYS], { readOnly: true }));
     expect(a.profile).toBe(true);
     expect(a.edit).toBe(false);
     expect(a.create).toBe(false);
@@ -58,7 +59,7 @@ describe('permission keys', () => {
   });
 
   it('switch off with the module', () => {
-    expect(studentAccess(user(['*'], { disabledModules: ['students'] })).profile).toBe(false);
+    expect(studentAccess(user([...PERMISSION_KEYS], { disabledModules: ['students'] })).profile).toBe(false);
   });
 });
 
@@ -134,7 +135,7 @@ describe('profile tabs', () => {
     registerStudentTab({ key: 'fees', label: 'Fees', permission: 'finance.fees.view' });
     expect(visibleStudentTabs(ADMIN).map((t) => t.key).at(-1)).toBe('fees');
     expect(visibleStudentTabs(user(['students.profiles.view'])).map((t) => t.key)).toEqual(['overview']);
-    expect(visibleStudentTabs(user(['*'], { disabledModules: ['finance'] })).map((t) => t.key)).not.toContain('fees');
+    expect(visibleStudentTabs(user([...PERMISSION_KEYS], { disabledModules: ['finance'] })).map((t) => t.key)).not.toContain('fees');
     registerStudentTab({ key: 'fees', label: 'Fees and charges', permission: 'finance.fees.view' });
     expect(visibleStudentTabs(ADMIN).filter((t) => t.key === 'fees')).toHaveLength(1);
   });
@@ -171,7 +172,7 @@ describe('exports', () => {
   });
 
   it('give a support session no export at all', () => {
-    expect(studentAccess(user(['*'], { noExport: true })).export).toBe(false);
+    expect(studentAccess(user([...PERMISSION_KEYS], { noExport: true })).export).toBe(false);
   });
 });
 

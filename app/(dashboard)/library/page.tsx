@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { LibraryOverviewClient } from '@/components/library/LibraryOverviewClient';
@@ -11,7 +12,8 @@ export default async function LibraryPage() {
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
-  const { schoolId, role } = user;
+  await guardPage(user, 'facilities.library.view');
+  const { schoolId } = user;
 
   const now = new Date();
 
@@ -55,7 +57,6 @@ export default async function LibraryPage() {
         overdue:   overdueCount,
       }}
       overdueList={overdueList}
-      userRole={role}
       settings={{
         libraryFineLimit: school?.libraryFineLimit.toNumber() ?? 5,
         studentLoanLimit: school?.studentLoanLimit ?? 2,

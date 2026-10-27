@@ -618,6 +618,17 @@ enum AuditAction {
   HR_EMPLOYEE_STATUS
   HR_CHANGE_PAY
   HR_VIEW_SENSITIVE
+  ACCESS_ROLE_ASSIGNED
+  ACCESS_ROLE_REMOVED
+  ACCESS_ROLE_SAVED
+  ACCESS_OVERRIDE_SAVED
+  ACCESS_OVERRIDE_REVOKED
+  ACCESS_REQUESTED
+  ACCESS_REQUEST_DECIDED
+  ACCESS_DENIED
+  ACCESS_SETTINGS_CHANGED
+  PAY_VIEWED
+  EXPORT_DATA
   HR_LINK_USER
   HR_SAVE_EMPLOYEE_ITEM
   HR_REQUEST_CHANGE
@@ -772,6 +783,7 @@ enum RoleScopeType {
   DEPARTMENT
   CLASS
   HOSTEL
+  STORE
 }
 
 enum SchoolStatus {
@@ -886,6 +898,11 @@ model School {
   renewalDate           DateTime?      @db.Date
   studentLimit          Int?
   suspendedReason       String?
+  // Access control (Settings, Roles). A school with one finance person lets the Owner act as the second person; teaching-staff leave may be
+  // approved by the Deputy when the Head turns delegation on; last term's records stay readable to a teacher for this many days.
+  singlePersonFinance   Boolean        @default(false)
+  deputyLeaveDelegation Boolean        @default(false)
+  previousTermReadDays  Int            @default(30)
   createdAt             DateTime       @default(now())
   // Legacy column "currentTerm" still exists in the database until the
   // contract migration; the current term is now the OPEN AcademicTerm.
@@ -931,6 +948,8 @@ model School {
   streams                   Stream[]
   roleDefinitions           RoleDefinition[]
   userRoles                 UserRole[]
+  permissionOverrides       UserPermissionOverride[]
+  accessRequests            AccessRequest[]
   invoices                  SubscriptionInvoice[]
   plan                      Plan?                     @relation(fields: [planId], references: [id])
   RolePermission            RolePermission[]
@@ -1028,6 +1047,8 @@ model User {
   // password, or an ADMIN logs everyone out. A JWT carrying an older value is
   // rejected (lib/auth.ts).
   tokenVersion       Int         @default(0)
+  // Bumped on any change to this person's roles, overrides or status, or to the grants of a role they hold. The session is rebuilt when it moves (lib/access).
+  permVersion        Int         @default(0)
   // True for accounts created or reset by an admin until the user picks their own password.
   mustChangePassword Boolean     @default(false)
   phone              String?
@@ -1085,6 +1106,11 @@ model User {
   unavailablePeriods    TeacherAvailability[]
   coversAbsent          CoverLesson[]         @relation("CoverAbsent")
   coversTaken           CoverLesson[]         @relation("CoverTeacher")
+  rolesAssigned         UserRole[]            @relation("UserRoleAssignedBy")
+  permissionOverrides   UserPermissionOverride[] @relation("OverrideSubject")
+  overridesCreated      UserPermissionOverride[] @relation("OverrideCreator")
+  accessRequests        AccessRequest[]       @relation("AccessRequester")
+  accessRequestsDecided AccessRequest[]       @relation("AccessDecider")
 
   @@unique([schoolId, email])
   @@index([schoolId])
@@ -2100,15 +2126,20 @@ model RoleDefinition {
   name        String
   description String
   isSystem    Boolean  @default(true)
+  // A custom role is made by copying a role; this is the one it was copied from (kept when that role is later deleted: null).
+  copiedFromRoleId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   school      School           @relation(fields: [schoolId], references: [id])
+  copiedFrom  RoleDefinition?  @relation("RoleCopies", fields: [copiedFromRoleId], references: [id], onDelete: SetNull)
+  copies      RoleDefinition[] @relation("RoleCopies")
   permissions RolePermission[]
   users       UserRole[]
 
   @@unique([schoolId, key])
   @@index([schoolId])
+  @@index([copiedFromRoleId])
 }
 
 // Every permission key there is, module.page.action ("*" means everything). Other modules add
@@ -2116,10 +2147,17 @@ model RoleDefinition {
 model Permission {
   key         String   @id
   module      String
+  // The three parts of "module.page.action" kept apart so the grid and the checks need not split the key ("*" has page and action "*").
+  page        String
+  action      String
   description String
+  // Reads of a sensitive key, and every refusal of it, are written to the audit log (lib/access).
+  isSensitive Boolean  @default(false)
   createdAt   DateTime @default(now())
 
-  grants RolePermission[]
+  grants    RolePermission[]
+  overrides UserPermissionOverride[]
+  requests  AccessRequest[]
 }
 
 model RolePermission {
@@ -2127,6 +2165,8 @@ model RolePermission {
   schoolId      String
   roleId        String
   permissionKey String
+  // How far the grant reaches. Worked out from records (class teacher, timetable, hostel ...), never typed in: see lib/access/scopes.ts.
+  scope         AccessScope @default(SCHOOL)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 
@@ -2148,16 +2188,99 @@ model UserRole {
   roleId    String
   scopeType RoleScopeType @default(SCHOOL)
   scopeId   String        @default("")
+  // Who gave the role (null for roles made by migrations and imports).
+  assignedById String?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
-  school School         @relation(fields: [schoolId], references: [id])
-  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role   RoleDefinition @relation(fields: [roleId], references: [id])
+  school     School         @relation(fields: [schoolId], references: [id])
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       RoleDefinition @relation(fields: [roleId], references: [id])
+  assignedBy User?          @relation("UserRoleAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
 
   @@unique([userId, roleId, scopeType, scopeId])
   @@index([schoolId])
   @@index([roleId])
+  @@index([assignedById])
+}
+
+// How far a grant reaches (docs: Pfuma Access Control, Scopes). CHILDREN is reserved for the parent portal.
+enum AccessScope {
+  SCHOOL
+  DEPARTMENT
+  CLASS
+  ASSIGNED
+  HOSTEL
+  STORE
+  RECORDED_BY_ME
+  SELF
+  CHILDREN
+}
+
+enum OverrideEffect {
+  GRANT
+  DENY
+}
+
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+// An exception for one person: one key at one scope, with a reason and an end date (at most 90 days). A DENY beats every grant.
+// Expired and revoked rows stay as history. Nobody may make one for themselves (database check).
+model UserPermissionOverride {
+  id            String         @id @default(cuid())
+  schoolId      String
+  userId        String
+  permissionKey String
+  scope         AccessScope    @default(SCHOOL)
+  // The department, class, hostel or store for those scopes; empty otherwise.
+  scopeId       String         @default("")
+  effect        OverrideEffect
+  reason        String
+  expiresAt     DateTime
+  createdById   String
+  revokedAt     DateTime?
+  createdAt     DateTime       @default(now())
+
+  school     School     @relation(fields: [schoolId], references: [id])
+  user       User       @relation("OverrideSubject", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy  User       @relation("OverrideCreator", fields: [createdById], references: [id])
+  permission Permission @relation(fields: [permissionKey], references: [key])
+  request    AccessRequest?
+
+  @@index([schoolId, userId])
+  @@index([schoolId, expiresAt])
+}
+
+// "Request access" on the access-denied page. The Administrator (the Owner for finance and staff-pay keys) approves it as a time-limited
+// override or declines it with a reason.
+model AccessRequest {
+  id                   String              @id @default(cuid())
+  schoolId             String
+  userId               String
+  permissionKey        String
+  // The page the person was trying to open.
+  page                 String
+  reason               String
+  status               AccessRequestStatus @default(PENDING)
+  decidedById          String?
+  decidedAt            DateTime?
+  // Why it was declined.
+  decisionNote         String?
+  resultingOverrideId  String?             @unique
+  createdAt            DateTime            @default(now())
+
+  school     School                  @relation(fields: [schoolId], references: [id])
+  user       User                    @relation("AccessRequester", fields: [userId], references: [id], onDelete: Cascade)
+  decidedBy  User?                   @relation("AccessDecider", fields: [decidedById], references: [id])
+  permission Permission              @relation(fields: [permissionKey], references: [key])
+  override   UserPermissionOverride? @relation(fields: [resultingOverrideId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, status])
+  @@index([userId])
 }
 
 model Notification {

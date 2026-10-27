@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canManageUsers } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import type { SessionUser } from '@/types';
 
 // "Log out all sessions": ends every open session of every user in the school
@@ -13,7 +13,7 @@ async function _POST() {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageUsers(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'system.users.edit');
 
   const count = await db.$tx(async (tx) => {
     const { count } = await tx.user.updateMany({

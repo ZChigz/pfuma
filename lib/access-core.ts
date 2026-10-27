@@ -6,6 +6,7 @@
 // they never look at a role name. Who holds which permission is decided here and
 // in the RolePermission table, so a new access level is a data change.
 import type { UserRole } from '@/types';
+import type { EffectivePermissions } from '@/lib/access/types';
 
 // ─── Modules ─────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,7 @@ export const PERMISSIONS = {
   'system.audit.view':          'See the audit log',
   'system.audit.export':        'Export the audit log',
   'system.subscription.view':   'See the subscription and invoices',
+  'system.terms.reopen':        'Reopen a closed term',
 
   // Student Information: the same keys are rows in the Permission table (migration 20261031000000).
   // Owner and Administrator hold them through '*'; other roles are given them in System, Roles.
@@ -271,6 +273,7 @@ export const PERMISSIONS = {
   'facilities.library.desk':       'Lend and take back books at the desk',
   'facilities.library.waive':      'Waive library fines',
   'facilities.textbooks.issue':    'Issue and collect textbooks',
+  'facilities.transport.view':     'See routes, vehicles and trips',
   'facilities.transport.manage':   'Manage routes, vehicles, drivers and bookings',
   'facilities.transport.trips':    'Record daily trips and fuel',
   'facilities.transport.assign':   'Put learners on a route',
@@ -287,6 +290,12 @@ export const PERMISSIONS = {
   'communication.announcements.view': 'View announcements',
   'communication.messages.view':      'View SMS and WhatsApp messages',
   'communication.portal.view':        'View the parent portal',
+  // Placeholders until the Communication module is built (migration 20261109000300).
+  'communication.broadcast.school': 'Send a message to the whole school',
+  'communication.send.group':       'Send a message to a group (staff, boarders, candidates, own class)',
+  'communication.reminders.send':    'Send fee reminders',
+  'communication.templates.manage':  'Manage message templates',
+  'communication.log.view':          'See the message log',
 
   'account.profile.view':       'View my profile',
   'account.profile.update':     'Change my profile',
@@ -324,9 +333,6 @@ const isSelfService = (permission: string) => moduleOf(permission) === 'account'
 
 // ─── can() ───────────────────────────────────────────────────────────────────
 
-/** The grant that means every permission (given to Owner and Administrator). */
-export const WILDCARD = '*';
-
 export interface AccessUser {
   id: string;
   schoolId: string;
@@ -340,6 +346,16 @@ export interface AccessUser {
   readOnly?: boolean;
   /** A support session: looking is allowed, but nothing may be exported (people's details stay on screen). */
   noExport?: boolean;
+  /** A Pfuma support person looking at this school (read-only). */
+  support?: boolean;
+  /** How each key is held (at which scope), with the exceptions applied: lib/access/effective.ts. Server side only. */
+  effective?: EffectivePermissions;
+  /** Keys refused outright by a DENY exception. They beat every grant, "*" included. */
+  denied?: readonly string[];
+  /** Moves whenever the person's roles, exceptions or status change, or the grants of a role they hold (User.permVersion). */
+  permVersion?: number;
+  /** Days last term's records stay readable to a teacher after the term changes (School.previousTermReadDays). */
+  previousTermReadDays?: number;
 }
 
 /** Narrows a check, e.g. to one school. A scope naming another school is never allowed. */
@@ -349,6 +365,27 @@ export interface AccessScope {
 
 /** The actions that only look. Everything else changes something. */
 const LOOKING = new Set(['view', 'export']);
+
+/**
+ * True when the person holds `permission` for the whole school, not only for their own classes, hostel, department or records.
+ * Lists that narrow to "what is mine" for a narrower grant ask this instead of looking at a role name.
+ */
+export function schoolWide(user: AccessUser | null | undefined, permission: string): boolean {
+  if (!can(user, permission)) return false;
+  const eff = user!.effective;
+  if (!eff) return true; // a bare list of keys has always meant school-wide
+  const own = eff.grants.get(permission);
+  return !!own && own.some((g) => g.scope === 'SCHOOL' && !g.scopeId);
+}
+
+/** True when the person holds `permission` at `scope` (a bare list of keys counts as school-wide). */
+export function heldAt(user: AccessUser | null | undefined, permission: string, scope: string): boolean {
+  if (!can(user, permission)) return false;
+  const eff = user!.effective;
+  if (!eff) return scope === 'SCHOOL';
+  const own = eff.grants.get(permission);
+  return !!own && own.some((g) => g.scope === scope);
+}
 
 export function can(user: AccessUser | null | undefined, permission: string, scope?: AccessScope): boolean {
   if (!user) return false;
@@ -366,8 +403,9 @@ export function can(user: AccessUser | null | undefined, permission: string, sco
   if (user.readOnly && !LOOKING.has(action)) return false;
   if (user.noExport && action === 'export') return false;
 
+  if (user.denied?.includes(permission)) return false;
   const grants = user.grants ?? [];
-  return grants.includes(WILDCARD) || grants.includes(permission);
+  return grants.includes(permission);
 }
 
 /** Turns the rows that say which modules are on into the list of switched-off ones. */

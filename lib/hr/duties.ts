@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import type { Employee, EmployeeCategory } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
+import * as guards from '@/lib/access/guards';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { audit, daysBetween, fullName, hrHolds, idSchema, isoDateSchema, isoOf, need, optText, ownEmployee, tellEmployee, tellHolders, toDay, todayInHarare, type Actor } from '@/lib/hr/common';
 import { ensureHrDefaults } from '@/lib/hr/defaults';
@@ -344,6 +345,9 @@ export async function confirmSwap(user: Actor, swapId: string) {
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const s = await tx.dutySwap.findFirst({ where: { id: swapId, schoolId: user.schoolId } });
     if (!s) throw new ServiceError('Swap not found', 404);
+    // Rule 7: nobody confirms a duty swap they are part of, whatever their role.
+    const parties = await tx.employee.findMany({ where: { schoolId: user.schoolId, id: { in: [s.fromEmployeeId, s.toEmployeeId] } }, select: { userId: true } });
+    for (const p of parties) if (p.userId) guards.cannotApproveOwn(user, p.userId, 'duty swap');
     if (s.status !== 'ACCEPTED') throw new ServiceError(s.status === 'REQUESTED' ? 'The colleague has not accepted yet' : `This swap is ${s.status.toLowerCase()}`, 409);
     const a = await tx.dutyAssignment.findFirstOrThrow({ where: { id: s.assignmentId } });
     if (a.employeeId !== s.fromEmployeeId) throw new ServiceError('The duty is no longer theirs', 409);

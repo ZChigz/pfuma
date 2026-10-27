@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type { ScopedDb } from '@/lib/scoped-db';
 import type { TableQuery } from '@/lib/table-query';
 import { EXPORT_LIMIT } from '@/lib/table-query';
+import type { AccessUser } from '@/lib/access-core';
+import { auditFinanceFilter } from '@/lib/access/serializers/audit';
 
 // The audit log is append-only (a database trigger refuses any change or delete) and entries are
 // kept for at least this long. Nothing in the app deletes them; if archiving is ever added it must
@@ -60,8 +62,12 @@ const AUDIT_SELECT = {
   actor: { select: { id: true, fullName: true } },
 } as const;
 
-export async function listAuditLog(db: ScopedDb, q: TableQuery, opts: { all?: boolean } = {}) {
-  const where = auditWhere(q);
+/**
+ * The audit log for one person. Finance entries are cut unless they hold finance.reports.view as well as system.audit.view (the cut is part
+ * of the query, so the count and the pages are right).
+ */
+export async function listAuditLog(db: ScopedDb, q: TableQuery, opts: { all?: boolean; user: AccessUser }) {
+  const where: Prisma.AuditLogWhereInput = { AND: [auditWhere(q), auditFinanceFilter(opts.user) as Prisma.AuditLogWhereInput] };
   const dir = q.dir;
   const orderBy: Prisma.AuditLogOrderByWithRelationInput[] =
     q.sort === 'actor' ? [{ actor: { fullName: dir } }, { createdAt: 'desc' }]

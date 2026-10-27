@@ -7,7 +7,8 @@ import { SubscriptionBanner } from './SubscriptionBanner';
 import { SupportBanner } from './SupportBanner';
 import { Sidebar } from './Sidebar';
 import { TopBar, type JumpItem } from './TopBar';
-import { ROLE_LABELS, ROLE_NAV } from './nav-config';
+import { workspaceFor } from './nav-config';
+import { STAFF_ROLES } from '@/lib/staff-roles';
 import type { ReactNode } from 'react';
 
 // One shell for every page: sidebar for modules, top bar for school, term and user.
@@ -25,7 +26,8 @@ export async function DashboardShell({ children }: { children: ReactNode }) {
 
   const banner = school ? subscriptionView(school).banner : null;
   const groups = buildNav(user);
-  const workspace = ROLE_NAV[user.role] ?? null;
+  const roleLabel = STAFF_ROLES.filter((r) => user.roles.includes(r.key)).map((r) => r.label).slice(0, 2).join(' · ') || 'Staff';
+  const workspace = workspaceFor(user, roleLabel);
   const jumpItems: JumpItem[] = [
     ...groups.flatMap((g) => g.items.filter((i) => i.href).map((i) => ({ label: i.label, href: i.href as string, icon: i.icon }))),
     ...(workspace?.sections.flatMap((s) => s.items) ?? []),
@@ -43,7 +45,7 @@ export async function DashboardShell({ children }: { children: ReactNode }) {
             viewTermId={view.term?.id ?? null}
             unread={unread}
             fullName={user.fullName}
-            roleLabel={ROLE_LABELS[user.role]}
+            roleLabel={roleLabel}
             jumpItems={jumpItems}
             canSwitchTerm={can('account.term.view')}
             canSeeNotifications={canSeeNotifications}

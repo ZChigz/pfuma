@@ -3,7 +3,8 @@ import { assertLegacyWritable } from '@/lib/finance/legacy-guard';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { assertCanVerifyPayment, canVerifyPayment } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
+import { assertCanVerifyPayment } from '@/lib/permissions';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -17,12 +18,7 @@ async function _POST(
   const db = getScopedDb(user.schoolId, user.id);
   await assertLegacyWritable(db, user.schoolId);
 
-  try {
-    await canVerifyPayment(user.role);
-  } catch (e) {
-    if (e instanceof Response) return e;
-    throw e;
-  }
+  await authorize(user, 'finance.payments.verify');
 
   const payment = await db.payment.findUnique({
     where: { id: params.id, schoolId: user.schoolId },

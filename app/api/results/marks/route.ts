@@ -4,7 +4,7 @@ import { getScopedDb } from '@/lib/scoped-db';
 import {
   apiSuccess, apiUnauthorized, apiError, apiForbidden, apiNotFound, parseBody, withApi,
 } from '@/lib/api';
-import { canEnterMarksSync } from '@/lib/permissions';
+import { authorizeAny, reachesSheet } from '@/lib/access';
 import { logAudit } from '@/lib/audit';
 import { EnterMarkSchema } from '@/lib/validations/results';
 import { boundariesFor, gradeFor } from '@/lib/results';
@@ -18,6 +18,7 @@ async function _GET(req: NextRequest): Promise<Response> {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  const access = await authorizeAny(user, ['exams.marks.enter', 'exams.marks.view']);
 
   const { searchParams } = new URL(req.url);
   const classId   = searchParams.get('classId');
@@ -37,7 +38,7 @@ async function _GET(req: NextRequest): Promise<Response> {
     where: { schoolId: user.schoolId, subjectId, classId, termId: term.id },
   });
   if (!assignment) return apiNotFound('Assignment');
-  if (user.role === 'TEACHER' && assignment.teacherId !== user.id) {
+  if (!(await reachesSheet(access, ['exams.marks.enter', 'exams.marks.view'], assignment))) {
     return apiError('You are not assigned to this subject for this class', 403);
   }
 
@@ -71,11 +72,7 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try {
-    canEnterMarksSync(user.role);
-  } catch (e) {
-    return e as Response;
-  }
+  const access = await authorizeAny(user, ['exams.marks.enter']);
 
   const parsed = await parseBody(req, EnterMarkSchema);
   if ('error' in parsed) return parsed.error;
@@ -109,7 +106,7 @@ async function _POST(req: NextRequest) {
   });
   if (!assignment) return apiNotFound('Assignment');
 
-  if (user.role === 'TEACHER' && assignment.teacherId !== user.id) {
+  if (!(await reachesSheet(access, ['exams.marks.enter'], assignment))) {
     return apiForbidden();
   }
 

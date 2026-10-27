@@ -35,7 +35,7 @@ beforeEach(async () => {
 });
 
 const tokenOf = (url: string) => url.split('/portal/')[1];
-const regenerate = async (as = A.users.BURSAR) => {
+const regenerate = async (as = A.users.ADMIN) => {
   const r = await call('portal-links/[id]', 'POST', { as, params: { id: A.studentId } });
   expect(r.status).toBe(200);
   return { url: r.json.data.portalUrl as string, token: tokenOf(r.json.data.portalUrl) };
@@ -59,7 +59,7 @@ describe('portal link generation', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
       vi.setSystemTime(new Date('2026-10-15T09:00:00Z'));
-      const r = await call('portal-links/[id]', 'POST', { as: A.users.HEAD, params: { id: A.studentId } });
+      const r = await call('portal-links/[id]', 'POST', { as: A.users.ADMIN, params: { id: A.studentId } });
       expect(new Date(r.json.data.expiresAt).toISOString()).toBe('2026-12-31T23:59:59.999Z');
       const row = await prisma.student.findUniqueOrThrow({ where: { id: A.studentId } });
       expect(row.portalTokenExpiresAt?.toISOString()).toBe('2026-12-31T23:59:59.999Z');
@@ -78,11 +78,11 @@ describe('portal link generation', () => {
     expect(await prisma.auditLog.count({ where: { action: 'REGENERATE_PORTAL_LINK', entityId: A.studentId } })).toBeGreaterThanOrEqual(2);
   });
 
-  it('only ADMIN, HEAD and BURSAR may regenerate', async () => {
-    for (const role of ['ADMIN', 'HEAD', 'BURSAR'] as const) {
+  it('only those who may change guardians (the Administrator) may regenerate', async () => {
+    for (const role of ['ADMIN'] as const) {
       expect((await call('portal-links/[id]', 'POST', { as: A.users[role], params: { id: A.studentId } })).status).toBe(200);
     }
-    for (const role of ['DIRECTOR', 'TEACHER', 'LIBRARIAN'] as const) {
+    for (const role of ['HEAD', 'BURSAR', 'TEACHER', 'LIBRARIAN'] as const) {
       expect((await call('portal-links/[id]', 'POST', { as: A.users[role], params: { id: A.studentId } })).status).toBe(403);
     }
     expect((await call('portal-links/[id]', 'POST', { as: null, params: { id: A.studentId } })).status).toBe(401);
@@ -130,7 +130,7 @@ describe('looking a link up (public)', () => {
 describe('PIN', () => {
   it('is generated, stored hashed, returned once with a message for the guardian phone', async () => {
     const { token } = await regenerate();
-    const r = await call('portal-links/[id]/pin', 'POST', { as: A.users.HEAD, params: { id: A.studentId } });
+    const r = await call('portal-links/[id]/pin', 'POST', { as: A.users.ADMIN, params: { id: A.studentId } });
     expect(r.status).toBe(200);
     const { pin, guardianPhone, whatsappUrl, smsUrl } = r.json.data;
     expect(pin).toMatch(/^\d{4}$/);
@@ -150,13 +150,13 @@ describe('PIN', () => {
     const s = await prisma.student.create({
       data: { schoolId: A.schoolId, admissionNumber: 'STU20269999', firstName: 'No', surname: 'Link', fullName: 'No Link', gender: 'F', admissionDate: new Date('2026-01-10') },
     });
-    const r = await call('portal-links/[id]/pin', 'POST', { as: A.users.HEAD, params: { id: s.id } });
+    const r = await call('portal-links/[id]/pin', 'POST', { as: A.users.ADMIN, params: { id: s.id } });
     expect(r.status).toBe(409);
   });
 
   it('is asked for once per device: a wrong PIN is refused, the right one sets a signed cookie', async () => {
     const { token } = await regenerate();
-    const { pin } = (await call('portal-links/[id]/pin', 'POST', { as: A.users.HEAD, params: { id: A.studentId } })).json.data;
+    const { pin } = (await call('portal-links/[id]/pin', 'POST', { as: A.users.ADMIN, params: { id: A.studentId } })).json.data;
     const found = await portal.lookupPortalToken(token);
     if (found.status !== 'ok') throw new Error('expected ok');
 
@@ -181,7 +181,7 @@ describe('PIN', () => {
 
   it('a cookie stops working when the PIN or the link changes', async () => {
     const { token } = await regenerate();
-    const { pin } = (await call('portal-links/[id]/pin', 'POST', { as: A.users.HEAD, params: { id: A.studentId } })).json.data;
+    const { pin } = (await call('portal-links/[id]/pin', 'POST', { as: A.users.ADMIN, params: { id: A.studentId } })).json.data;
     const ok = await call('portal/verify-pin', 'POST', { body: { token, pin }, headers: { 'x-forwarded-for': '10.0.0.2' } });
     const cookie = ok.response.headers.get('set-cookie')!.split(';')[0].split('=')[1];
 
@@ -189,7 +189,7 @@ describe('PIN', () => {
     if (before.status !== 'ok') throw new Error('expected ok');
     expect(portal.pinCookieValid(before.student, cookie)).toBe(true);
 
-    await call('portal-links/[id]/pin', 'POST', { as: A.users.HEAD, params: { id: A.studentId } }); // new PIN
+    await call('portal-links/[id]/pin', 'POST', { as: A.users.ADMIN, params: { id: A.studentId } }); // new PIN
     const afterPin = await portal.lookupPortalToken(token);
     if (afterPin.status !== 'ok') throw new Error('expected ok');
     expect(portal.pinCookieValid(afterPin.student, cookie)).toBe(false);
@@ -197,7 +197,7 @@ describe('PIN', () => {
 
   it('is limited: 5 wrong tries lock that IP for 15 minutes, even for the right PIN', async () => {
     const { token } = await regenerate();
-    const { pin } = (await call('portal-links/[id]/pin', 'POST', { as: A.users.HEAD, params: { id: A.studentId } })).json.data;
+    const { pin } = (await call('portal-links/[id]/pin', 'POST', { as: A.users.ADMIN, params: { id: A.studentId } })).json.data;
     const wrongPin = pin === '0000' ? '1111' : '0000';
     for (let i = 0; i < 5; i++) {
       expect((await call('portal/verify-pin', 'POST', { body: { token, pin: wrongPin }, headers: { 'x-forwarded-for': '10.0.0.3' } })).status).toBe(403);
@@ -211,7 +211,7 @@ describe('PIN', () => {
 
   it('is also limited per link across all addresses (20 wrong tries)', async () => {
     const { token } = await regenerate();
-    const { pin } = (await call('portal-links/[id]/pin', 'POST', { as: A.users.HEAD, params: { id: A.studentId } })).json.data;
+    const { pin } = (await call('portal-links/[id]/pin', 'POST', { as: A.users.ADMIN, params: { id: A.studentId } })).json.data;
     const wrongPin = pin === '0000' ? '1111' : '0000';
     for (let i = 0; i < 20; i++) {
       await call('portal/verify-pin', 'POST', { body: { token, pin: wrongPin }, headers: { 'x-forwarded-for': `10.1.0.${i}` } });
@@ -221,7 +221,7 @@ describe('PIN', () => {
 
   it('rejects malformed PINs and links without a PIN', async () => {
     const { token } = await regenerate();
-    await call('portal-links/[id]/pin', 'DELETE', { as: A.users.HEAD, params: { id: A.studentId } });
+    await call('portal-links/[id]/pin', 'DELETE', { as: A.users.ADMIN, params: { id: A.studentId } });
     expect((await call('portal/verify-pin', 'POST', { body: { token, pin: '1234' } })).status).toBe(404); // no PIN set
     expect((await call('portal/verify-pin', 'POST', { body: { token, pin: '12' } })).status).toBe(422);
     expect((await call('portal/verify-pin', 'POST', { body: { token: 'nonsense', pin: '1234' } })).status).toBe(404);
@@ -229,8 +229,8 @@ describe('PIN', () => {
 
   it('removing the PIN lets the link open without one', async () => {
     const { token } = await regenerate();
-    await call('portal-links/[id]/pin', 'POST', { as: A.users.HEAD, params: { id: A.studentId } });
-    const del = await call('portal-links/[id]/pin', 'DELETE', { as: A.users.HEAD, params: { id: A.studentId } });
+    await call('portal-links/[id]/pin', 'POST', { as: A.users.ADMIN, params: { id: A.studentId } });
+    const del = await call('portal-links/[id]/pin', 'DELETE', { as: A.users.ADMIN, params: { id: A.studentId } });
     expect(del.status).toBe(200);
     const found = await portal.lookupPortalToken(token);
     if (found.status !== 'ok') throw new Error('expected ok');
@@ -249,7 +249,7 @@ describe('view log', () => {
     expect(rows.map((r) => r.ip)).toEqual(['41.1.1.1', '41.2.2.2']);
     expect(rows[0].schoolId).toBe(A.schoolId);
 
-    const info = await call('portal-links/[id]', 'GET', { as: A.users.BURSAR, params: { id: A.studentId } });
+    const info = await call('portal-links/[id]', 'GET', { as: A.users.ADMIN, params: { id: A.studentId } });
     expect(info.status).toBe(200);
     expect(info.json.data.views.map((v: { ip: string }) => v.ip)).toEqual(['41.2.2.2', '41.1.1.1']); // newest first
     expect(info.json.data.hasLink).toBe(true);

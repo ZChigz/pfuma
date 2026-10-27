@@ -49,7 +49,7 @@ beforeAll(async () => {
   ]);
   ["setup","structures","billing","payments","refunds","requests","expenses","accounts","rates","cashup","bank","plans","payroll","sponsors","discounts","credit","statements","invoices","spending","paynow","reports","common","fees"].forEach((n, i) => { m[n] = mods[i]; });
   m.tables = await import('@/lib/finance/report-tables');
-  A = await seedSchool(prisma, 'School A');
+  A = await seedSchool(prisma, 'School A', { operator: true });
   W = await financeWorld(prisma, A);
   W.funds = Object.fromEntries((await m.setup.listFunds(W.bursar)).map((f: { code: string; id: string }) => [f.code, f.id]));
   // A fee structure, approved and billed: day learners owe 300 + 50 US dollars and ZiG 2000.
@@ -162,10 +162,10 @@ describe('refunds', () => {
     expect(credit.creditCents).toBeGreaterThan(500);
     await fails(m.refunds.decideRefund(W.head, r.id, 'approve'), 403); // the Head does not approve refunds
     await fails(m.refunds.decideRefund(W.bursar, r.id, 'approve'), 403);
-    await m.refunds.decideRefund(W.owner, r.id, 'approve');
-    await fails(m.refunds.payRefund(W.owner, r.id, { method: 'CASH' }), 403, /approved/); // the approver does not pay
+    await m.refunds.decideRefund(W.operator, r.id, 'approve');
+    await fails(m.refunds.payRefund(W.operator, r.id, { method: 'CASH' }), 403, /approved/); // the approver does not pay
     await fails(m.refunds.payRefund(W.bursar, r.id, { method: 'CASH' }), 403, /asked/); // nor the person who asked
-    await m.refunds.payRefund(W.admin, r.id, { method: 'CASH' });
+    await m.refunds.payRefund(W.operator2, r.id, { method: 'CASH' });
     const row = await prisma.finRefund.findUniqueOrThrow({ where: { id: r.id } });
     expect(row.status).toBe('PAID');
   });
@@ -267,7 +267,7 @@ describe('payroll', () => {
   it('is paid by Finance, never by the person who prepared it, and records the salaries as expenses', async () => {
     await expect(prisma.$transaction((tx) => m.payroll.handOverPayroll(tx, A.schoolId, { period: '2026-10', preparedById: W.head.id, approvedById: W.head.id, lines: [{ employee: 'Mr X', currency: 'USD', netCents: 50000, method: 'BANK_TRANSFER' }] }))).rejects.toThrow(/approved by someone other/);
     const run: { id: string } = await prisma.$transaction((tx) => m.payroll.handOverPayroll(tx, A.schoolId, {
-      period: '2026-10', preparedById: W.head.id, approvedById: W.owner.id,
+      period: '2026-10', preparedById: W.head.id, approvedById: W.operator.id,
       lines: [{ employee: 'Mr Banda', currency: 'USD', netCents: 50000, method: 'BANK_TRANSFER', account: '123' }, { employee: 'Mrs Chuma', currency: 'ZIG', netCents: 900000, method: 'ECOCASH' }],
       statutory: [{ type: 'PAYE', currency: 'USD', amountCents: 8000, dueDate: '2026-11-10' }],
     }), { timeout: 20000 } as never);

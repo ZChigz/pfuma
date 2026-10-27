@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
@@ -21,7 +22,7 @@ export default async function BursarDisbursementsPage() {
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
-  if (user.role !== 'BURSAR') redirect('/');
+  await guardPage(user, 'finance.requests.disburse');
 
   const requests = (await db.expenseRequest.findMany({
     where: { schoolId: user.schoolId, status: { in: ['APPROVED', 'DISBURSED'] } },
