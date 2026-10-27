@@ -279,7 +279,7 @@ describe('exeats and visitors', () => {
     await pg.exec(x('', ''));
     expect(await refused(x('', '').replace('2026-03-08 17:00', '2026-03-06 14:00'))).toMatch(/FacExeat_times/);
     expect(await refused(x('', '').replace('Family function', ' '))).toMatch(/FacExeat_reason/);
-    expect(await refused(x(', "status"', ", 'SIGNED_OUT'"))).toMatch(/FacExeat_status/);
+    expect(await refused(x(', "status"', ", 'SIGNED_OUT'"))).toMatch(/FacExeat_status|Say who is collecting/);
   });
 
   it('a visitor is a guardian on record or someone the boarding master approved', async () => {

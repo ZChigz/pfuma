@@ -2866,6 +2866,7 @@ enum AttendanceStatus {
   EXCUSED
   SUSPENDED
   EXEAT
+  SICK_BAY
 }
 
 enum ExcuseReason {

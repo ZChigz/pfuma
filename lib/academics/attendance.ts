@@ -14,7 +14,7 @@
 //  • when two devices changed the same register the later change wins and both versions are kept in the audit log;
 //  • SMS to the primary guardian for an unexplained absence, and notices about chronic absence, are written in the same
 //    transaction (so a failed save leaves none behind).
-import { exeatOn } from '@/lib/facilities/away';
+import { exeatOn, sickBayStudentIds } from '@/lib/facilities/away';
 import { z } from 'zod';
 import type { AttendanceStatus, ExcuseReason, RegisterSession } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
@@ -29,12 +29,12 @@ import {
 import { NO_SCHOOL_TEXT, schoolDayInfo } from '@/lib/academics/school-days';
 import { timetableInForce } from '@/lib/academics/timetable';
 
-export const STATUSES = ['PRESENT', 'LATE', 'ABSENT', 'EXCUSED', 'SUSPENDED', 'EXEAT'] as const satisfies readonly AttendanceStatus[];
+export const STATUSES = ['PRESENT', 'LATE', 'ABSENT', 'EXCUSED', 'SUSPENDED', 'EXEAT', 'SICK_BAY'] as const satisfies readonly AttendanceStatus[];
 export const REASONS = ['SICK', 'FAMILY', 'SCHOOL_ACTIVITY', 'OTHER'] as const satisfies readonly ExcuseReason[];
 export const REASON_LABEL: Record<ExcuseReason, string> = { SICK: 'Sick', FAMILY: 'Family', SCHOOL_ACTIVITY: 'School activity', OTHER: 'Other' };
 /** A register older than this many days needs the Deputy (academics.attendance.correct). */
 export const CORRECTION_WINDOW_DAYS = 7;
-const LOCKED: AttendanceStatus[] = ['SUSPENDED', 'EXEAT'];
+const LOCKED: AttendanceStatus[] = ['SUSPENDED', 'EXEAT', 'SICK_BAY'];
 
 export function harareDate(d: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Harare', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
@@ -90,14 +90,16 @@ export async function exeatStudentIds(tx: Db, date: string, studentIds: string[]
 }
 
 /** Students under an approved suspension on the date (from Discipline) or on exeat (from Hostel): locked in the register. */
-export async function lockedStudents(tx: Db, schoolId: string, date: string, studentIds: string[]): Promise<Map<string, 'SUSPENDED' | 'EXEAT'>> {
-  const out = new Map<string, 'SUSPENDED' | 'EXEAT'>();
+export async function lockedStudents(tx: Db, schoolId: string, date: string, studentIds: string[]): Promise<Map<string, 'SUSPENDED' | 'EXEAT' | 'SICK_BAY'>> {
+  const out = new Map<string, 'SUSPENDED' | 'EXEAT' | 'SICK_BAY'>();
   const susp = await tx.disciplineAction.findMany({
     where: { schoolId, type: 'SUSPENSION', status: 'APPROVED', studentId: { in: studentIds }, startDate: { lte: toDay(date) }, endDate: { gte: toDay(date) } },
     select: { studentId: true },
   });
   for (const s of susp) out.set(s.studentId, 'SUSPENDED');
   for (const id of Array.from(await exeatStudentIds(tx, date, studentIds))) if (!out.has(id)) out.set(id, 'EXEAT');
+  // In the sick bay: only that fact reaches the register, never the complaint or the treatment.
+  for (const id of Array.from(await sickBayStudentIds(tx, date, studentIds))) if (!out.has(id)) out.set(id, 'SICK_BAY');
   return out;
 }
 
@@ -232,7 +234,7 @@ interface Ctx {
 type Norm = { studentId: string; status: AttendanceStatus; reason: ExcuseReason | null; reasonNote: string | null; arrivalTime: string | null };
 
 /** Everyone on the roster gets a mark (missing = present); locked students are forced to their lock; unknown students are refused. */
-function normalise(ctx: Ctx, locks: Map<string, 'SUSPENDED' | 'EXEAT'>): Norm[] {
+function normalise(ctx: Ctx, locks: Map<string, 'SUSPENDED' | 'EXEAT' | 'SICK_BAY'>): Norm[] {
   const given = new Map<string, z.output<typeof EntrySchema>>();
   for (const e of ctx.entries) {
     if (!ctx.roster.has(e.studentId)) throw new ServiceError('One of the students is not in this register', 422);
@@ -257,7 +259,7 @@ const tally = (n: Norm[]) => ({
   locked: n.filter((e) => LOCKED.includes(e.status)).length,
 });
 
-async function persist(tx: Db, ctx: Ctx, locks: Map<string, 'SUSPENDED' | 'EXEAT'>): Promise<SaveResult> {
+async function persist(tx: Db, ctx: Ctx, locks: Map<string, 'SUSPENDED' | 'EXEAT' | 'SICK_BAY'>): Promise<SaveResult> {
   const { user } = ctx;
   const norm = normalise(ctx, locks);
   const existing = await tx.attendanceRegister.findFirst({

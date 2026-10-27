@@ -530,6 +530,17 @@ const ATTACKS: Attack[] = [
   { name: 'decide many exeats of another school', file: 'facilities/exeats/decide-many', method: 'POST', as: 'OPERATOR', body: () => ({ ids: ['not-in-this-school'], decision: 'APPROVE' }), expect: 404 },
   { name: 'calendar options', file: 'facilities/exeats/calendar', method: 'GET', as: 'OPERATOR', expect: 'ok' },
   { name: 'visiting days', file: 'facilities/exeats/visiting-days', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  // Facilities sickbay
+  { name: 'sick bay visits (list)', file: 'facilities/sickbay', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'sick bay visit for a learner of another school', file: 'facilities/sickbay', method: 'POST', as: 'OPERATOR', body: () => ({ studentId: b().studentId, complaint: 'HEADACHE', outcome: 'BACK_TO_CLASS' }), expect: 404 },
+  { name: 'medical alerts of a learner of another school', file: 'facilities/sickbay/alerts', method: 'GET', as: 'OPERATOR', url: () => `?studentId=${b().studentId}`, expect: 404 },
+  { name: 'discharge a visit of another school', file: 'facilities/sickbay/[id]/discharge', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({}), expect: 404 },
+  { name: 'sick bay summary', file: 'facilities/sickbay/summary', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'medication round', file: 'facilities/sickbay/round', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'close a round that does not exist', file: 'facilities/sickbay/round', method: 'POST', as: 'OPERATOR', body: () => ({ date: '2020-01-01' }), expect: 404 },
+  { name: 'give a dose of another school', file: 'facilities/sickbay/round/[id]/give', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({}), expect: 404 },
+  // Facilities sickbay-2
+  { name: 'sick bay medicine', file: 'facilities/sickbay/medicine', method: 'GET', as: 'OPERATOR', expect: 'ok' },
 ];
 
 function academicsAttacks(): Attack[] {

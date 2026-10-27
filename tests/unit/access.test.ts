@@ -85,7 +85,7 @@ describe('can()', () => {
 });
 
 // The parts of Facilities & Operations that have pages so far; the others show "Coming soon".
-const LIVE_FACILITIES = ['Inventory', 'Library', 'Assets', 'Hostel', 'Exeats'];
+const LIVE_FACILITIES = ['Inventory', 'Library', 'Assets', 'Hostel', 'Exeats', 'Sick bay'];
 
 describe('sidebar', () => {
   it('lists the groups in the required order', () => {

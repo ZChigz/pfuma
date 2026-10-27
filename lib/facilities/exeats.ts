@@ -59,7 +59,7 @@ async function collectorRecord(tx: Db, schoolId: string, studentId: string, c: C
 /** What the gate may show of an ID number: the end of it, unless the person may see guardians' ID numbers. */
 const maskId = (id: string | null, full: boolean) => (!id ? null : full || id.length <= 4 ? id : `${'•'.repeat(Math.max(0, id.length - 4))}${id.slice(-4)}`);
 
-async function primaryContacts(tx: Db, schoolId: string, studentId: string): Promise<Contact[]> {
+export async function primaryContacts(tx: Db, schoolId: string, studentId: string): Promise<Contact[]> {
   const links = await tx.studentGuardian.findMany({ where: { studentId, isPrimary: true, canReceiveSms: true, student: { schoolId } }, select: { guardian: { select: { id: true, fullName: true, phone: true } } } });
   return links.map((l) => ({ guardianId: l.guardian.id, name: l.guardian.fullName, phone: l.guardian.phone }));
 }

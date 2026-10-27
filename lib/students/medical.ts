@@ -49,7 +49,7 @@ export interface MedicalView {
   specialNeeds: { type: string | null; supportNeeded: string | null };
   consent: { emergencyTreatment: boolean | null; date: string | null; hasForm: boolean };
   notes: string | null;
-  sickBay: { enabled: boolean; visits: { id: string; visitedAt: string; complaint: string; treatment: string | null; outcome: SickBayOutcome; guardianInformed: boolean }[] };
+  sickBay: { enabled: boolean; visits: { id: string; visitedAt: string; complaint: string; treatment: string | null; outcome: string; guardianInformed: boolean }[] };
   updatedAt: string | null;
 }
 
@@ -69,11 +69,12 @@ export async function viewMedical(user: AccessUser, studentId: string): Promise<
   const { schoolId } = user;
   return getScopedDb(schoolId, user.id).$tx(async (tx) => {
     const student = await reachable(tx, user, studentId);
-    const [profile, primary, off, visits] = await Promise.all([
+    const [profile, primary, off, visits, facVisits] = await Promise.all([
       tx.medicalProfile.findUnique({ where: { studentId }, include: { medications: { orderBy: { createdAt: 'asc' } } } }),
       tx.studentGuardian.findFirst({ where: { studentId, isPrimary: true }, select: { relationship: true, guardian: { select: { fullName: true, phone: true } } } }),
       tx.schoolModule.findMany({ where: { schoolId, enabled: false }, select: { module: true } }),
       tx.sickBayVisit.findMany({ where: { studentId }, orderBy: { visitedAt: 'desc' }, take: 50 }),
+      tx.facSickBayVisit.findMany({ where: { studentId, schoolId }, orderBy: { visitedAt: 'desc' }, take: 50 }),
     ]);
     // Hostel and sick bay belong to Facilities & Operations, so they follow that module's switch.
     const sickBayOn = !off.some((m) => m.module === 'facilities');
@@ -98,7 +99,10 @@ export async function viewMedical(user: AccessUser, studentId: string): Promise<
       notes: profile?.notes ?? null,
       sickBay: {
         enabled: sickBayOn,
-        visits: sickBayOn ? visits.map((v) => ({ id: v.id, visitedAt: v.visitedAt.toISOString(), complaint: v.complaint, treatment: v.treatment, outcome: v.outcome, guardianInformed: v.guardianInformed })) : [],
+        // Once the sick bay (Facilities) holds this school's visits, the tab reads from there; the old visits were copied into it.
+        visits: !sickBayOn ? [] : facVisits.length > 0
+          ? facVisits.map((v) => ({ id: v.id, visitedAt: v.visitedAt.toISOString(), complaint: v.complaintNote ?? v.complaint.charAt(0) + v.complaint.slice(1).toLowerCase().replace('_', ' '), treatment: v.treatment, outcome: v.outcome === 'BACK_TO_CLASS' ? 'RETURNED_TO_CLASS' : v.outcome, guardianInformed: !!v.guardianInformedAt }))
+          : visits.map((v) => ({ id: v.id, visitedAt: v.visitedAt.toISOString(), complaint: v.complaint, treatment: v.treatment, outcome: v.outcome, guardianInformed: v.guardianInformed })),
       },
       updatedAt: profile?.updatedAt.toISOString() ?? null,
     };
@@ -182,6 +186,7 @@ export async function recordSickBayVisit(user: AccessUser, studentId: string, ra
   return getScopedDb(schoolId, user.id).$tx(async (tx) => {
     const off = await tx.schoolModule.findFirst({ where: { schoolId, module: 'facilities', enabled: false } });
     if (off) throw new ServiceError('Sick bay visits are recorded when the Hostel module is on', 409);
+    if ((await tx.facSickBayVisit.count({ where: { schoolId } })) > 0) throw new ServiceError('Sick bay visits are now recorded in Facilities, under Sick bay', 409);
     const student = await reachable(tx, user, studentId);
     const v = await tx.sickBayVisit.create({ data: { schoolId, studentId, visitedAt: when, complaint: input.complaint, treatment: input.treatment ?? null, outcome: input.outcome, guardianInformed: input.guardianInformed, recordedById: user.id } });
     await logAudit({ schoolId, actorId: user.id, action: 'UPDATE_MEDICAL', entityType: 'Student', entityId: studentId, detail: `${student.fullName}: sick bay visit recorded`, after: { visitId: v.id, outcome: input.outcome } }, tx);

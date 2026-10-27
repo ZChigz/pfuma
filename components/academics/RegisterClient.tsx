@@ -22,9 +22,9 @@ export interface Sheet {
   register: { markedBy: string; markedAt: string; changedAt: string } | null; students: SheetStudent[];
 }
 
-const LABEL: Record<MarkStatus, string> = { PRESENT: 'Present', LATE: 'Late', ABSENT: 'Absent', EXCUSED: 'Excused', SUSPENDED: 'Suspended', EXEAT: 'On exeat' };
+const LABEL: Record<MarkStatus, string> = { PRESENT: 'Present', LATE: 'Late', ABSENT: 'Absent', EXCUSED: 'Excused', SUSPENDED: 'Suspended', EXEAT: 'On exeat', SICK_BAY: 'In sick bay' };
 const TONE: Record<MarkStatus, string> = {
-  PRESENT: 'bg-success-bg text-success', LATE: 'bg-warn-bg text-warn', ABSENT: 'bg-danger-bg text-danger', EXCUSED: 'bg-[#dbeafe] text-[#1d4ed8]', SUSPENDED: 'bg-canvas text-muted', EXEAT: 'bg-canvas text-muted',
+  PRESENT: 'bg-success-bg text-success', LATE: 'bg-warn-bg text-warn', ABSENT: 'bg-danger-bg text-danger', EXCUSED: 'bg-[#dbeafe] text-[#1d4ed8]', SUSPENDED: 'bg-canvas text-muted', EXEAT: 'bg-canvas text-muted', SICK_BAY: 'bg-canvas text-muted',
 };
 const REASONS = [['SICK', 'Sick'], ['FAMILY', 'Family'], ['SCHOOL_ACTIVITY', 'School activity'], ['OTHER', 'Other']] as const;
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('');
@@ -90,7 +90,7 @@ export function RegisterClient({ sheet: initial }: { sheet: Sheet }) {
   }, []);
 
   const counts = useMemo(() => {
-    const c = { PRESENT: 0, LATE: 0, ABSENT: 0, EXCUSED: 0, SUSPENDED: 0, EXEAT: 0 } as Record<MarkStatus, number>;
+    const c = { PRESENT: 0, LATE: 0, ABSENT: 0, EXCUSED: 0, SUSPENDED: 0, EXEAT: 0, SICK_BAY: 0 } as Record<MarkStatus, number>;
     for (const s of sheet.students) c[marks[s.id]?.status ?? s.status]++;
     return c;
   }, [marks, sheet.students]);

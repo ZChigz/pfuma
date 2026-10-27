@@ -27,6 +27,15 @@ export async function inSickBayAt(tx: Db, at: Date, studentIds: string[]): Promi
   return new Set(rows.map((r) => r.studentId));
 }
 
+/** Learners kept in the sick bay at any time on a day (admitted by its end, not discharged before its start). */
+export async function sickBayStudentIds(tx: Db, date: string, studentIds: string[]): Promise<Set<string>> {
+  if (studentIds.length === 0) return new Set();
+  const from = startOf(date);
+  const to = new Date(from.getTime() + DAY);
+  const rows = await tx.facSickBayVisit.findMany({ where: { studentId: { in: studentIds }, admittedAt: { lt: to }, OR: [{ dischargedAt: null }, { dischargedAt: { gt: from } }] }, select: { studentId: true } });
+  return new Set(rows.map((r) => r.studentId));
+}
+
 export type Away = 'EXEAT' | 'SICK_BAY' | 'SUSPENDED';
 
 /** Exeat first, then sick bay, then suspended: the reason shown when more than one is true. */

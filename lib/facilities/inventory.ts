@@ -820,3 +820,44 @@ function isoWeek(d: Date): string {
   const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
   return `${t.getUTCFullYear()}-W${String(Math.ceil(((t.getTime() - y0.getTime()) / 864e5 + 1) / 7)).padStart(2, '0')}`;
 }
+
+/**
+ * Takes stock out of the store with this name for another part (medicine given in the sick bay, goods sold at the tuck shop). The
+ * stock rules are the same as for any issue: first-expiring batches go first, nothing goes below zero, every movement is kept.
+ */
+export async function drawFromStore(
+  tx: Db, user: Actor,
+  o: { storeName: string; itemId: string; qty: number; type: 'ISSUE' | 'SALE'; receiverName?: string; studentId?: string; reason?: string; chargeId?: string | null; ledgerEntryId?: string | null },
+): Promise<{ movementIds: string[]; unitCostCents: number; currency: Cur; itemName: string }> {
+  await ensureStores(tx, user.schoolId);
+  const store = await tx.facStore.findFirst({ where: { schoolId: user.schoolId, name: o.storeName, active: true } });
+  if (!store) throw new ServiceError(`The ${o.storeName} store is not set up`, 409);
+  const item = await itemOf(tx, user.schoolId, o.itemId);
+  if (!qtyOk(item.unit, o.qty)) throw new ServiceError(`${item.name} is counted in whole ${item.unit.toLowerCase()}s`, 422);
+  const pool = await positionOf(tx, user.schoolId, item.id, store.id);
+  const drawn = await plan(tx, user.schoolId, item.id, store.id, o.qty, item.name);
+  const ids: string[] = [];
+  for (const d of drawn) {
+    const m = await tx.facStockMovement.create({
+      data: {
+        schoolId: user.schoolId, itemId: item.id, storeId: store.id, lotId: d.lotId, type: o.type, qty: -d.qty, unitCostCents: pool.avgCents, currency: pool.currency ?? 'USD',
+        receiverName: o.receiverName ?? null, studentId: o.studentId ?? null, reason: o.reason ?? null, chargeId: o.chargeId ?? null, ledgerEntryId: o.ledgerEntryId ?? null, createdById: user.id,
+      },
+      select: { id: true },
+    });
+    ids.push(m.id);
+  }
+  return { movementIds: ids, unitCostCents: pool.avgCents, currency: (pool.currency ?? 'USD') as Cur, itemName: item.name };
+}
+
+/** What a named store holds right now (items with stock only), for the sick bay and the tuck shop screens. */
+export async function storeStock(tx: Db, schoolId: string, storeName: string) {
+  await ensureStores(tx, schoolId);
+  const store = await tx.facStore.findFirst({ where: { schoolId, name: storeName, active: true }, select: { id: true } });
+  if (!store) return [];
+  const [items, all] = await Promise.all([tx.facStockItem.findMany({ where: { schoolId, active: true }, orderBy: { name: 'asc' } }), movements(tx, schoolId, { storeId: store.id })]);
+  const pos = positions(all);
+  return items
+    .map((i) => ({ itemId: i.id, name: i.name, size: i.size, unit: i.unit, barcode: i.barcode, priceCents: i.priceCents, priceCurrency: i.priceCurrency as Cur | null, reorderLevel: i.reorderLevel, qty: round3(Array.from(pos.values()).filter((p) => p.itemId === i.id).reduce((s, p) => s + p.qty, 0)) }))
+    .filter((r) => r.qty > 0);
+}
