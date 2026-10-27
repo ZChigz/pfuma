@@ -129,6 +129,11 @@ export async function applyCreditIfAllowed(tx: Db, user: Pick<Actor, 'id' | 'sch
 export async function recordPayment(user: Actor, raw: unknown) {
   need(user, 'finance.payments.record');
   const input = RecordPaymentSchema.parse(raw);
+  return getScopedDb(user.schoolId, user.id).$tx((tx) => recordPaymentTx(tx, user, input));
+}
+
+/** The body of recordPayment for a caller that already holds a transaction (a pocket money deposit that commits with its wallet entry). The caller checks the permission. */
+export async function recordPaymentTx(tx: Db, user: Actor, input: z.output<typeof RecordPaymentSchema>) {
   const today = todayInHarare();
   const receivedOn = input.receivedOn ?? today;
   if (receivedOn > today) throw new ServiceError('The date received cannot be in the future', 422);
@@ -138,7 +143,7 @@ export async function recordPayment(user: Actor, raw: unknown) {
   if (new Set(fundIds).size !== fundIds.length) throw new ServiceError('Each fund can appear only once', 422);
   if (input.proofKey && !proofKeyBelongsTo(input.proofKey, user.schoolId)) throw new ServiceError('That proof of payment does not belong to this school', 422);
 
-  return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
+  {
     // Who is paying: a learner, or a family through its fee-payer guardian.
     let studentId = input.studentId;
     let guardianId: string | null = null;
@@ -219,7 +224,7 @@ export async function recordPayment(user: Actor, raw: unknown) {
     }
     await tellApprovers(tx, user, 'finance.payments.verify', { title: 'Payment to verify', body: `${student.fullName}: ${created.length} payment(s) recorded`, link: '/finance/payments?status=PENDING' });
     return { payments: created };
-  });
+  }
 }
 
 // ─── Verify, reject, void ────────────────────────────────────────────────────

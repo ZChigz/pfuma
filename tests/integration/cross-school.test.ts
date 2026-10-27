@@ -541,6 +541,20 @@ const ATTACKS: Attack[] = [
   { name: 'give a dose of another school', file: 'facilities/sickbay/round/[id]/give', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({}), expect: 404 },
   // Facilities sickbay-2
   { name: 'sick bay medicine', file: 'facilities/sickbay/medicine', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  // Facilities tuckshop
+  { name: 'wallets (list)', file: 'facilities/tuckshop/wallets', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'wallet of a learner of another school', file: 'facilities/tuckshop/wallets/detail', method: 'GET', as: 'OPERATOR', url: () => `?studentId=${b().studentId}&currency=USD`, expect: 404 },
+  { name: 'deposit for a learner of another school', file: 'facilities/tuckshop/wallets/deposit', method: 'POST', as: 'OPERATOR', body: () => ({ studentId: b().studentId, currency: 'USD', amountCents: 500, note: 'Not mine' }), expect: 404 },
+  { name: 'withdraw for a learner of another school', file: 'facilities/tuckshop/wallets/withdraw', method: 'POST', as: 'OPERATOR', body: () => ({ studentId: b().studentId, currency: 'USD', amountCents: 500, note: 'Not mine' }), expect: 404 },
+  { name: 'limits for a learner of another school', file: 'facilities/tuckshop/wallets/limits', method: 'POST', as: 'OPERATOR', body: () => ({ studentId: b().studentId, currency: 'USD', weeklyLimitCents: 500 }), expect: 404 },
+  { name: 'close a wallet of another school', file: 'facilities/tuckshop/wallets/close', method: 'POST', as: 'OPERATOR', body: () => ({ studentId: b().studentId, currency: 'USD', action: 'REFUNDED', note: 'Not mine' }), expect: 404 },
+  { name: 'trust check', file: 'facilities/tuckshop/trust', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'tuck shop items', file: 'facilities/tuckshop/items', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'tuck shop sales (list)', file: 'facilities/tuckshop/sales', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'sell to a learner of another school', file: 'facilities/tuckshop/sales', method: 'POST', as: 'OPERATOR', body: () => ({ lines: [{ itemId: 'x', qty: 1 }], payment: 'WALLET', studentId: b().studentId }), expect: 404 },
+  { name: 'cash-ups (list)', file: 'facilities/tuckshop/cashup', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'cash up with nothing sold', file: 'facilities/tuckshop/cashup', method: 'POST', as: 'OPERATOR', body: () => ({ currency: 'USD', countedCents: 0 }), expect: 201 },
+  { name: 'confirm a cash-up of another school', file: 'facilities/tuckshop/cashup/[id]/confirm', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
 ];
 
 function academicsAttacks(): Attack[] {

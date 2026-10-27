@@ -1,0 +1,7 @@
+// Asks can() first; the service behind it checks the permission again and every tuck shop rule.
+import { guarded } from '@/lib/finance/route';
+import { tuckItems } from '@/lib/facilities/tuckshop';
+
+export const runtime = 'nodejs';
+
+export const GET = guarded('GET /api/facilities/tuckshop/items', ['facilities.tuckshop.sell', 'facilities.tuckshop.cashup'], async ({ user }) => tuckItems(user));
