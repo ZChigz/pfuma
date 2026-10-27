@@ -24,7 +24,7 @@ const TABLES = [
   'FacReservation', 'FacTextbookSet', 'FacTextbookIssue', 'FacStocktake', 'FacStocktakeScan', 'FacRoute', 'FacStop', 'FacStudentRoute', 'FacVehicle',
   'FacVehicleDocument', 'FacDriver', 'FacDriverDocument', 'FacTrip', 'FacTripPassenger', 'FacFuelLog', 'FacVehicleBooking', 'FacStore', 'FacStockItem',
   'FacStockLot', 'FacStockMovement', 'FacStockCount', 'FacStockCountLine', 'FacAssetCategory', 'FacAsset', 'FacAssetTransfer', 'FacMaintenanceSchedule',
-  'FacMaintenanceJob', 'FacAssetDisposal', 'FacVerificationRound', 'FacVerificationScan', 'FacWriteoffRequest',
+  'FacMaintenanceJob', 'FacAssetDisposal', 'FacVerificationRound', 'FacVerificationScan', 'FacWriteoffRequest', 'FacDisposalRequest',
 ];
 
 // Rows that are only ever added: no updatedAt.
@@ -49,8 +49,8 @@ beforeAll(async () => {
     await pg.exec(`INSERT INTO "User" ("id", "schoolId", "fullName", "email", "passwordHash", "role") VALUES ('${id}', '${school}', 'User ${id}', '${id}@x.test', 'x', 'TEACHER')`);
   }
   for (const [id, school] of [['st1', 's1'], ['st2', 's1'], ['st3', 's2']]) {
-    await pg.exec(`INSERT INTO "Student" ("id", "schoolId", "admissionNumber", "firstName", "surname", "fullName", "admissionDate", "updatedAt")
-      VALUES ('${id}', '${school}', 'A-${id}', 'Ann', '${id}', 'Ann ${id}', '2026-01-10', now())`);
+    await pg.exec(`INSERT INTO "Student" ("id", "schoolId", "admissionNumber", "firstName", "surname", "fullName", "admissionDate", "boarding", "updatedAt")
+      VALUES ('${id}', '${school}', 'A-${id}', 'Ann', '${id}', 'Ann ${id}', '2026-01-10', 'BOARDER', now())`);
   }
   await pg.exec(`INSERT INTO "FacStore" ("id", "schoolId", "name") VALUES ('store1', 's1', 'Main store'), ('store2', 's1', 'Kitchen'), ('store3', 's2', 'Main store')`);
   await pg.exec(`INSERT INTO "FacStockItem" ("id", "schoolId", "name", "category") VALUES ('item1', 's1', 'Maize meal', 'FOOD'), ('item3', 's2', 'Maize meal', 'FOOD')`);

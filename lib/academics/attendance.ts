@@ -14,6 +14,7 @@
 //  • when two devices changed the same register the later change wins and both versions are kept in the audit log;
 //  • SMS to the primary guardian for an unexplained absence, and notices about chronic absence, are written in the same
 //    transaction (so a failed save leaves none behind).
+import { exeatOn } from '@/lib/facilities/away';
 import { z } from 'zod';
 import type { AttendanceStatus, ExcuseReason, RegisterSession } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
@@ -83,13 +84,9 @@ export interface SaveResult { outcome: SaveOutcome; registerId: string; present:
 
 // ─── Who is locked ───────────────────────────────────────────────────────────
 
-/**
- * Students on exeat on this date. The Hostel module is not built yet; when it is, this is the one place that returns
- * them and the register fills them in as On exeat (locked) without any other change.
- */
-export async function exeatStudentIds(...args: [tx: Db, date: string, studentIds: string[]]): Promise<Set<string>> {
-  void args;
-  return new Set();
+/** Students on exeat on this date (Facilities, Exeats): the register fills them in as On exeat and locks them. */
+export async function exeatStudentIds(tx: Db, date: string, studentIds: string[]): Promise<Set<string>> {
+  return exeatOn(tx, date, studentIds);
 }
 
 /** Students under an approved suspension on the date (from Discipline) or on exeat (from Hostel): locked in the register. */

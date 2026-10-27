@@ -495,6 +495,25 @@ const ATTACKS: Attack[] = [
   { name: 'close a round of another school', file: 'facilities/assets/rounds/[id]/close', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
   { name: 'move an asset in a round of another school', file: 'facilities/assets/rounds/[id]/move', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ assetId: 'x' }), expect: 404 },
   { name: 'asset reports', file: 'facilities/assets/reports', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  // Facilities hostel
+  { name: 'hostels (list)', file: 'facilities/hostel', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'hostel add (own school)', file: 'facilities/hostel', method: 'POST', as: 'OPERATOR', body: () => ({ name: 'Attack House', gender: 'M' }), expect: 'ok' },
+  { name: 'hostel of another school', file: 'facilities/hostel/[id]', method: 'GET', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
+  { name: 'room list of another school', file: 'facilities/hostel/[id]/room-list', method: 'GET', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
+  { name: 'room in a hostel of another school', file: 'facilities/hostel/rooms', method: 'POST', as: 'OPERATOR', body: () => ({ hostelId: 'not-in-this-school', name: 'Room X' }), expect: 404 },
+  { name: 'beds in a room of another school', file: 'facilities/hostel/beds', method: 'POST', as: 'OPERATOR', body: () => ({ roomId: 'not-in-this-school', count: 2 }), expect: 404 },
+  { name: 'bed in another school for a learner of another school', file: 'facilities/hostel/allocate', method: 'POST', as: 'OPERATOR', body: () => ({ studentId: b().studentId, bedId: 'not-in-this-school' }), expect: 404 },
+  { name: 'release a learner of another school', file: 'facilities/hostel/vacate', method: 'POST', as: 'OPERATOR', body: () => ({ studentId: b().studentId, reason: 'Not mine' }), expect: 404 },
+  { name: 'allocate an intake into a hostel of another school', file: 'facilities/hostel/auto-allocate', method: 'POST', as: 'OPERATOR', body: () => ({ hostelId: 'not-in-this-school' }), expect: 404 },
+  { name: 'bed history of a learner of another school', file: 'facilities/hostel/bed-history', method: 'GET', as: 'OPERATOR', url: () => `?studentId=${b().studentId}`, expect: 404 },
+  { name: 'roll call sheet of a hostel of another school', file: 'facilities/hostel/rollcall', method: 'GET', as: 'OPERATOR', url: () => '?hostelId=not-in-this-school&session=EVENING', expect: 404 },
+  { name: 'roll call for a hostel of another school', file: 'facilities/hostel/rollcall', method: 'POST', as: 'OPERATOR', body: () => ({ hostelId: 'not-in-this-school', date: '2026-10-01', session: 'EVENING', entries: [] }), expect: 404 },
+  { name: 'roll call sync with an empty list', file: 'facilities/hostel/rollcall/sync', method: 'POST', as: 'OPERATOR', body: () => ({ rollCalls: [] }), expect: 422 },
+  { name: 'roll call status', file: 'facilities/hostel/rollcall/status', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'inspections (list)', file: 'facilities/hostel/inspections', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'inspect a room of another school', file: 'facilities/hostel/inspections', method: 'POST', as: 'OPERATOR', body: () => ({ hostelId: 'not-in-this-school', roomId: 'x', items: [{ item: 'LOCKERS', score: 3 }] }), expect: 404 },
+  { name: 'decide damage of another school', file: 'facilities/hostel/inspections/items/[id]/decide', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ decision: 'REJECT', reason: 'Not mine' }), expect: 404 },
+  { name: 'hostel dashboard', file: 'facilities/hostel/dashboard', method: 'GET', as: 'OPERATOR', expect: 'ok' },
 ];
 
 function academicsAttacks(): Attack[] {

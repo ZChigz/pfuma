@@ -6815,6 +6815,7 @@ model FacInspectionItem {
   damageStatus       FacApproval?
   damageApprovedById String?
   ledgerEntryId      String?
+  damageChargeId     String?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @default(now()) @updatedAt
 
