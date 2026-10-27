@@ -22,8 +22,8 @@ beforeAll(async () => {
   ({ prisma } = await import('@/lib/prisma'));
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await buildWorld(prisma, A);
   f2 = await students(prisma, A, W.f2East, 4, 'Two');
   f3 = await students(prisma, A, W.f3North, 4, 'Three');
@@ -35,7 +35,7 @@ afterAll(async () => {
   await t.stop();
 });
 
-const admin = () => A.users.ADMIN;
+const admin = () => A.operator!;
 const teacher = () => A.users.TEACHER;
 const audit = (action: string, entityType?: string) => prisma.auditLog.findMany({ where: { schoolId: A.schoolId, action: action as never, ...(entityType ? { entityType } : {}) } });
 
@@ -70,7 +70,7 @@ describe('departments', () => {
   it('are closed to a teacher, to another school and to visitors', async () => {
     expect((await call('academics/departments', 'POST', { as: teacher(), body: { name: 'Mine' } })).status).toBe(403);
     expect((await call('academics/departments', 'POST', { as: null, body: { name: 'Mine' } })).status).toBe(401);
-    expect((await call('academics/departments/[id]', 'PATCH', { as: B.users.ADMIN, params: { id: W.dept.sciences }, body: { name: 'Hacked' } })).status).toBe(404);
+    expect((await call('academics/departments/[id]', 'PATCH', { as: B.operator!, params: { id: W.dept.sciences }, body: { name: 'Hacked' } })).status).toBe(404);
     expect((await prisma.department.findUniqueOrThrow({ where: { id: W.dept.sciences } })).name).toBe('Sciences');
   });
 });

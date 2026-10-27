@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canManageUsers } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { CreateUserSchema } from '@/lib/validations/admin';
 import { generateTempPassword, hashPassword } from '@/lib/password';
 import type { SessionUser } from '@/types';
@@ -14,7 +14,7 @@ async function _GET() {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageUsers(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'system.users.view');
 
   const users = await db.user.findMany({
     where: { schoolId: user.schoolId, isSupport: false },
@@ -31,7 +31,7 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageUsers(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'system.users.create');
 
   const parsed = await parseBody(req, CreateUserSchema);
   if ('error' in parsed) return parsed.error;

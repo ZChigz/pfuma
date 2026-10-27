@@ -24,9 +24,9 @@ describe('names', () => {
 });
 
 describe('roles', () => {
-  it('are 13, each with a name and an access level', () => {
-    expect(STAFF_ROLES).toHaveLength(13);
-    expect(new Set(STAFF_ROLE_KEYS).size).toBe(13);
+  it('are 14, each with a name and an access level', () => {
+    expect(STAFF_ROLES).toHaveLength(14);
+    expect(new Set(STAFF_ROLE_KEYS).size).toBe(14);
     for (const r of STAFF_ROLES) expect(['ADMIN', 'DIRECTOR', 'HEAD', 'BURSAR', 'LIBRARIAN', 'TEACHER']).toContain(r.access);
   });
   it('give a person the highest access of any role they hold', () => {

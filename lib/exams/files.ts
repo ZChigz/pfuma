@@ -5,7 +5,7 @@ import { ServiceError } from '@/lib/api';
 import { toCsv } from '@/lib/csv';
 import { parseCsv } from '@/lib/students/csv';
 import { getScopedDb } from '@/lib/scoped-db';
-import { holds, isFull, num, resolveTerm, type Actor } from '@/lib/exams/common';
+import { holds, num, resolveTerm, type Actor } from '@/lib/exams/common';
 import { rowsFromTable, TableError } from '@/lib/exams/import-table';
 import type { TemplateData } from '@/lib/exams/import';
 
@@ -81,7 +81,7 @@ export async function tableXlsx(title: string, headers: string[], rows: (string 
 export interface BroadsheetScope { termId?: string; classId?: string; levelId?: string }
 
 export async function broadsheetXlsx(user: Actor, scope: BroadsheetScope): Promise<{ fileName: string; buffer: Buffer }> {
-  if (!isFull(user) && !holds(user, 'exams.results.view') && !holds(user, 'exams.results.publish')) throw new ServiceError('Forbidden', 403);
+  if (!holds(user, 'exams.results.view') && !holds(user, 'exams.results.publish')) throw new ServiceError('Forbidden', 403);
   if (!scope.classId && !scope.levelId) throw new ServiceError('Choose a class or a form', 422);
   const data = await getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const sid = user.schoolId;

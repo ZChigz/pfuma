@@ -136,7 +136,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { label: 'Exeats',         permission: 'facilities.exeats.request',   or: ['facilities.exeats.approve', 'facilities.exeats.signout', 'facilities.visitors.log'], icon: 'calendar' },
       { label: 'Sick bay',       permission: 'facilities.sickbay.record',    or: ['facilities.sickbay.view'], icon: 'shield' },
       { label: 'Tuck shop',      permission: 'facilities.tuckshop.sell',     or: ['facilities.tuckshop.cashup', 'facilities.wallets.manage', 'facilities.wallets.view'], icon: 'card' },
-      { label: 'Library',        permission: 'facilities.library.view',     or: ['facilities.library.desk', 'facilities.library.manage', 'facilities.textbooks.issue'], icon: 'library' },
+      { label: 'Library',        href: '/facilities/library', permission: 'facilities.library.view',     or: ['facilities.library.desk', 'facilities.library.manage', 'facilities.textbooks.issue'], icon: 'library' },
       { label: 'Transport',      permission: 'facilities.transport.manage',  or: ['facilities.transport.trips', 'facilities.transport.assign'], icon: 'assets' },
       { label: 'Inventory',      href: '/facilities/inventory', permission: 'facilities.inventory.view',   or: ['facilities.inventory.manage', 'facilities.inventory.receive', 'facilities.inventory.issue', 'facilities.inventory.count', 'facilities.inventory.writeoff'], icon: 'assets' },
       { label: 'Assets',         permission: 'facilities.assets.view',      or: ['facilities.assets.manage', 'facilities.assets.maintain', 'facilities.assets.dispose', 'facilities.assets.verify'], icon: 'assets' },

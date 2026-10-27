@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { grantRows } from '../../prisma/seed/access';
 import { startTestDb, type TestDb } from '../helpers/test-db';
 import { grantPermission, revokePermission, seedSchool, type SeededSchool } from '../helpers/seed';
 import { call } from '../helpers/route';
@@ -14,6 +15,9 @@ vi.mock('@/lib/auth', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/auth')>()),
   auth: (await import('../helpers/session')).mockAuth,
 }));
+
+// The pages are rendered to HTML here, outside the app, so the router hooks their client parts use are stubbed.
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, refresh: () => undefined }), usePathname: () => '/system/roles', useSearchParams: () => new URLSearchParams() }));
 
 // What the caller sent, for the audit log's address and browser columns.
 const req = vi.hoisted(() => ({ headers: new Headers() }));
@@ -28,7 +32,7 @@ let B: SeededSchool;
 let prisma: typeof import('@/lib/prisma').prisma;
 
 const admin = () => A.users.ADMIN;
-const ROLE_KEYS = ['OWNER', 'HEAD', 'DEPUTY_HEAD', 'ADMINISTRATOR', 'BURSAR', 'ACCOUNTS_CLERK', 'HR_OFFICER', 'HOD', 'TEACHER', 'CLASS_TEACHER', 'EXAMS_OFFICER', 'LIBRARIAN', 'BOARDING_MASTER'];
+const ROLE_KEYS = ['OWNER', 'HEAD', 'DEPUTY_HEAD', 'ADMINISTRATOR', 'BURSAR', 'ACCOUNTS_CLERK', 'HR_OFFICER', 'HOD', 'TEACHER', 'CLASS_TEACHER', 'EXAMS_OFFICER', 'LIBRARIAN', 'BOARDING_MASTER', 'MATRON'];
 const SYSTEM_PERMISSIONS = [
   'system.dashboard.view', 'system.calendar.view', 'system.calendar.create', 'system.calendar.edit', 'system.calendar.delete', 'system.calendar.export',
   'system.settings.view', 'system.settings.edit', 'system.users.view', 'system.users.create', 'system.users.edit', 'system.users.deactivate', 'system.users.export',
@@ -64,12 +68,12 @@ const render = async (user: object, mod: string, props: object = {}) => {
 // ─── Roles and permissions ───────────────────────────────────────────────────
 
 describe('roles and permissions as data', () => {
-  it('gives every school the 13 system roles, each with a name and a one-line description', async () => {
+  it('gives every school the 14 system roles (and the four custom-role templates), each with a name and a one-line description', async () => {
     for (const s of [A, B]) {
       const roles = await prisma.roleDefinition.findMany({ where: { schoolId: s.schoolId } });
-      expect(roles.map((r) => r.key).sort()).toEqual([...ROLE_KEYS].sort());
+      expect(roles.filter((r) => r.isSystem).map((r) => r.key).sort()).toEqual([...ROLE_KEYS].sort());
+      expect(roles.filter((r) => !r.isSystem).map((r) => r.key).sort()).toEqual(['NURSE', 'STOREKEEPER', 'TRANSPORT_OFFICER', 'TUCKSHOP_ATTENDANT']);
       for (const r of roles) {
-        expect(r.isSystem, r.key).toBe(true);
         expect(r.name.length, r.key).toBeGreaterThan(2);
         expect(r.description.length, r.key).toBeGreaterThan(10);
         expect(r.description, r.key).not.toContain('\n');
@@ -77,56 +81,20 @@ describe('roles and permissions as data', () => {
     }
   });
 
-  it('knows every permission key, as module.page.action, and the wildcard', async () => {
+  it('knows every permission key, as module.page.action', async () => {
     const keys = (await prisma.permission.findMany()).map((p) => p.key);
     for (const k of SYSTEM_PERMISSIONS) expect(keys, k).toContain(k);
-    expect(keys).toContain('*');
     for (const k of keys.filter((x) => x !== '*')) expect(k).toMatch(/^[a-z]+\.[a-z_]+\.[a-z_]+$|^[a-z]+\.[a-z]+$/);
     expect((await prisma.permission.findMany({ where: { key: { in: SYSTEM_PERMISSIONS } } })).every((p) => p.module === 'system')).toBe(true);
   });
 
-  it('grants Owner and Administrator everything, every role the dashboard and the calendar, and nothing else', async () => {
+  it('gives every role exactly the grants of the access seed (prisma/seed/access.ts), each at its scope; none holds "*"', async () => {
     const roles = await prisma.roleDefinition.findMany({ where: { schoolId: A.schoolId }, include: { permissions: true } });
     for (const r of roles) {
-      const keys = r.permissions.map((p) => p.permissionKey).sort();
-      if (r.key === 'OWNER' || r.key === 'ADMINISTRATOR') expect(keys, r.key).toEqual(['*', 'system.calendar.view', 'system.dashboard.view']);
-      else {
-        // Teachers and class teachers also hold the own-class keys of Academics (the code narrows them to their own classes).
-        const own = r.key === 'TEACHER'
-          ? ['academics.assignments.view', 'academics.attendance.mark', 'academics.classes.view', 'academics.schemes.edit', 'academics.schemes.view', 'academics.subjects.view', 'academics.timetable.view']
-          : r.key === 'CLASS_TEACHER'
-            ? ['academics.attendance.mark', 'academics.attendance.view', 'academics.classes.view', 'academics.subjects.view', 'academics.timetable.view']
-            : [];
-        // Examinations keys each role starts with (exams_role_keys in the migration).
-        const exams: Record<string, string[]> = {
-          TEACHER: ['exams.analytics.view', 'exams.assessments.create', 'exams.comments.subject', 'exams.marks.enter', 'exams.marks.submit'],
-          CLASS_TEACHER: ['exams.analytics.view', 'exams.comments.class', 'exams.results.view'],
-          HOD: ['exams.analytics.view', 'exams.marks.verify', 'exams.marks.view', 'exams.results.view'],
-          HEAD: ['exams.analytics.view', 'exams.comments.head', 'exams.marks.unlock', 'exams.marks.view', 'exams.projects.manage', 'exams.reportcards.settings', 'exams.results.publish', 'exams.results.unpublish', 'exams.results.view', 'exams.setup.manage', 'exams.zimsec.approve'],
-          DEPUTY_HEAD: ['exams.analytics.view', 'exams.marks.view', 'exams.results.view', 'exams.timetable.approve'],
-          EXAMS_OFFICER: ['exams.analytics.view', 'exams.invigilation.manage', 'exams.marks.view', 'exams.projects.manage', 'exams.results.view', 'exams.setup.manage', 'exams.timetable.manage', 'exams.zimsec.manage', 'exams.zimsec.results_import'],
-        };
-        // Finance keys each role starts with (finance_role_keys in the migration): everyone who can ask for spending, and the finance people.
-        const raise = ['finance.requests.create'];
-        const finance: Record<string, string[]> = {
-          TEACHER: raise, HOD: raise, EXAMS_OFFICER: raise, LIBRARIAN: raise, HR_OFFICER: raise, BOARDING_MASTER: raise,
-          DEPUTY_HEAD: ['finance.fees.view', 'finance.requests.create'],
-          ACCOUNTS_CLERK: ['finance.fees.view', 'finance.accounts.view', 'finance.payments.view', 'finance.payments.record', 'finance.statements.view', 'finance.cashup.submit', 'finance.requests.view', 'finance.requests.create'],
-          HEAD: ['finance.dashboard.view', 'finance.fees.view', 'finance.fees.approve', 'finance.accounts.view', 'finance.payments.view', 'finance.payments.verify', 'finance.adjustments.approve', 'finance.awards.approve', 'finance.plans.approve', 'finance.statements.view', 'finance.expenses.view', 'finance.requests.view', 'finance.requests.create', 'finance.requests.approve', 'finance.funds.manage', 'finance.rates.view', 'finance.cashup.signoff', 'finance.reports.view', 'finance.reports.export'],
-          BURSAR: ['finance.dashboard.view', 'finance.fees.view', 'finance.fees.manage', 'finance.billing.run', 'finance.accounts.view', 'finance.charges.create', 'finance.adjustments.create', 'finance.sponsors.manage', 'finance.payments.view', 'finance.payments.record', 'finance.payments.verify', 'finance.payments.allocate', 'finance.refunds.request', 'finance.refunds.pay', 'finance.credit.transfer', 'finance.statements.view', 'finance.plans.manage', 'finance.expenses.view', 'finance.expenses.record', 'finance.expenses.manage', 'finance.suppliers.manage', 'finance.budgets.manage', 'finance.requests.view', 'finance.requests.create', 'finance.requests.disburse', 'finance.rates.view', 'finance.rates.manage', 'finance.cashup.confirm', 'finance.bank.reconcile', 'finance.reports.view', 'finance.reports.export', 'finance.payroll.pay'],
-          CLASS_TEACHER: ['finance.requests.create', 'finance.arrears.flag'],
-        };
-        // HR keys (hr_role_keys in the migration): every staff member gets the self-service keys; a few roles get more.
-        const self = ['hr.attendance.self', 'hr.leave.request', 'hr.self.details', 'hr.self.leave', 'hr.self.payslips'];
-        const hrMore: Record<string, string[]> = {
-          HEAD: ['hr.directory.view', 'hr.employees.view', 'hr.staff.view', 'hr.posts.approve', 'hr.leave.approve', 'hr.leave.view_all', 'hr.leave.view', 'hr.attendance.view', 'hr.duties.approve', 'hr.duties.view', 'hr.discipline.view', 'hr.reports.view'],
-          DEPUTY_HEAD: ['hr.directory.view', 'hr.attendance.view', 'hr.attendance.mark', 'hr.duties.manage', 'hr.duties.view', 'hr.leave.approve', 'hr.leave.view'],
-          HR_OFFICER: ['hr.directory.view', 'hr.employees.view', 'hr.employees.manage', 'hr.staff.view', 'hr.pay.view', 'hr.pay.manage', 'hr.posts.manage', 'hr.recruitment.manage', 'hr.contracts.manage', 'hr.attendance.mark', 'hr.attendance.view', 'hr.attendance.correct', 'hr.leave.view_all', 'hr.leave.view', 'hr.leave.adjust', 'hr.duties.view', 'hr.payroll.prepare', 'hr.payroll.view', 'hr.payroll.settings', 'hr.documents.manage', 'hr.discipline.manage', 'hr.discipline.view', 'hr.reports.view'],
-          BURSAR: ['hr.payroll.settings'], HOD: ['hr.directory.view', 'hr.duties.view'], BOARDING_MASTER: ['hr.duties.view'],
-        };
-        expect(keys, r.key).toEqual([...own, ...(exams[r.key] ?? []), ...(finance[r.key] ?? []), ...self, ...(hrMore[r.key] ?? []), 'system.calendar.view', 'system.dashboard.view'].sort());
-      }
+      const want = grantRows().filter((g) => g.role === r.key).map((g) => `${g.key}@${g.scope}`).sort();
+      expect(r.permissions.map((p) => `${p.permissionKey}@${p.scope}`).sort(), r.key).toEqual(want);
     }
+    for (const r of roles) expect(r.permissions.map((p) => p.permissionKey), r.key).not.toContain('*');
   });
 
   it('cannot delete or re-key a system role, but a name can be changed', async () => {
@@ -143,9 +111,10 @@ describe('roles and permissions as data', () => {
   it('keeps the scope columns ready on UserRole: whole school by default, with a place for a department, class or hostel', async () => {
     const row = await prisma.userRole.findFirstOrThrow({ where: { userId: A.users.TEACHER.id } });
     expect(row).toMatchObject({ scopeType: 'SCHOOL', scopeId: '' });
+    // (the seeded teacher is also a class teacher, so holds two school-wide roles)
     const hod = await prisma.roleDefinition.findFirstOrThrow({ where: { schoolId: A.schoolId, key: 'HOD' } });
     await prisma.userRole.create({ data: { schoolId: A.schoolId, userId: A.users.TEACHER.id, roleId: hod.id, scopeType: 'DEPARTMENT', scopeId: 'sciences' } });
-    expect((await prisma.userRole.findMany({ where: { userId: A.users.TEACHER.id } })).map((r) => r.scopeType).sort()).toEqual(['DEPARTMENT', 'SCHOOL']);
+    expect((await prisma.userRole.findMany({ where: { userId: A.users.TEACHER.id } })).map((r) => r.scopeType).sort()).toEqual(['DEPARTMENT', 'SCHOOL', 'SCHOOL']);
     await prisma.userRole.deleteMany({ where: { userId: A.users.TEACHER.id, roleId: hod.id } });
   });
 
@@ -187,23 +156,28 @@ describe('the Roles & Permissions page', () => {
     expect(html).toContain('Runs the library: books, borrowing and fines.');
     expect(html).toMatch(/Librarian<\/span><span[^>]*>1 user</);
     expect(html).toContain('By user');
+    expect(html).toContain('Exceptions');
   });
 
   it('opens a role to a read-only grid of ticks, with the note, and who holds it', async () => {
     const teacher = renderToStaticMarkup(await render(admin(), '@/app/(dashboard)/system/roles/[key]/page', { params: { key: 'TEACHER' } }));
-    expect(teacher).toContain('Access levels will be configurable soon');
-    expect(teacher.match(/✓/g)).toHaveLength(2); // the dashboard and the calendar, to look
+    expect(teacher).toContain('This is a system role');
+    expect(teacher).toContain('See the dashboard');
     expect(teacher).toContain(A.users.TEACHER.fullName);
-    expect(teacher).not.toContain('<input');
+    expect(teacher).not.toContain('<input'); // a system role is read-only
+    expect(teacher).toContain('Copy to custom role');
     const adminHtml = renderToStaticMarkup(await render(admin(), '@/app/(dashboard)/system/roles/[key]/page', { params: { key: 'ADMINISTRATOR' } }));
-    expect(adminHtml.match(/✓/g)!.length).toBe(SYSTEM_PERMISSIONS.length);
-    expect(adminHtml).toContain('full access');
+    expect(adminHtml.match(/✓/g)!.length).toBeGreaterThanOrEqual(SYSTEM_PERMISSIONS.length);
+    expect(adminHtml).not.toContain('Copy to custom role'); // the Administrator may not copy a protected role; only the Owner may
+    expect(adminHtml).not.toContain('full access');          // nobody holds everything any more
+    expect(renderToStaticMarkup(await render(A.users.DIRECTOR, '@/app/(dashboard)/system/roles/[key]/page', { params: { key: 'ADMINISTRATOR' } }))).toContain('Copy to custom role');
     expect(adminHtml).toContain(A.users.ADMIN.fullName);
   });
 
-  it('shows the placeholder for roles by user, and a 404 for a role that does not exist', async () => {
+  it('lists people with a way to manage their access, and a 404 for a role that does not exist', async () => {
     const tab = renderToStaticMarkup(await render(admin(), '@/app/(dashboard)/system/roles/page', { searchParams: { tab: 'users' } }));
-    expect(tab).toContain('coming soon');
+    expect(tab).toContain('Manage access');
+    expect(tab).toContain(`/system/users/${A.users.TEACHER.id}/access`);
     await expect(render(admin(), '@/app/(dashboard)/system/roles/[key]/page', { params: { key: 'NOPE' } })).rejects.toThrow();
     await expect(render(A.users.TEACHER, '@/app/(dashboard)/system/roles/[key]/page', { params: { key: 'OWNER' } })).resolves.toBeTruthy(); // denied page, not an error
   });
@@ -212,7 +186,8 @@ describe('the Roles & Permissions page', () => {
 // ─── Audit log ───────────────────────────────────────────────────────────────
 
 describe('the audit log', () => {
-  const get = async (query = '', as: object = admin()) => (await call('system/audit-log', 'GET', { as: as as never, query })).json.data;
+  // The Owner reads the whole log (finance entries need finance.reports.view as well as the audit permission, which the Administrator lacks).
+  const get = async (query = '', as: object = A.users.DIRECTOR) => (await call('system/audit-log', 'GET', { as: as as never, query })).json.data;
 
   it('keeps the address and browser of the caller on each entry, and the module of the record', async () => {
     req.headers = new Headers({ 'x-forwarded-for': '203.0.113.9, 10.0.0.1', 'user-agent': 'TestBrowser/1.0 (Windows)' });
@@ -276,7 +251,7 @@ describe('the audit log', () => {
   });
 
   it('exports exactly the filtered list as CSV, with the columns of the screen', async () => {
-    const r = await call('system/audit-log', 'GET', { as: admin(), query: '?format=csv&module=finance' });
+    const r = await call('system/audit-log', 'GET', { as: A.users.DIRECTOR, query: '?format=csv&module=finance' });
     expect(r.status).toBe(200);
     const lines = r.text.replace(/^﻿/, '').trim().split('\r\n');
     expect(lines[0]).toBe('Date and time,User,Action,Action code,Module,Record type,Record,Record ID,IP');
@@ -555,7 +530,10 @@ describe('my profile', () => {
     const tree = (await render(A.users.TEACHER, '@/app/(dashboard)/system/profile/page')) as unknown as { props: { children: { props: Record<string, unknown> }[] } };
     const form = tree.props.children[1].props as { phone: string; roles: { key: string; name: string; description: string }[]; canUpdate: boolean; canChangePassword: boolean };
     expect(form.phone).toBe('+263782223344');
-    expect(form.roles).toEqual([{ key: 'TEACHER', name: 'Teacher', description: expect.stringContaining('Teaches classes') }]);
+    expect(form.roles).toEqual([
+      { key: 'TEACHER', name: 'Teacher', description: expect.stringContaining('Teaches classes') },
+      { key: 'CLASS_TEACHER', name: 'Class Teacher', description: expect.stringContaining('one class') },
+    ]);
     expect(form.canUpdate && form.canChangePassword).toBe(true);
   });
 });

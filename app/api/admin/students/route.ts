@@ -33,7 +33,7 @@ async function _GET(req: NextRequest) {
       status: 'ACTIVE',
       ...(classId ? { classId } : {}),
       ...(levelId ? { class: { levelId } } : {}),
-      student: studentScope(access, term.id),
+      student: await studentScope(access, term.id),
     },
     include: {
       student: { select: { id: true, admissionNumber: true, fullName: true, status: true } },

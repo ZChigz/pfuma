@@ -4,10 +4,12 @@
 import { z } from 'zod';
 import type { Employee, EmployeeCategory, EmployeeStatus, HrEmployer, Prisma } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
+import * as guards from '@/lib/access/guards';
+import { maskTail } from '@/lib/access/serializers/mask';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { normalizeZimbabwePhone } from '@/lib/phone';
 import {
-  audit, runsIn, canSeePay, centsSchema, currencySchema, employeeById, fullName, hrHolds, idSchema, isoDateSchema, isOwner, logSensitiveView, need, nextEmployeeNo,
+  audit, runsIn, canSeePay, centsSchema, currencySchema, employeeById, fullName, hrHolds, idSchema, isoDateSchema, logSensitiveView, need, nextEmployeeNo,
   optText, reasonSchema, tellEmployee, tellHolders, textSchema, toDay, isoOf, todayInHarare, type Actor,
 } from '@/lib/hr/common';
 import { ensureHrDefaults } from '@/lib/hr/defaults';
@@ -348,8 +350,12 @@ async function readPay(tx: Db, user: Actor, e: Employee, log: boolean) {
   const defs = await tx.payComponent.findMany({ where: { schoolId: user.schoolId } });
   const name = new Map(defs.map((d) => [d.id, d]));
   const loans = await tx.loan.findMany({ where: { schoolId: user.schoolId, employeeId: e.id }, orderBy: { createdAt: 'desc' } });
+  // A person reading their own pay without hr.pay.view sees the figures, but tax and NSSA numbers cut to their last 4 characters and no bank account number.
+  const mine = e.userId === user.id && !hrHolds(user, 'hr.pay.view');
+  const fields = Object.fromEntries(PAY_FIELDS.map((f) => [f, p[f] ?? null]));
+  if (mine) Object.assign(fields, { zimraTaxNo: maskTail(p.zimraTaxNo, 4), nssaNo: maskTail(p.nssaNo, 4), accountNumber: null });
   return {
-    ...Object.fromEntries(PAY_FIELDS.map((f) => [f, p[f] ?? null])), effectiveFrom: isoOf(p.effectiveFrom),
+    ...fields, effectiveFrom: isoOf(p.effectiveFrom),
     components: comps.map((c) => ({ id: c.id, componentId: c.componentId, name: name.get(c.componentId)?.name ?? '?', kind: name.get(c.componentId)?.kind ?? 'ALLOWANCE', amountCents: c.amountCents, currency: c.currency, startsOn: isoOf(c.startsOn), endsOn: c.endsOn ? isoOf(c.endsOn) : null, active: c.active, childStudentId: c.childStudentId })),
     loans: loans.map((l) => ({ id: l.id, principalCents: l.principalCents, balanceCents: l.balanceCents, instalmentCents: l.instalmentCents, currency: l.currency, status: l.status, startMonth: l.startMonth })),
   };
@@ -533,7 +539,7 @@ export async function requestChange(user: Actor, raw: unknown) {
 }
 
 export async function listChangeRequests(user: Actor) {
-  const hr = hrHolds(user, 'hr.employees.manage') || isOwner(user);
+  const hr = hrHolds(user, 'hr.employees.manage') || hrHolds(user, 'hr.pay.view');
   if (!hr) need(user, 'hr.self.details');
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const own = hr ? null : await tx.employee.findFirst({ where: { schoolId: user.schoolId, userId: user.id }, select: { id: true } });
@@ -565,7 +571,11 @@ export async function decideChange(user: Actor, id: string, raw: unknown) {
     if (r.requestedById === user.id || e.userId === user.id) throw new ServiceError('You cannot decide your own request', 403);
     const secondStep = r.status === 'HR_APPROVED';
     // First step: HR. Second step (bank only): the Owner.
-    if (secondStep) { if (!(isOwner(user) && hrHolds(user, 'hr.pay.manage'))) throw new ServiceError('A bank change needs the Owner\'s approval as well as HR\'s', 403); }
+    if (secondStep) {
+      // Rule 9: the pair that approves a bank change is HR and the Owner, two different people.
+      const first = await tx.userRole.findMany({ where: { userId: r.hrDecidedById ?? '' }, select: { role: { select: { key: true } } } });
+      guards.bankChangeNeedsHrAndOwner({ id: r.hrDecidedById ?? '', roles: first.map((k) => k.role.key) }, user);
+    }
     // The first step is HR's own: the key must be granted to a role (an HR Officer), not just held through the Owner's "*".
     else if (!(user.grants ?? []).includes('hr.employees.manage')) throw new ServiceError('HR approves a bank change first; then the Owner approves it.', 403);
     if (secondStep && r.hrDecidedById === user.id) throw new ServiceError('A bank change needs two different people to approve it', 403);

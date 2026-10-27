@@ -1,6 +1,7 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
+import { authorize } from '@/lib/access';
 import { logAudit } from '@/lib/audit';
 import { parseBody, apiSuccess, apiUnauthorized, withApi, apiError } from '@/lib/api';
 import { z } from 'zod';
@@ -15,13 +16,12 @@ const SetExchangeRateSchema = z.object({
   source: z.enum(['RBZ', 'SCHOOL', 'OTHER']).optional().default('SCHOOL'),
 });
 
-const ALLOWED_ROLES = ['BURSAR', 'HEAD', 'DIRECTOR'] as const;
-
 async function _GET(_req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorize(user, 'finance.rates.view');
 
   // The rate in force now: latest effectiveFrom on or before now, not simply the newest row.
   const rate = await rateFor(db, new Date());
@@ -39,12 +39,7 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  if (!ALLOWED_ROLES.includes(user.role as typeof ALLOWED_ROLES[number])) {
-    return new Response(
-      JSON.stringify({ success: false, message: 'Forbidden' }),
-      { status: 403, headers: { 'Content-Type': 'application/json' } },
-    );
-  }
+  await authorize(user, 'finance.rates.manage');
 
   const parsed = await parseBody(req, SetExchangeRateSchema);
   if ('error' in parsed) return parsed.error;

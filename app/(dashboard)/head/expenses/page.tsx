@@ -2,9 +2,9 @@ import { StatCard } from '@/components/ui/StatCard';
 import { sendToFinance } from '@/lib/finance/legacy-redirect';
 import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
+import { guardPage, can } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
-import { Permission } from '@/lib/permissions';
 import { formatUSD, formatZiG, formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { LogExpenseModal } from '@/components/accounting/LogExpenseModal';
@@ -30,7 +30,7 @@ export default async function HeadExpensesPage({
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
-  if (user.role !== 'HEAD') redirect('/');
+  const access = await guardPage(user, 'finance.expenses.view');
 
   const { currency, category, from, to } = searchParams;
 
@@ -55,7 +55,7 @@ export default async function HeadExpensesPage({
     orderBy: { spentOn: 'desc' },
   });
 
-  const canVoid = Permission.voidExpense.includes(user.role);
+  const canVoid = can(access, 'finance.expenses.void');
 
   // Summary
   const totalUSD = expenses

@@ -2,11 +2,11 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
-import { canManageLibrary } from '@/lib/permissions';
+import { authorize, authorizeAny } from '@/lib/access';
 import { parseBody, apiSuccess, apiError, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { CheckoutSchema } from '@/lib/validations/library';
 import { getDaysOverdue } from '@/lib/utils';
-import { checkoutBlock, memberName } from '@/lib/library';
+import { checkoutBlock, memberName, libraryMoved, LIBRARY_MOVED_MESSAGE } from '@/lib/library';
 import type { SessionUser } from '@/types';
 
 async function _GET(req: NextRequest) {
@@ -14,6 +14,7 @@ async function _GET(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorizeAny(user, ['facilities.library.desk', 'facilities.library.view']);
 
   const { searchParams } = req.nextUrl;
   const overdue   = searchParams.get('overdue')   === 'true';
@@ -57,8 +58,9 @@ async function _POST(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  if (await libraryMoved(db, user.schoolId)) return apiError(LIBRARY_MOVED_MESSAGE, 409);
 
-  try { await canManageLibrary(user.role); } catch (res) { return res as Response; }
+  await authorize(user, 'facilities.library.desk');
 
   const parsed = await parseBody(req, CheckoutSchema);
   if ('error' in parsed) return parsed.error;

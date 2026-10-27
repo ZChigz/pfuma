@@ -10,6 +10,7 @@ import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DataTable, type DataColumn } from '@/components/ui/DataTable';
+import { useCan } from '@/components/access/AccessProvider';
 import { Drawer } from '@/components/ui/Drawer';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -90,6 +91,7 @@ const firstError = (body: { errors?: Record<string, string[]>; message?: string 
 
 export function UsersClient(props: Props) {
   const router = useRouter();
+  const mayManageAccess = useCan('system.roles.view');
   const params = useSearchParams();
   const [drawer, setDrawer] = useState<{ mode: 'create' } | { mode: 'edit'; user: UserRowData } | null>(null);
   const [pending, setPending] = useState<Pending>(null);
@@ -206,6 +208,7 @@ export function UsersClient(props: Props) {
       render: (u) => (
         <div className="-ml-2.5 flex flex-wrap items-center">
           {props.canUpdate && <button type="button" className={action} onClick={() => openDrawer({ mode: 'edit', user: u })}>Edit</button>}
+          {mayManageAccess && <Link href={`/system/users/${u.id}/access`} className={cn(action, 'inline-flex items-center')}>Manage access</Link>}
           {props.canInvite && u.status === 'invited' && <button type="button" className={action} disabled={busy} onClick={() => newInvite(u)}>New invite</button>}
           {props.canDeactivate && u.id !== props.currentUserId && (
             <button type="button" className={action} onClick={() => setPending({ kind: u.status === 'deactivated' ? 'reactivate' : 'deactivate', user: u })}>

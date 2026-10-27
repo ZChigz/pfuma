@@ -1,3 +1,4 @@
+import { can, type AccessUser, type PermissionKey } from '@/lib/access-core';
 import type { UserRole } from '@/types';
 
 export const icons: Record<string, string> = {
@@ -16,12 +17,18 @@ export const icons: Record<string, string> = {
   calendar:  'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
 };
 
-// ─── Nav config ──────────────────────────────────────────────────────────────
+// ─── The older screens ──────────────────────────────────────────────────────
+// Screens written before roles were data (the Head's office, the Bursar's desk, the teacher's mark entry ...). The sidebar lists the ones
+// a person may use, each by the permission that opens it, never by a role name; the page and the routes behind it check the same key.
 
 export interface NavItem {
   href: string;
   label: string;
   icon: keyof typeof icons;
+  /** Shown to, and opened by, anyone holding this permission ... */
+  permission: PermissionKey;
+  /** ... or any of these. */
+  or?: PermissionKey[];
 }
 
 export interface NavSection {
@@ -29,113 +36,81 @@ export interface NavSection {
   items: NavItem[];
 }
 
-export interface RoleNav {
+export interface Workspace {
   header: string;
   sections: NavSection[];
 }
 
-export const ROLE_NAV: Record<UserRole, RoleNav> = {
-  ADMIN: {
-    header: 'Admin Panel',
-    sections: [
-      {
-        title: 'Setup',
-        items: [
-          { href: '/admin',          label: 'Dashboard', icon: 'dashboard' },
-          { href: '/admin/users',    label: 'Users',    icon: 'students' },
-          { href: '/admin/classes',  label: 'Classes',  icon: 'classes'  },
-          { href: '/students', label: 'Students', icon: 'students' },
-          { href: '/admin/subjects', label: 'Subjects', icon: 'subjects' },
-          { href: '/admin/academic', label: 'Academic calendar', icon: 'calendar' },
-          { href: '/students/promotion', label: 'Promotions', icon: 'classes' },
-        ],
-      },
+export const LEGACY_SECTIONS: NavSection[] = [
+  {
+    title: 'Setup',
+    items: [
+      { href: '/admin',          label: 'Dashboard',         icon: 'dashboard', permission: 'system.users.view' },
+      { href: '/admin/users',    label: 'Users',             icon: 'students',  permission: 'system.users.edit' },
+      { href: '/admin/classes',  label: 'Classes',           icon: 'classes',   permission: 'academics.classes.manage' },
+      { href: '/admin/subjects', label: 'Subjects',          icon: 'subjects',  permission: 'academics.subjects.manage' },
+      { href: '/admin/academic', label: 'Academic calendar', icon: 'calendar',  permission: 'system.settings.edit' },
     ],
   },
-  DIRECTOR: {
-    header: 'Director',
-    sections: [
-      {
-        title: 'Finance',
-        items: [
-          { href: '/finance',        label: 'Finance module', icon: 'payments' },
-          { href: '/director',       label: 'Profitability', icon: 'dashboard' },
-          { href: '/director/voids', label: 'Void Entries',  icon: 'expenses'  },
-        ],
-      },
+  {
+    title: 'Finance',
+    items: [
+      { href: '/director',       label: 'Profitability',    icon: 'dashboard', permission: 'finance.reports.view' },
+      { href: '/director/voids', label: 'Void Entries',     icon: 'expenses',  permission: 'finance.payments.void' },
+      { href: '/head',           label: 'Dashboard',        icon: 'dashboard', permission: 'finance.dashboard.view' },
+      { href: '/head/fees',      label: 'Fee Management',   icon: 'payments',  permission: 'finance.fees.approve' },
+      { href: '/head/payments',  label: 'Payments',         icon: 'payments',  permission: 'finance.payments.verify' },
+      { href: '/head/expenses',  label: 'Expenses',         icon: 'expenses',  permission: 'finance.expenses.view' },
+      { href: '/head/requests',  label: 'Expense Requests', icon: 'expenses',  permission: 'finance.requests.approve' },
     ],
   },
-  HEAD: {
-    header: "Head's Office",
-    sections: [
-      {
-        title: 'Finance',
-        items: [
-          { href: '/finance',       label: 'Finance module',   icon: 'payments' },
-          { href: '/head',          label: 'Dashboard',        icon: 'dashboard' },
-          { href: '/head/fees',     label: 'Fee Management',   icon: 'payments' },
-          { href: '/head/payments', label: 'Payments',         icon: 'payments' },
-          { href: '/head/expenses', label: 'Expenses',         icon: 'expenses' },
-          { href: '/head/requests', label: 'Expense Requests', icon: 'expenses' },
-        ],
-      },
-      {
-        title: 'Academic',
-        items: [
-          { href: '/head/results', label: 'Results', icon: 'results' },
-          { href: '/head/reports', label: 'Reports', icon: 'reports' },
-        ],
-      },
+  {
+    title: 'Academic',
+    items: [
+      { href: '/head/results', label: 'Results', icon: 'results', permission: 'exams.results.publish' },
+      { href: '/head/reports', label: 'Reports', icon: 'reports', permission: 'exams.results.view' },
     ],
   },
-  BURSAR: {
-    header: 'Bursar',
-    sections: [
-      {
-        title: 'Daily Work',
-        items: [
-          { href: '/finance',              label: 'Finance module',  icon: 'payments' },
-          { href: '/bursar/students',      label: 'Students',        icon: 'students' },
-          { href: '/bursar/payments',      label: 'Record Payment',  icon: 'payments' },
-          { href: '/bursar/disbursements', label: 'Disbursements',   icon: 'expenses' },
-          { href: '/bursar/expenses',      label: 'Direct Expenses', icon: 'expenses' },
-        ],
-      },
+  {
+    title: 'Daily Work',
+    items: [
+      { href: '/bursar/students',      label: 'Students',        icon: 'students', permission: 'finance.accounts.view' },
+      { href: '/bursar/payments',      label: 'Record Payment',  icon: 'payments', permission: 'finance.payments.record' },
+      { href: '/bursar/disbursements', label: 'Disbursements',   icon: 'expenses', permission: 'finance.requests.disburse' },
+      { href: '/bursar/expenses',      label: 'Direct Expenses', icon: 'expenses', permission: 'finance.expenses.record' },
     ],
   },
-  TEACHER: {
-    header: 'Teacher',
-    sections: [
-      {
-        title: 'Academic',
-        items: [
-          { href: '/teacher/marks',   label: 'Mark Entry', icon: 'marks'   },
-          { href: '/teacher/classes', label: 'My Classes', icon: 'classes' },
-        ],
-      },
-      {
-        title: 'Finance',
-        items: [
-          { href: '/teacher/requests', label: 'Requests', icon: 'expenses' },
-        ],
-      },
+  {
+    title: 'Teaching',
+    items: [
+      { href: '/teacher/marks',    label: 'Mark Entry', icon: 'marks',    permission: 'exams.marks.enter' },
+      { href: '/teacher/classes',  label: 'My Classes', icon: 'classes',  permission: 'academics.classes.view' },
+      { href: '/teacher/requests', label: 'Requests',   icon: 'expenses', permission: 'finance.requests.create' },
     ],
   },
-  LIBRARIAN: {
-    header: 'Library',
-    sections: [
-      {
-        title: 'Library',
-        items: [
-          { href: '/library',          label: 'Dashboard', icon: 'dashboard' },
-          { href: '/library/catalog',  label: 'Catalog',   icon: 'library'   },
-          { href: '/library/borrowing', label: 'Checkout', icon: 'students'  },
-        ],
-      },
+  {
+    title: 'Library',
+    items: [
+      { href: '/library',           label: 'Dashboard', icon: 'dashboard', permission: 'facilities.library.view' },
+      { href: '/library/catalog',   label: 'Catalog',   icon: 'library',   permission: 'facilities.library.view' },
+      { href: '/library/borrowing', label: 'Checkout',  icon: 'students',  permission: 'facilities.library.desk' },
     ],
   },
-};
+];
 
+/**
+ * The older screens this person may use. A key held only through the temporary "*" does not count here, so an Owner or Administrator
+ * is not shown every desk in the building; once "*" is gone the two lists are the same.
+ */
+export function workspaceFor(user: AccessUser, header: string): Workspace | null {
+  const held = (k: PermissionKey) => can(user, k) && (!user.effective || user.effective.grants.has(k));
+  const sections = LEGACY_SECTIONS
+    .map((s) => ({ title: s.title, items: s.items.filter((i) => held(i.permission) || (i.or ?? []).some(held)) }))
+    .filter((s) => s.items.length > 0);
+  return sections.length ? { header, sections } : null;
+}
+
+/** Labels for the older single access level (shown on the older Users screen). Not used to decide anything. */
 export const ROLE_LABELS: Record<UserRole, string> = {
   ADMIN:     'Admin',
   DIRECTOR:  'Director',
@@ -144,11 +119,6 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   TEACHER:   'Teacher',
   LIBRARIAN: 'Librarian',
 };
-
-export function flatNav(role: UserRole | undefined): NavItem[] {
-  if (!role) return [];
-  return ROLE_NAV[role].sections.flatMap((s) => s.items);
-}
 
 // Routes that have nested sub-pages need exact matching on their root
 // so the parent link isn't highlighted while viewing a child page.

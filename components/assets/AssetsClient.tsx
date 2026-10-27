@@ -2,6 +2,7 @@
 
 import { StatCard } from '@/components/ui/StatCard';
 import { useMemo, useState } from 'react';
+import { useCan } from '@/components/access/AccessProvider';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
@@ -9,7 +10,7 @@ import { Select } from '@/components/ui/Select';
 import { Table } from '@/components/ui/Table';
 import { AddAssetModal } from '@/components/assets/AddAssetModal';
 import { formatDate } from '@/lib/utils';
-import type { AssetCondition, AssetStatus, UserRole } from '@/types';
+import type { AssetCondition, AssetStatus } from '@/types';
 
 type AssetRow = {
   id: string;
@@ -39,7 +40,6 @@ interface Props {
   categories:     { id: string; name: string }[];
   stats:          { activeCount: number; maintenanceCount: number; disposedThisTerm: number };
   overdueAssets:  OverdueAsset[];
-  userRole:       UserRole;
 }
 
 const CONDITION_OPTIONS = [
@@ -80,7 +80,7 @@ function statusBadge(status: AssetStatus) {
   return <Badge variant={cfg.variant} label={cfg.label} />;
 }
 
-export function AssetsClient({ initialAssets, categories, stats, overdueAssets, userRole }: Props) {
+export function AssetsClient({ initialAssets, categories, stats, overdueAssets }: Props) {
   const router = useRouter();
 
   const [q,         setQ]         = useState('');
@@ -153,7 +153,7 @@ export function AssetsClient({ initialAssets, categories, stats, overdueAssets, 
     },
   ];
 
-  const canManage = ['DIRECTOR', 'HEAD', 'BURSAR'].includes(userRole);
+  const canManage = useCan('facilities.assets.manage');
 
   return (
     <div className="flex flex-col gap-6">

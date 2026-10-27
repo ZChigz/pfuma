@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startTestDb, type TestDb } from '../helpers/test-db';
 import { seedSchool, type SeededSchool } from '../helpers/seed';
+import { PERMISSION_KEYS } from '@/lib/access-core';
 
 vi.mock('@/lib/auth', async () => ({ auth: (await import('../helpers/session')).mockAuth }));
 
@@ -16,7 +17,7 @@ let prisma: typeof import('@/lib/prisma').prisma;
 const day = 864e5;
 const dbOf = async (s: SeededSchool) => (await import('@/lib/scoped-db')).getScopedDb(s.schoolId, s.users.ADMIN.id);
 const termOf = (id: string) => prisma.academicTerm.findUniqueOrThrow({ where: { id } });
-const userOf = (s: SeededSchool) => ({ id: s.users.ADMIN.id, schoolId: s.schoolId, role: 'ADMIN' as const, grants: ['*'] });
+const userOf = (s: SeededSchool) => ({ id: s.users.ADMIN.id, schoolId: s.schoolId, role: 'ADMIN' as const, grants: [...PERMISSION_KEYS] });
 const html = async (el: unknown) => renderToStaticMarkup((await el) as never);
 
 async function addStudent(s: SeededSchool, n: number, gender: 'M' | 'F' | null, classId: string, termId: string) {
@@ -176,7 +177,7 @@ describe('recent activity', () => {
     await prisma.auditLog.create({ data: { schoolId: B.schoolId, actorId: B.users.ADMIN.id, action: 'CREATE_USER', entityType: 'User', entityId: 'u', detail: 'B secret person', createdAt: new Date() } });
     await prisma.auditLog.create({ data: { schoolId: A.schoolId, actorId: actor.id, action: 'DATA_UPDATE', entityType: 'User', entityId: 'u', createdAt: new Date() } });
 
-    const feed = await loadFeed(await dbOf(A), A.schoolId);
+    const feed = await loadFeed(await dbOf(A), A.schoolId, { id: A.users.ADMIN.id, schoolId: A.schoolId, role: 'ADMIN' as never, grants: [...PERMISSION_KEYS] });
     const first = feed.map((f) => f.text);
     expect(first).toContain('School A HEAD added 42 students'.replace('School A HEAD', 'S. HEAD'));
     expect(first.some((x) => x.includes('B secret person'))).toBe(false);
@@ -197,7 +198,7 @@ describe('recent activity', () => {
   it('shows an empty state for a school with no activity', async () => {
     const { RecentActivity } = await import('@/components/system/lists/Lists');
     const fresh = await prisma.school.create({ data: { name: 'Fresh' } });
-    const out = await html(RecentActivity({ user: { id: 'x', schoolId: fresh.id, role: 'ADMIN', grants: ['*'] } }));
+    const out = await html(RecentActivity({ user: { id: 'x', schoolId: fresh.id, role: 'ADMIN', grants: [...PERMISSION_KEYS] } }));
     expect(out).toContain('Nothing has been done yet');
   });
 });

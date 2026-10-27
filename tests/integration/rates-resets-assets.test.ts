@@ -72,7 +72,7 @@ describe('5.3 — the rate for a date is the latest effectiveFrom on or before i
   });
 
   it('a rate without a start date applies from now', async () => {
-    const r = await call('accounting/exchange-rate', 'POST', { as: A.users.HEAD, body: { usdToZig: 26 } });
+    const r = await call('accounting/exchange-rate', 'POST', { as: A.users.BURSAR, body: { usdToZig: 26 } });
     expect(r.status).toBe(201);
     const row = await prisma.exchangeRate.findUniqueOrThrow({ where: { id: r.json.data.rate.id } });
     expect(Math.abs(row.effectiveFrom.getTime() - Date.now())).toBeLessThan(10_000);
@@ -276,20 +276,20 @@ describe('5.5 — asset tags, transfers and disposal income', () => {
     currency: 'USD', location: 'Lab', condition: 'GOOD', ...over,
   });
   const create = async (over: Record<string, unknown> = {}) => {
-    const r = await call('assets', 'POST', { as: A.users.HEAD, body: asset(over) });
+    const r = await call('assets', 'POST', { as: A.users.BURSAR, body: asset(over) });
     expect(r.status).toBe(201);
     return r.json.data.asset as { id: string };
   };
 
   it('a tag number is unique within a school (but another school may reuse it)', async () => {
     await create({ tagNumber: 'UNIQ-1' });
-    const dup = await call('assets', 'POST', { as: A.users.HEAD, body: asset({ tagNumber: 'UNIQ-1', name: 'Other' }) });
+    const dup = await call('assets', 'POST', { as: A.users.BURSAR, body: asset({ tagNumber: 'UNIQ-1', name: 'Other' }) });
     expect(dup.status).toBe(409);
     expect(dup.json.message).toMatch(/already used by Projector/);
     await expect(
       t.pg.exec(`INSERT INTO "Asset" ("id","schoolId","name","categoryId","tagNumber","acquisitionDate","acquisitionCost","currency","location") VALUES ('dup1','${A.schoolId}','x','${A.assetCategoryId}','UNIQ-1',now(),1,'USD','x')`),
     ).rejects.toThrow(/Asset_schoolId_tagNumber_key|duplicate key/);
-    const other = await call('assets', 'POST', { as: B.users.HEAD, body: asset({ tagNumber: 'UNIQ-1', categoryId: B.assetCategoryId }) });
+    const other = await call('assets', 'POST', { as: B.users.BURSAR, body: asset({ tagNumber: 'UNIQ-1', categoryId: B.assetCategoryId }) });
     expect(other.status).toBe(201);
   });
 
@@ -301,7 +301,7 @@ describe('5.5 — asset tags, transfers and disposal income', () => {
     const b = await create({ tagNumber: 'CUS-2', custodian: 'Mr Visiting Contractor' });
     const rowB = await prisma.asset.findUniqueOrThrow({ where: { id: b.id } });
     expect([rowB.custodianId, rowB.custodian]).toEqual([null, 'Mr Visiting Contractor']);
-    expect((await call('assets', 'POST', { as: A.users.HEAD, body: asset({ tagNumber: 'CUS-3', custodianId: B.users.TEACHER.id }) })).status).toBe(404);
+    expect((await call('assets', 'POST', { as: A.users.BURSAR, body: asset({ tagNumber: 'CUS-3', custodianId: B.users.TEACHER.id }) })).status).toBe(404);
   });
 
   it('moving an asset or handing it over is recorded and the history is kept', async () => {
@@ -318,7 +318,7 @@ describe('5.5 — asset tags, transfers and disposal income', () => {
     expect(await prisma.auditLog.count({ where: { action: 'TRANSFER_ASSET', entityId: a.id } })).toBe(1);
 
     // a back-dated move, and a custodian who is not a staff member
-    await call('assets/[id]', 'PATCH', { as: A.users.HEAD, params: { id: a.id }, body: { custodian: 'Contractor Dube', transferDate: '2026-03-01T00:00:00.000Z' } });
+    await call('assets/[id]', 'PATCH', { as: A.users.BURSAR, params: { id: a.id }, body: { custodian: 'Contractor Dube', transferDate: '2026-03-01T00:00:00.000Z' } });
     const all = await prisma.assetTransfer.findMany({ where: { assetId: a.id }, orderBy: { createdAt: 'asc' } });
     expect(all).toHaveLength(2);
     expect(all[1]).toMatchObject({ fromLocation: 'Staff room', toLocation: 'Staff room', toCustodianId: null, toCustodianName: 'Contractor Dube', fromCustodianId: A.users.LIBRARIAN.id });
@@ -331,7 +331,7 @@ describe('5.5 — asset tags, transfers and disposal income', () => {
 
   it('changing nothing that matters records no transfer; other edits do not either', async () => {
     const a = await create({ tagNumber: 'STILL-1', location: 'Hall', custodian: 'Mr Same' });
-    await call('assets/[id]', 'PATCH', { as: A.users.HEAD, params: { id: a.id }, body: { location: 'Hall', custodian: 'mr same', condition: 'FAIR' } });
+    await call('assets/[id]', 'PATCH', { as: A.users.BURSAR, params: { id: a.id }, body: { location: 'Hall', custodian: 'mr same', condition: 'FAIR' } });
     expect(await prisma.assetTransfer.count({ where: { assetId: a.id } })).toBe(0);
     expect((await prisma.asset.findUniqueOrThrow({ where: { id: a.id } })).condition).toBe('FAIR');
   });
@@ -344,9 +344,9 @@ describe('5.5 — asset tags, transfers and disposal income', () => {
 
   it('a disposed asset cannot be moved; a foreign custodian is not found', async () => {
     const a = await create({ tagNumber: 'DEAD-1' });
-    expect((await call('assets/[id]', 'PATCH', { as: A.users.HEAD, params: { id: a.id }, body: { custodianId: B.users.TEACHER.id } })).status).toBe(404);
+    expect((await call('assets/[id]', 'PATCH', { as: A.users.BURSAR, params: { id: a.id }, body: { custodianId: B.users.TEACHER.id } })).status).toBe(404);
     await call('assets/[id]/dispose', 'POST', { as: A.users.DIRECTOR, params: { id: a.id }, body: { disposalDate: '2026-09-01', reason: 'Broken', method: 'SCRAPPED' } });
-    expect((await call('assets/[id]', 'PATCH', { as: A.users.HEAD, params: { id: a.id }, body: { location: 'Skip' } })).status).toBe(409);
+    expect((await call('assets/[id]', 'PATCH', { as: A.users.BURSAR, params: { id: a.id }, body: { location: 'Skip' } })).status).toBe(409);
   });
 
   const dispose = (id: string, body: Record<string, unknown>) =>

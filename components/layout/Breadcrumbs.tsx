@@ -3,20 +3,11 @@
 import { Fragment, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { useCrumbStore } from '@/lib/crumb-store';
-import { ROLE_NAV } from './nav-config';
-import type { UserRole } from '@/types';
+import { LEGACY_SECTIONS } from './nav-config';
 
-/** Where "/" sends each role. The home page itself shows no breadcrumb. */
-const ROLE_HOME: Record<UserRole, string> = {
-  ADMIN: '/admin',
-  DIRECTOR: '/director',
-  HEAD: '/head',
-  BURSAR: '/bursar/students',
-  TEACHER: '/teacher/marks',
-  LIBRARIAN: '/library',
-};
+/** Where "/" sends everyone. The home page itself shows no breadcrumb. */
+const HOME = '/system/dashboard';
 
 // Pages that exist but are not in the sidebar.
 const EXTRA_LABELS: Record<string, string> = {
@@ -33,10 +24,8 @@ const LINK_ALIASES: Record<string, string> = {
 
 const STATIC_LABELS: Record<string, string> = (() => {
   const map: Record<string, string> = { ...EXTRA_LABELS };
-  for (const role of Object.values(ROLE_NAV)) {
-    for (const section of role.sections) {
-      for (const item of section.items) map[item.href] ??= item.label;
-    }
+  for (const section of LEGACY_SECTIONS) {
+    for (const item of section.items) map[item.href] ??= item.label;
   }
   return map;
 })();
@@ -75,11 +64,9 @@ export function CrumbLabel({ label }: { label: string }) {
 
 export function Breadcrumbs() {
   const pathname = usePathname();
-  const { data: session } = useSession();
   const dynamic = useCrumbStore((s) => s.labels);
-  const role = session?.user?.role as UserRole | undefined;
 
-  if (!role || pathname === ROLE_HOME[role]) return null;
+  if (pathname === HOME) return null;
   const trail = buildTrail(pathname, dynamic);
   if (trail.length === 0) return null;
 

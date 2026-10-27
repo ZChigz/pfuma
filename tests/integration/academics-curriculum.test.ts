@@ -19,7 +19,7 @@ let chikore: Awaited<ReturnType<typeof sessionFor>>;
 let moyo: Awaited<ReturnType<typeof sessionFor>>;
 let asg: { maths: string; eng: string };
 
-const admin = () => A.users.ADMIN;
+const admin = () => A.operator!;
 const audit = (action: string) => prisma.auditLog.findMany({ where: { schoolId: A.schoolId, action: action as never } });
 const topic = (body: object, as = admin()) => call('academics/syllabus', 'POST', { as, body: { subjectId: W.subjects.maths, levelId: W.form1, ...body } });
 const tree = async (subjectId = W.subjects.maths, levelId = W.form1) => (await call('academics/syllabus', 'GET', { as: admin(), query: `?subjectId=${subjectId}&levelId=${levelId}` })).json.data;
@@ -30,8 +30,8 @@ beforeAll(async () => {
   ({ prisma } = await import('@/lib/prisma'));
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await buildWorld(prisma, A);
   await prisma.calendarEvent.create({ data: { schoolId: A.schoolId, title: 'Test holiday', kind: 'PUBLIC_HOLIDAY', startDate: new Date('2026-10-09'), endDate: new Date('2026-10-09'), createdById: admin().id } });
   // The head of Sciences (maths, science, physics are Sciences) is a HOD with the scheme and syllabus permissions.
@@ -145,14 +145,14 @@ describe('the syllabus', () => {
       // School B (its own subject list) can see and use it.
       const bSubject = await prisma.subject.findFirstOrThrow({ where: { schoolId: B.schoolId } });
       await prisma.subjectLevel.create({ data: { schoolId: B.schoolId, subjectId: bSubject.id, levelId: B.levelId, type: 'CORE' } });
-      const list = await call('academics/syllabus/templates', 'GET', { as: B.users.ADMIN, query: '?subject=Mathematics&level=1' });
+      const list = await call('academics/syllabus/templates', 'GET', { as: B.operator!, query: '?subject=Mathematics&level=1' });
       expect(list.json.data.templates.map((x: { name: string }) => x.name)).toContain('Zimbabwe Form 1 Maths');
-      const use = await call('academics/syllabus/templates', 'POST', { as: B.users.ADMIN, body: { templateId: tpl.id, subjectId: bSubject.id, levelId: B.levelId } });
+      const use = await call('academics/syllabus/templates', 'POST', { as: B.operator!, body: { templateId: tpl.id, subjectId: bSubject.id, levelId: B.levelId } });
       expect(use.status).toBe(201);
       expect(use.json.data.topics).toBeGreaterThanOrEqual(5);
       expect(await prisma.syllabusTopic.count({ where: { schoolId: B.schoolId, subjectId: bSubject.id } })).toBe(use.json.data.topics);
       // Only into an empty syllabus.
-      const again = await call('academics/syllabus/templates', 'POST', { as: B.users.ADMIN, body: { templateId: tpl.id, subjectId: bSubject.id, levelId: B.levelId } });
+      const again = await call('academics/syllabus/templates', 'POST', { as: B.operator!, body: { templateId: tpl.id, subjectId: bSubject.id, levelId: B.levelId } });
       expect(again.status).toBe(409);
       // Nothing of school A's changed.
       expect(await prisma.syllabusTopic.count({ where: { schoolId: A.schoolId, subjectId: bSubject.id } })).toBe(0);

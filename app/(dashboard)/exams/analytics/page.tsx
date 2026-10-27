@@ -32,7 +32,7 @@ export default async function AnalyticsPage() {
       <AnalyticsClient
         panels={panels} initial={first} termId={term.id} terms={terms} levels={levels} classes={classes} subjects={subjects}
         assessments={assessments.map((a) => ({ id: a.id, label: `${a.title} (${a.subject.name}, ${a.level.name})` }))}
-        canVerified={can('exams.results.publish') || (user.roles ?? []).includes('HEAD') || (user.grants ?? []).includes('*')}
+        canVerified={can('exams.results.publish') || can('exams.marks.unlock')}
       />
     </div>
   );

@@ -4,7 +4,7 @@
 // be switched off for one school without touching another, and school A never sees or changes school B's facilities data.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startTestDb, type TestDb } from '../helpers/test-db';
-import { grantPermission, seedSchool, type SeededSchool } from '../helpers/seed';
+import { grantPermission, seedSchool, userWithRoles, type SeededSchool } from '../helpers/seed';
 import { actorOf } from '../helpers/academics';
 import { addStudent } from '../helpers/students';
 import { call } from '../helpers/route';
@@ -33,9 +33,9 @@ beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
   [money, common, settings, scoped] = await Promise.all([import('@/lib/facilities/money'), import('@/lib/facilities/common'), import('@/lib/facilities/settings'), import('@/lib/scoped-db')]);
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
-  C = await seedSchool(prisma, 'School C');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
+  C = await seedSchool(prisma, 'School C', { operator: true });
   await prisma.finSettings.create({ data: { schoolId: A.schoolId, legacyRetired: true } });
   await prisma.schoolModule.create({ data: { schoolId: B.schoolId, module: 'finance', enabled: false } });
   stA = (await addStudent(prisma, A, { firstName: 'Ann', surname: 'Alpha' })).id;
@@ -135,7 +135,7 @@ describe('numbers', () => {
 
 describe('settings', () => {
   it('start with the brief\'s defaults', async () => {
-    const admin = await actorOf(prisma, A.users.ADMIN.id);
+    const admin = await actorOf(prisma, A.operator!.id);
     expect(await settings.getFacSettings(admin)).toMatchObject({
       learnerMaxLoans: 2, learnerLoanDays: 14, staffMaxLoans: 5, staffLoanDays: 30, exeatHeadAlertMinutes: 120, longExeatNights: 3, expiryWarningDays: 30,
       prorateTransport: true, rollCallSessions: ['MORNING', 'EVENING', 'LIGHTS_OUT'],
@@ -143,17 +143,17 @@ describe('settings', () => {
   });
 
   it('change with an audit row that holds the before and after, and only the changed fields', async () => {
-    const admin = await actorOf(prisma, A.users.ADMIN.id);
+    const admin = await actorOf(prisma, A.operator!.id);
     const after = await settings.updateFacSettings(admin, { learnerMaxLoans: 3, lateFinePerDayCents: 25, lateFineCurrency: 'USD', learnerLoanDays: 14 });
     expect(after).toMatchObject({ learnerMaxLoans: 3, lateFinePerDayCents: 25, learnerLoanDays: 14 });
     const log = await prisma.auditLog.findFirstOrThrow({ where: { schoolId: A.schoolId, action: 'FAC_SAVE_SETTINGS' }, orderBy: { createdAt: 'desc' } });
-    expect(log.actorId).toBe(A.users.ADMIN.id);
+    expect(log.actorId).toBe(A.operator!.id);
     expect(log.before).toEqual({ learnerMaxLoans: 2, lateFinePerDayCents: 0 });
     expect(log.after).toEqual({ learnerMaxLoans: 3, lateFinePerDayCents: 25 });
   });
 
   it('are validated on the server', async () => {
-    const admin = await actorOf(prisma, A.users.ADMIN.id);
+    const admin = await actorOf(prisma, A.operator!.id);
     for (const bad of [{ learnerLoanDays: 0 }, { learnerMaxLoans: -1 }, { lateFinePerDayCents: 1.5 }, { rollCallSessions: [] }, { lateFineCurrency: 'EUR' }, { nonsense: 1 }, { learnerMaxLoans: '3' }]) {
       await fails(settings.updateFacSettings(admin, bad), 422);
     }
@@ -168,13 +168,13 @@ describe('settings', () => {
     await fails(settings.updateFacSettings(librarian, { staffMaxLoans: 7, disposalOwnerLimitUsdCents: 100000 }), 403);
     await fails(settings.updateFacSettings(librarian, { rollCallSessions: ['MORNING'] }), 403);
     expect((await settings.getFacSettings(librarian)).staffMaxLoans).toBe(6);
-    const teacher = await actorOf(prisma, A.users.TEACHER.id);
+    const teacher = await actorOf(prisma, (await userWithRoles(prisma, A, ['TEACHER'], 'plain')).id);
     await fails(settings.getFacSettings(teacher), 403);
     await fails(settings.updateFacSettings(teacher, { learnerMaxLoans: 9 }), 403);
   });
 
   it('are per school: changing them in A does not touch B', async () => {
-    const adminB = await actorOf(prisma, B.users.ADMIN.id);
+    const adminB = await actorOf(prisma, B.operator!.id);
     expect((await settings.getFacSettings(adminB)).learnerMaxLoans).toBe(2);
     expect((await settings.getFacSettings(adminB)).staffMaxLoans).toBe(5);
   });
@@ -183,8 +183,8 @@ describe('settings', () => {
 describe('a part switched off for one school', () => {
   it('refuses its permissions and its settings there, and nowhere else', async () => {
     await prisma.schoolModule.create({ data: { schoolId: B.schoolId, module: 'facilities.library', enabled: false } });
-    const adminB = await actorOf(prisma, B.users.ADMIN.id);
-    const adminA = await actorOf(prisma, A.users.ADMIN.id);
+    const adminB = await actorOf(prisma, B.operator!.id);
+    const adminA = await actorOf(prisma, A.operator!.id);
     const { can } = await import('@/lib/access-core');
     expect(can(adminB, 'facilities.library.desk')).toBe(false);
     expect(can(adminB, 'facilities.hostel.view')).toBe(true);
@@ -212,38 +212,39 @@ describe('the settings route', () => {
   it('401 without a session, 403 without a facilities key, and works for the Administrator', async () => {
     expect((await call('facilities/settings', 'GET', { as: null })).status).toBe(401);
     expect((await call('facilities/settings', 'PATCH', { as: null, body: {} })).status).toBe(401);
-    expect((await call('facilities/settings', 'GET', { as: A.users.TEACHER })).status).toBe(403);
-    expect((await call('facilities/settings', 'PATCH', { as: A.users.TEACHER, body: { learnerMaxLoans: 5 } })).status).toBe(403);
-    const ok = await call('facilities/settings', 'GET', { as: A.users.ADMIN });
+    const plain = await userWithRoles(prisma, A, ['TEACHER'], 'plain-route');
+    expect((await call('facilities/settings', 'GET', { as: plain })).status).toBe(403);
+    expect((await call('facilities/settings', 'PATCH', { as: plain, body: { learnerMaxLoans: 5 } })).status).toBe(403);
+    const ok = await call('facilities/settings', 'GET', { as: A.operator! });
     expect(ok.status).toBe(200);
     expect(ok.json.data).toMatchObject({ learnerMaxLoans: 3 });
   });
 
   it('validates the body (422) and saves a good one', async () => {
-    expect((await call('facilities/settings', 'PATCH', { as: A.users.ADMIN, body: { learnerLoanDays: 0 } })).status).toBe(422);
-    expect((await call('facilities/settings', 'PATCH', { as: A.users.ADMIN, rawBody: '{nope' })).status).toBe(400);
-    const r = await call('facilities/settings', 'PATCH', { as: A.users.ADMIN, body: { learnerLoanDays: 21 } });
+    expect((await call('facilities/settings', 'PATCH', { as: A.operator!, body: { learnerLoanDays: 0 } })).status).toBe(422);
+    expect((await call('facilities/settings', 'PATCH', { as: A.operator!, rawBody: '{nope' })).status).toBe(400);
+    const r = await call('facilities/settings', 'PATCH', { as: A.operator!, body: { learnerLoanDays: 21 } });
     expect(r.status).toBe(200);
     expect(r.json.data.learnerLoanDays).toBe(21);
   });
 
   it('school A cannot see or change school B: each administrator reaches only their own row', async () => {
     const beforeB = await prisma.facSettings.findUnique({ where: { schoolId: B.schoolId } });
-    const r = await call('facilities/settings', 'PATCH', { as: A.users.ADMIN, body: { staffLoanDays: 40 } });
+    const r = await call('facilities/settings', 'PATCH', { as: A.operator!, body: { staffLoanDays: 40 } });
     expect(r.status).toBe(200);
     const afterB = await prisma.facSettings.findUnique({ where: { schoolId: B.schoolId } });
     expect(afterB?.staffLoanDays ?? 30).toBe(beforeB?.staffLoanDays ?? 30);
     expect((await prisma.facSettings.findUniqueOrThrow({ where: { schoolId: A.schoolId } })).staffLoanDays).toBe(40);
     // B's administrator reads B's own numbers, not A's.
-    const own = await call('facilities/settings', 'GET', { as: B.users.ADMIN });
+    const own = await call('facilities/settings', 'GET', { as: B.operator! });
     expect(own.status).toBe(200);
     expect(own.json.data.staffLoanDays).toBe(30);
   });
 
   it('a part that is off for the school refuses its settings even though other parts are on', async () => {
-    const r = await call('facilities/settings', 'PATCH', { as: B.users.ADMIN, body: { learnerMaxLoans: 6 } });
+    const r = await call('facilities/settings', 'PATCH', { as: B.operator!, body: { learnerMaxLoans: 6 } });
     expect(r.status).toBe(403);
-    const ok = await call('facilities/settings', 'PATCH', { as: B.users.ADMIN, body: { longExeatNights: 4 } });
+    const ok = await call('facilities/settings', 'PATCH', { as: B.operator!, body: { longExeatNights: 4 } });
     expect(ok.status).toBe(200);
   });
 });

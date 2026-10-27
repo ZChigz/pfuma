@@ -1,5 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
+import { authorizeAny } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { isoWeekKey } from '@/lib/utils';
@@ -13,6 +14,7 @@ async function _GET(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
   const { schoolId } = user;
+  await authorizeAny(user, ['finance.dashboard.view', 'finance.reports.view']);
 
   const rawCurr = new URL(req.url).searchParams.get('currency');
   const currency: Currency = rawCurr === 'ZIG' ? 'ZIG' : 'USD';

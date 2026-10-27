@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canManagePortalLinks } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { generatePortalPin, hashPortalPin } from '@/lib/portal';
 import { PRIMARY_GUARDIAN_INCLUDE } from '@/lib/students/guardians';
 import { buildWhatsAppLink } from '@/lib/utils';
@@ -16,7 +16,7 @@ async function _POST(_req: Request, { params }: { params: { id: string } }) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManagePortalLinks(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'students.guardians.edit');
 
   const student = await db.student.findUnique({
     where: { id: params.id },
@@ -60,7 +60,7 @@ async function _DELETE(_req: Request, { params }: { params: { id: string } }) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManagePortalLinks(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'students.guardians.edit');
 
   const student = await db.student.findUnique({ where: { id: params.id }, select: { id: true } });
   if (!student) return apiNotFound('Student');

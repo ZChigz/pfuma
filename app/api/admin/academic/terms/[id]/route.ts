@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth';
 import { apiError, apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
-import { canManageAcademicCalendar } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { UpdateTermDatesSchema } from '@/lib/validations/academic';
 import { closeTerm, openTerm, updateTermDates } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
@@ -17,7 +17,7 @@ async function session() {
 async function _PATCH(req: Request, { params }: Ctx) {
   const user = await session();
   if (!user) return apiUnauthorized();
-  try { await canManageAcademicCalendar(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'system.settings.edit');
 
   const parsed = await parseBody(req, UpdateTermDatesSchema);
   if ('error' in parsed) return parsed.error;
@@ -29,7 +29,7 @@ async function _PATCH(req: Request, { params }: Ctx) {
 async function _POST(req: Request, { params }: Ctx) {
   const user = await session();
   if (!user) return apiUnauthorized();
-  try { await canManageAcademicCalendar(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'system.settings.edit');
 
   const action = new URL(req.url).searchParams.get('action');
   if (action === 'open') return apiSuccess({ term: await openTerm(user.schoolId, user.id, params.id) });

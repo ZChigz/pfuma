@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
-import { canManageAssets } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { CreateAssetSchema } from '@/lib/validations/assets';
 import { resolveCustodian } from '@/lib/assets';
@@ -13,6 +13,7 @@ async function _GET(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorize(user, 'facilities.assets.view');
 
   const { searchParams } = req.nextUrl;
   const category  = searchParams.get('category')  || undefined;
@@ -50,7 +51,7 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageAssets(user.role); } catch (res) { return res as Response; }
+  await authorize(user, 'facilities.assets.manage');
 
   const parsed = await parseBody(req, CreateAssetSchema);
   if ('error' in parsed) return parsed.error;

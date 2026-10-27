@@ -1,5 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
+import { authorize } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiUnauthorized, apiError, apiNotFound, withApi } from '@/lib/api';
 import { renderToStream } from '@react-pdf/renderer';
@@ -21,6 +22,7 @@ async function _GET(
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorize(user, 'exams.results.view', { model: 'Student', id: params.studentId });
 
   const termId = new URL(req.url).searchParams.get('termId');
   if (!termId) return apiError('termId query parameter is required', 400);

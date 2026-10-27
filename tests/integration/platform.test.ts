@@ -1,6 +1,7 @@
 // @vitest-environment node
 // The Pfuma console: staff sign-in, creating a school, modules, billing, suspension, invoices, support access.
 import fs from 'node:fs';
+import { grantRows } from '../../prisma/seed/access';
 import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -41,7 +42,7 @@ beforeAll(async () => {
   process.env.NEXTAUTH_URL = 'https://pfuma.test';
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
-  A = await seedSchool(prisma, 'School A');
+  A = await seedSchool(prisma, 'School A', { operator: true });
   const admin = await prisma.platformAdmin.create({ data: { fullName: 'Pfuma Staff', email: 'staff@pfuma.test', passwordHash: bcrypt.hashSync(PASSWORD, 4) } });
   adminId = admin.id;
 }, 120_000);
@@ -113,7 +114,7 @@ describe('who may use the console', () => {
     for (const [file, method, params] of routes) {
       const body = method === 'GET' ? undefined : {};
       expect((await call(file, method, { as: null, params, body })).status, `${method} ${file}`).toBe(401);
-      expect((await call(file, method, { as: A.users.ADMIN, params, body })).status, `school admin ${method} ${file}`).toBe(401);
+      expect((await call(file, method, { as: A.operator!, params, body })).status, `school admin ${method} ${file}`).toBe(401);
       expect((await call(file, method, { params, body, headers: { cookie: 'pfuma_platform=junk.1.2.3' } })).status, `forged ${method} ${file}`).toBe(401);
     }
   });
@@ -153,7 +154,7 @@ describe('creating a school', () => {
     expect(await prisma.school.count()).toBe(before);
   });
 
-  it('makes the school, its 13 roles, an Owner and an Administrator, and an invite for each', async () => {
+  it('makes the school, its 14 roles, an Owner and an Administrator, and an invite for each', async () => {
     const r = await call('platform/schools', 'POST', { ...as(), body: newSchool() });
     expect(r.status, JSON.stringify(r.json)).toBe(201);
     created = r.json.data;
@@ -166,9 +167,10 @@ describe('creating a school', () => {
     expect(school.renewalDate?.toISOString().slice(0, 10)).toBe('2027-01-15');
 
     const roles = await prisma.roleDefinition.findMany({ where: { schoolId: school.id }, include: { permissions: true } });
-    expect(roles).toHaveLength(13);
-    for (const key of ['OWNER', 'ADMINISTRATOR']) expect(roles.find((x) => x.key === key)!.permissions.map((p) => p.permissionKey), key).toContain('*');
-    expect(roles.find((x) => x.key === 'TEACHER')!.permissions.map((p) => p.permissionKey).sort()).toEqual(['academics.assignments.view', 'academics.attendance.mark', 'academics.classes.view', 'academics.schemes.edit', 'academics.schemes.view', 'academics.subjects.view', 'academics.timetable.view', 'exams.analytics.view', 'exams.assessments.create', 'exams.comments.subject', 'exams.marks.enter', 'exams.marks.submit', 'finance.requests.create', 'hr.attendance.self', 'hr.leave.request', 'hr.self.details', 'hr.self.leave', 'hr.self.payslips', 'system.calendar.view', 'system.dashboard.view']);
+    expect(roles.filter((x) => x.isSystem)).toHaveLength(14);
+    for (const x of roles) expect(x.permissions.map((p) => p.permissionKey), x.key).not.toContain('*');
+    for (const key of ['OWNER', 'ADMINISTRATOR']) expect(roles.find((x) => x.key === key)!.permissions.map((p) => p.permissionKey).sort(), key).toEqual(grantRows().filter((g) => g.role === key).map((g) => g.key).sort());
+    expect(roles.find((x) => x.key === 'TEACHER')!.permissions.map((p) => p.permissionKey).sort()).toEqual(grantRows().filter((g) => g.role === 'TEACHER').map((g) => g.key).sort());
 
     const users = await prisma.user.findMany({ where: { schoolId: school.id }, include: { userRoles: { include: { role: true } } } });
     expect(users).toHaveLength(2);
@@ -253,13 +255,14 @@ describe('creating a school', () => {
     it('is what the school then sees: a switched-off module refuses its keys even to its administrator', async () => {
       const id = created.school.id;
       await call('platform/schools/[id]/modules', 'PATCH', { ...as(), params: { id }, body: { modules: { finance: false } } });
-      const admin = await prisma.user.findFirstOrThrow({ where: { schoolId: id, email: 'administrator@newschool.test' } });
-      session.current = { id: admin.id, email: admin.email, schoolId: id, role: 'ADMIN', fullName: admin.fullName };
+      // The Owner holds finance.payments.view; with the module off even the Owner is refused.
+      const admin = await prisma.user.findFirstOrThrow({ where: { schoolId: id, email: 'owner@newschool.test' } });
+      session.current = { id: admin.id, email: admin.email, schoolId: id, role: 'DIRECTOR', fullName: admin.fullName };
       const { requirePermission } = await import('@/lib/access');
       await expect(requirePermission('finance.payments.view')).rejects.toMatchObject({ status: 403 });
       await expect(requirePermission('system.users.view')).resolves.toBeTruthy();
       await call('platform/schools/[id]/modules', 'PATCH', { ...as(), params: { id }, body: { modules: { finance: true } } });
-      session.current = { id: admin.id, email: admin.email, schoolId: id, role: 'ADMIN', fullName: admin.fullName };
+      session.current = { id: admin.id, email: admin.email, schoolId: id, role: 'DIRECTOR', fullName: admin.fullName };
       await expect(requirePermission('finance.payments.view')).resolves.toBeTruthy();
     });
 
@@ -322,7 +325,7 @@ describe('creating a school', () => {
       await expect(db.notification.create({ data: { userId: admin.id, title: 'Still works' } as never })).resolves.toBeTruthy();
       await expect(db.user.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } })).resolves.toBeTruthy();
       // ... and other schools are not affected
-      const other = await call('system/calendar', 'POST', { as: A.users.ADMIN, body: { title: 'School A open day', kind: 'OTHER', startDate: '2026-05-05', endDate: '2026-05-05' } });
+      const other = await call('system/calendar', 'POST', { as: A.operator!, body: { title: 'School A open day', kind: 'OTHER', startDate: '2026-05-05', endDate: '2026-05-05' } });
       expect(other.status, other.text.slice(0, 200)).toBe(201);
     });
 
@@ -380,8 +383,8 @@ describe('creating a school', () => {
       expect((await platformAudit({ action: 'INVOICE_PAID', schoolId: id })).length).toBe(1);
 
       // the school's own page and PDF
-      const admin = await prisma.user.findFirstOrThrow({ where: { schoolId: id, email: 'administrator@newschool.test' } });
-      const school = { id: admin.id, email: admin.email, schoolId: id, role: 'ADMIN', fullName: admin.fullName };
+      const admin = await prisma.user.findFirstOrThrow({ where: { schoolId: id, email: 'owner@newschool.test' } });
+      const school = { id: admin.id, email: admin.email, schoolId: id, role: 'DIRECTOR', fullName: admin.fullName };
       const pdf = await call('system/subscription/invoices/[id]/pdf', 'GET', { as: school as never, params: { id: open.id } });
       expect(pdf.status).toBe(200);
       expect(pdf.response.headers.get('content-type')).toBe('application/pdf');

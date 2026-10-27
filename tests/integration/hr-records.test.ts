@@ -84,8 +84,12 @@ describe('employees, the directory and sensitive data', () => {
     expect(view.access).toMatchObject({ full: false, pay: false });
     expect(view.personal).toBeNull();
     expect(view.pay).toBeNull();
-    await fails(emp.getEmployee(W.teacher2, ids.grounds!), 403); // a teacher has no directory access
-    await fails(emp.listDirectory(W.teacher2), 403);
+    // Every member of staff holds hr.directory.view: a teacher sees names, titles and departments, never the record.
+    expect((await emp.listDirectory(W.teacher2)).items[0]).not.toHaveProperty('nationalId');
+    const teacherView = await emp.getEmployee(W.teacher2, ids.grounds!);
+    expect(teacherView.access).toMatchObject({ full: false, pay: false });
+    expect(teacherView.personal).toBeNull();
+    expect(teacherView.pay).toBeNull();
     const hrView = await emp.getEmployee(W.hr, ids.grounds!);
     expect(hrView.access).toMatchObject({ full: true, pay: true });
     expect(hrView.personal?.nationalId).toBe('08-111111 Z 08');
@@ -121,7 +125,10 @@ describe('employees, the directory and sensitive data', () => {
   });
 
   it('an employee cannot see a colleague\'s record, only their own', async () => {
-    await fails(emp.getEmployee(W.teacher2, ids.gov!), 403);
+    const colleague = await emp.getEmployee(W.teacher2, ids.gov!); // the directory entry only
+    expect(colleague.access).toMatchObject({ full: false, pay: false });
+    expect(colleague.personal).toBeNull();
+    expect(colleague.pay).toBeNull();
     const mine = await emp.getMyRecord(W.teacher2);
     expect(mine.id).toBe(ids.t2);
     await fails(emp.getMyRecord(W.outsider), 404);
@@ -261,7 +268,7 @@ describe('posts and recruitment', () => {
     ids.post = p.id;
     expect(p.monthlyTotalCents).toBe(120000);
     await fails(rec.decidePost(W.hr, p.id, { decision: 'APPROVE' }), 403);       // not the person who asked, and no authority
-    await fails(rec.decidePost(W.admin, p.id, { decision: 'APPROVE' }), 403, /Head and by the Owner/);
+    await fails(rec.decidePost(W.admin, p.id, { decision: 'APPROVE' }), 403);   // the Administrator holds no approval at all
     const a = await rec.decidePost(W.head, p.id, { decision: 'APPROVE' });
     expect(a).toMatchObject({ status: 'PENDING', awaiting: 'owner' });
     await fails(rec.decidePost(W.head, p.id, { decision: 'APPROVE' }), 409);
@@ -467,7 +474,7 @@ describe('the staff register', () => {
     expect(reg.rows.find((x) => x.employeeId === ids.gov)).toMatchObject({ status: 'LATE', arrivalTime: '07:55' });
     expect(reg.rows.find((x) => x.employeeId === ids.grounds)?.status).toBe('ABSENT');
     expect(reg.rows.find((x) => x.employeeId === ids.cleaner)?.status).toBe('PRESENT');
-    const sum = await att.dailySummary(W.head, day);
+    const sum = await att.dailySummary(W.deputy, day); // the Deputy holds hr.attendance.view; the Head does not
     expect(sum.total.LATE).toBe(1);
     expect(sum.total.ABSENT).toBe(1);
   });

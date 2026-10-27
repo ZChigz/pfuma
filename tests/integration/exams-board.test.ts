@@ -39,8 +39,8 @@ beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
   board = await import('@/lib/exams/board');
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await examWorld(prisma, A);
   await prisma.subject.update({ where: { id: W.subjects.maths }, data: { zimsecCode: '4004' } });
   await prisma.subject.update({ where: { id: W.subjects.english }, data: { zimsecCode: '1122' } });
@@ -85,7 +85,7 @@ describe('a session', () => {
   });
 
   it('keeps sessions of another school apart', async () => {
-    const outsider = await actorOf(prisma, B.users.ADMIN.id);
+    const outsider = await actorOf(prisma, B.operator!.id);
     expect(await board.listSessions(outsider)).toEqual([]);
     await fails(board.getSession(outsider, sessionId), 404);
     await fails(board.pullSchoolCandidates(outsider, sessionId), 404);

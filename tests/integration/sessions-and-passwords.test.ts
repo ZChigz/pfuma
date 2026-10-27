@@ -32,7 +32,7 @@ afterAll(async () => {
 
 const version = async (id: string) => (await prisma.user.findUniqueOrThrow({ where: { id } })).tokenVersion;
 
-describe('session revalidation (JWT re-checked against the database every 5 minutes)', () => {
+describe('session revalidation (JWT re-checked against the database every minute)', () => {
   let revalidateToken: typeof import('@/lib/session-check').revalidateToken;
   beforeAll(async () => {
     ({ revalidateToken } = await import('@/lib/session-check'));
@@ -42,11 +42,12 @@ describe('session revalidation (JWT re-checked against the database every 5 minu
     id: u.id, schoolId: u.schoolId, role: u.role as never, fullName: u.fullName, tokenVersion, mustChangePassword: false, checkedAt,
   });
 
-  it('trusts a token checked less than 5 minutes ago without touching the database', async () => {
+  it('trusts a token checked less than a minute ago without touching the database', async () => {
     const u = A.users.LIBRARIAN;
     await prisma.user.update({ where: { id: u.id }, data: { active: false } });
     const now = Date.now();
-    expect(await revalidateToken(tokenFor(u, now - 60_000), now)).not.toBeNull();
+    expect(await revalidateToken(tokenFor(u, now - 30_000), now)).not.toBeNull();
+    expect(await revalidateToken(tokenFor(u, now - 61_000), now)).toBeNull(); // a minute on, the database is read and the deactivated user is out
     await prisma.user.update({ where: { id: u.id }, data: { active: true } });
   });
 
@@ -79,6 +80,25 @@ describe('session revalidation (JWT re-checked against the database every 5 minu
     expect(kept?.role).toBe('HEAD');
     expect(kept?.checkedAt).toBe(now);
     await prisma.user.update({ where: { id: u.id }, data: { role: 'TEACHER' } });
+  });
+
+  it('carries the roles and permVersion, and rebuilds the roles when the person access changed, without signing out', async () => {
+    const u = A.users.BURSAR;
+    const now = Date.now();
+    const before = await revalidateToken({ ...tokenFor(u, now - 61_000, await version(u.id)), roles: ['TEACHER'], permVersion: -1 }, now);
+    expect(before?.roles).toEqual(['BURSAR']);
+    const v0 = (await prisma.user.findUniqueOrThrow({ where: { id: u.id } })).permVersion;
+    expect(before?.permVersion).toBe(v0);
+    const head = await prisma.roleDefinition.findFirstOrThrow({ where: { schoolId: A.schoolId, key: 'HEAD' } });
+    await prisma.userRole.create({ data: { schoolId: A.schoolId, userId: u.id, roleId: head.id } });
+    await prisma.user.update({ where: { id: u.id }, data: { permVersion: { increment: 1 } } });
+    const after = await revalidateToken({ ...tokenFor(u, now - 61_000, await version(u.id)), roles: before?.roles, permVersion: v0 }, now);
+    expect(after?.roles?.slice().sort()).toEqual(['BURSAR', 'HEAD']);
+    expect(after?.permVersion).toBe(v0 + 1);
+    // Inside the minute the token is trusted as it is.
+    const same = await revalidateToken({ ...tokenFor(u, now - 5_000, await version(u.id)), roles: ['BURSAR'], permVersion: v0 }, now);
+    expect(same?.roles).toEqual(['BURSAR']);
+    await prisma.userRole.deleteMany({ where: { userId: u.id, roleId: head.id } });
   });
 });
 

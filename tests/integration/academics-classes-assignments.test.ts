@@ -22,8 +22,8 @@ beforeAll(async () => {
   ({ prisma } = await import('@/lib/prisma'));
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await buildWorld(prisma, A);
   f1 = await students(prisma, A, W.f1North, 5, 'One');
   f2 = await students(prisma, A, W.f2East, 3, 'Two');
@@ -35,7 +35,7 @@ afterAll(async () => {
   await t.stop();
 });
 
-const admin = () => A.users.ADMIN;
+const admin = () => A.operator!;
 const audit = (action: string) => prisma.auditLog.findMany({ where: { schoolId: A.schoolId, action: action as never } });
 const mk = (o: object = {}) => ({ teacherId: W.teachers.chikore, subjectId: W.subjects.maths, classId: W.f1North, periodsPerWeek: 5, ...o });
 
@@ -418,11 +418,11 @@ describe('another school', () => {
       ['academics/classes/[id]', 'GET', { id: W.f1North }, undefined],
       ['academics/classes/[id]/class-teacher', 'PUT', { id: W.f1North }, { userId: B.users.TEACHER.id }],
     ] as const) {
-      const r = await call(file, method, { as: B.users.ADMIN, params, body });
+      const r = await call(file, method, { as: B.operator!, params, body });
       expect(r.status, `${method} ${file}`).toBe(404);
     }
-    const mine = await call('academics/assignments', 'GET', { as: B.users.ADMIN });
+    const mine = await call('academics/assignments', 'GET', { as: B.operator! });
     expect(mine.json.data.assignments).toEqual([]);
-    expect((await call('academics/classes', 'GET', { as: B.users.ADMIN })).json.data.classes.map((c: { id: string }) => c.id)).not.toContain(W.f1North);
+    expect((await call('academics/classes', 'GET', { as: B.operator! })).json.data.classes.map((c: { id: string }) => c.id)).not.toContain(W.f1North);
   });
 });

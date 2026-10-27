@@ -3,7 +3,7 @@
 // permission), the bodies are validated on the server, and the money flows work end to end through the HTTP layer.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startTestDb, type TestDb } from '../helpers/test-db';
-import { seedSchool, type SeededSchool, type SeededUser } from '../helpers/seed';
+import { seedSchool, type SeededSchool, type SeededUser, userWithRoles } from '../helpers/seed';
 import { call } from '../helpers/route';
 import { addStudent } from '../helpers/students';
 import { addTeacher } from '../helpers/academics';
@@ -115,16 +115,17 @@ describe('fees, payments and balances through the API', () => {
     expect(self.json.message).toMatch(/You recorded this payment/);
     expect(await bal()).toBe(15000);
 
-    const rejected = await call('finance/payments/[id]/reject', 'POST', { as: A.users.HEAD, params: { id: myId }, body: { reason: '' } });
+    const bursar2 = await userWithRoles(prisma, A, ['BURSAR'], 'bursar2'); // a second finance person: the Head approves, but does not verify or reject money
+    const rejected = await call('finance/payments/[id]/reject', 'POST', { as: bursar2, params: { id: myId }, body: { reason: '' } });
     expect(rejected.status).toBe(422);
-    const ok = await call('finance/payments/[id]/reject', 'POST', { as: A.users.HEAD, params: { id: myId }, body: { reason: 'Cash was short' } });
+    const ok = await call('finance/payments/[id]/reject', 'POST', { as: bursar2, params: { id: myId }, body: { reason: 'Cash was short' } });
     expect(ok.status).toBe(200);
-    const listed = await call('finance/payments', 'GET', { as: A.users.HEAD, query: '?status=REJECTED' });
+    const listed = await call('finance/payments', 'GET', { as: bursar2, query: '?status=REJECTED' });
     expect(listed.json.data.rows.map((r: { id: string }) => r.id)).toContain(myId);
-    const receipt = await call('finance/payments/[id]', 'GET', { as: A.users.HEAD, params: { id } });
+    const receipt = await call('finance/payments/[id]', 'GET', { as: bursar2, params: { id } });
     expect(receipt.json.data.amountCents).toBe(10000);
     expect(receipt.json.data.allocations[0].amountCents).toBe(10000);
-    expect((await call('finance/payments/[id]', 'GET', { as: A.users.HEAD, params: { id: 'nope' } })).status).toBe(404);
+    expect((await call('finance/payments/[id]', 'GET', { as: bursar2, params: { id: 'nope' } })).status).toBe(404);
   });
 
   it('a malformed body is a 422, not a crash', async () => {

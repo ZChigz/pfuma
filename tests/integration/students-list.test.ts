@@ -2,7 +2,7 @@
 // The Students list and exports: search, filters, counts, who may see which column, and the audit entry of every export.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startTestDb, type TestDb } from '../helpers/test-db';
-import { grantPermission, seedSchool, type SeededSchool } from '../helpers/seed';
+import { grantPermission, seedSchool, userWithRoles, type SeededSchool } from '../helpers/seed';
 import { call } from '../helpers/route';
 
 vi.mock('@/lib/auth', async () => ({ auth: (await import('../helpers/session')).mockAuth }));
@@ -54,8 +54,8 @@ let house: string;
 beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   const level2 = await prisma.level.create({ data: { schoolId: A.schoolId, name: 'Form 2', order: 2, category: 'O_LEVEL' } });
   form2East = (await prisma.schoolClass.create({ data: { schoolId: A.schoolId, name: 'Form 2 East', levelId: level2.id, stream: 'East' } })).id;
   house = (await prisma.house.create({ data: { schoolId: A.schoolId, name: 'Zambezi', colour: '#0A7' } })).id;
@@ -72,7 +72,7 @@ afterAll(async () => {
   await t.stop();
 });
 
-const list = (query = '', as = A.users.ADMIN) => call('students', 'GET', { as, query });
+const list = (query = '', as = A.operator!) => call('students', 'GET', { as, query });
 const names = (r: { json: { data: { rows: { fullName: string }[] } } }) => r.json.data.rows.map((x) => x.fullName).sort();
 
 describe('who may open the list', () => {
@@ -81,12 +81,11 @@ describe('who may open the list', () => {
   });
 
   it('refuses a user whose roles do not include students.profiles.view', async () => {
-    expect((await list('', A.users.BURSAR)).status).toBe(403);
-    expect((await list('', A.users.TEACHER)).status).toBe(403);
+    expect((await list('', await userWithRoles(prisma, A, []))).status).toBe(403);
   });
 
   it('lets the owner and administrator see every student of their own school, and no other school', async () => {
-    for (const u of [A.users.ADMIN, A.users.DIRECTOR]) {
+    for (const u of [A.operator!, A.users.DIRECTOR]) {
       const r = await list('?status=', u);
       expect(r.status).toBe(200);
       expect(names(r as never)).toEqual(['Nyasha Moyo', 'Rufaro Chari', 'Tatenda Dube', 'Tendai Moyo1'].sort());
@@ -202,7 +201,7 @@ describe('filters and counts', () => {
 
 describe('guardian columns', () => {
   it('are empty for a user who may not see guardians, and filled for one who may', async () => {
-    await grantPermission(prisma, A.schoolId, 'BURSAR', 'students.profiles.view');
+    await grantPermission(prisma, A.schoolId, 'BURSAR', 'students.profiles.view', 'CLASS');
     const bursar = await call('students', 'GET', { as: A.users.BURSAR, query: '' });
     // the bursar teaches nothing, so sees nobody; use a class they lead to check the columns
     expect(bursar.json.data.rows).toHaveLength(0);
@@ -217,7 +216,7 @@ describe('guardian columns', () => {
 });
 
 describe('exports', () => {
-  const exportCsv = (as: typeof A.users.ADMIN, body: unknown = {}) => call('students/export', 'POST', { as, body });
+  const exportCsv = (as: typeof A.operator!, body: unknown = {}) => call('students/export', 'POST', { as, body });
   const header = (r: { text: string }) => r.text.replace(/^﻿/, '').split('\r\n')[0]!.split(',');
 
   it('needs students.profiles.export', async () => {
@@ -226,14 +225,14 @@ describe('exports', () => {
   });
 
   it('gives an administrator every column, and writes an audit entry with the columns taken', async () => {
-    const r = await exportCsv(A.users.ADMIN);
+    const r = await exportCsv(A.operator!);
     expect(r.status).toBe(200);
     expect(r.response.headers.get('content-type')).toContain('text/csv');
     expect(header(r)).toEqual(expect.arrayContaining(['Medical alert', 'Discipline incidents', 'Birth certificate number', 'Guardian national ID', 'Primary guardian']));
     expect(r.text).toContain('Severe allergy: penicillin');
     expect(r.text).toContain('63-123456 A 42');
     const entry = await prisma.auditLog.findFirstOrThrow({ where: { schoolId: A.schoolId, action: 'EXPORT_STUDENTS' }, orderBy: { createdAt: 'desc' } });
-    expect(entry.actorId).toBe(A.users.ADMIN.id);
+    expect(entry.actorId).toBe(A.operator!.id);
     expect(entry.after).toMatchObject({ count: 4 });
     expect((entry.after as { columns: string[] }).columns).toContain('medicalAlert');
   });
@@ -259,17 +258,17 @@ describe('exports', () => {
   it('exports only the ticked rows, and never rows of another school or ones the user may not reach', async () => {
     const mine = await prisma.student.findFirstOrThrow({ where: { schoolId: A.schoolId, surname: 'Dube' } });
     const theirs = await prisma.student.findFirstOrThrow({ where: { schoolId: B.schoolId } });
-    const r = await exportCsv(A.users.ADMIN, { ids: [mine.id, theirs.id], columns: ['surname'] });
+    const r = await exportCsv(A.operator!, { ids: [mine.id, theirs.id], columns: ['surname'] });
     expect(r.text.replace(/^﻿/, '').trim().split('\r\n')).toEqual(['Surname', 'Dube']);
   });
 
   it('refuses an export of nothing', async () => {
-    expect((await exportCsv(A.users.ADMIN, { filters: { q: 'zzzzzz' } })).status).toBe(404);
+    expect((await exportCsv(A.operator!, { filters: { q: 'zzzzzz' } })).status).toBe(404);
   });
 
   it('keeps spreadsheet formulas from running', async () => {
     const s = await addStudent(A, { firstName: '=SUM(A1)', surname: 'Formula' });
-    const r = await exportCsv(A.users.ADMIN, { ids: [s.id], columns: ['firstName'] });
+    const r = await exportCsv(A.operator!, { ids: [s.id], columns: ['firstName'] });
     expect(r.text).toContain("'=SUM(A1)");
   });
 });

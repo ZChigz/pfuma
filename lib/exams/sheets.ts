@@ -17,7 +17,7 @@ import { classStats, markKey } from '@/lib/results';
 import { recalculateLevel } from '@/lib/results/service';
 import { peopleWith } from '@/lib/academics/common';
 import {
-  EDITABLE, STATUS_LABEL, assertLive, assertOwnAssignment, classNameOf, ensureSheet, holds, idSchema, isFull, isTeacherOf, levelIdOf, loadAssignment, num,
+  EDITABLE, STATUS_LABEL, assertLive, assertOwnAssignment, classNameOf, ensureSheet, holds, idSchema, isTeacherOf, levelIdOf, loadAssignment, num,
   resolveTerm, toDay, todayInHarare, type Actor, type LoadedAssignment,
 } from '@/lib/exams/common';
 import { buildGrid, type Grid } from '@/lib/exams/marks';
@@ -47,7 +47,6 @@ export async function verifiersOf(tx: Db, schoolId: string, a: LoadedAssignment)
 /** May this person verify (or return) this sheet? Never the teacher or second teacher, whoever they are. */
 export function mayVerify(user: Actor, a: LoadedAssignment, v: VerifierInfo): boolean {
   if (isTeacherOf(a, user.id)) return false;
-  if (isFull(user)) return true;
   return holds(user, 'exams.marks.verify') && v.verifierIds.includes(user.id);
 }
 
@@ -217,7 +216,7 @@ const dayText = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10
 export async function mySheets(user: Actor, opts: { termId?: string; all?: boolean } = {}): Promise<MySheets> {
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const term = await resolveTerm(tx, user.schoolId, opts.termId);
-    const wide = opts.all && (isFull(user) || holds(user, 'exams.marks.view'));
+    const wide = opts.all && (holds(user, 'exams.marks.view'));
     const assignments = await tx.teacherAssignment.findMany({
       where: { schoolId: user.schoolId, termId: term.id, status: 'ACTIVE', ...(wide ? {} : { OR: [{ teacherId: user.id }, { coTeacherId: user.id }] }) },
       select: { id: true }, orderBy: [{ class: { name: 'asc' } }, { subject: { name: 'asc' } }], take: 300,
@@ -321,7 +320,7 @@ export async function reviewSheet(user: Actor, assignmentId: string): Promise<Re
     const v = await verifiersOf(tx, user.schoolId, a);
     const may = mayVerify(user, a, v);
     const own = isTeacherOf(a, user.id) && holds(user, 'exams.marks.enter');
-    if (!may && !own && !isFull(user) && !holds(user, 'exams.marks.view') && !holds(user, 'exams.marks.unlock')) throw new ServiceError('Class not found', 404);
+    if (!may && !own && !holds(user, 'exams.marks.view') && !holds(user, 'exams.marks.unlock')) throw new ServiceError('Class not found', 404);
     const grid = await buildGrid(tx, user, a, false);
     const marks = grid.students.map((s) => grid.preview[s.id]).filter((p): p is NonNullable<typeof p> => !!p && p.roundedMark !== null);
     const values = marks.map((m) => m.roundedMark!);
@@ -370,7 +369,7 @@ export async function reviewSheet(user: Actor, assignmentId: string): Promise<Re
 
 /** Every change to a student's marks this term after first submission, for the student's results page. */
 export async function studentMarkHistory(user: Actor, studentId: string, termId?: string): Promise<HistoryRow[]> {
-  if (!holds(user, 'exams.results.view') && !isFull(user)) throw new ServiceError('Forbidden', 403);
+  if (!holds(user, 'exams.results.view')) throw new ServiceError('Forbidden', 403);
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const term = await resolveTerm(tx, user.schoolId, termId);
     if (!(await tx.student.findFirst({ where: { id: studentId, schoolId: user.schoolId }, select: { id: true } }))) throw new ServiceError('Student not found', 404);
@@ -393,7 +392,7 @@ export interface TermProgress {
 
 /** "34 of 48 mark sheets verified" and the overdue sheets by teacher. */
 export async function termProgress(user: Actor, termId?: string): Promise<TermProgress> {
-  if (!isFull(user) && !holds(user, 'exams.marks.view') && !holds(user, 'exams.marks.unlock')) throw new ServiceError('Forbidden', 403);
+  if (!holds(user, 'exams.marks.view') && !holds(user, 'exams.marks.unlock')) throw new ServiceError('Forbidden', 403);
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const term = await resolveTerm(tx, user.schoolId, termId);
     const [assignments, sheets, dl] = await Promise.all([
@@ -434,7 +433,7 @@ const RemindSchema = z.object({ termId: idSchema.optional(), teacherIds: z.array
 
 /** The Remind button: tells each teacher which of their mark sheets are overdue. */
 export async function remindTeachers(user: Actor, raw: unknown) {
-  if (!isFull(user) && !holds(user, 'exams.marks.unlock') && !holds(user, 'exams.setup.manage')) throw new ServiceError('Forbidden', 403);
+  if (!holds(user, 'exams.marks.unlock') && !holds(user, 'exams.setup.manage')) throw new ServiceError('Forbidden', 403);
   const input = RemindSchema.parse(raw);
   const progress = await termProgress(user, input.termId);
   const wanted = new Set(input.teacherIds);

@@ -16,7 +16,7 @@ import { recalculateLevel } from '@/lib/results/service';
 import { loadLetterhead, type SchoolLetterhead } from '@/lib/students/documents';
 import { scaleFor } from '@/lib/exams/scales';
 import {
-  MAX_COMMENT, classNameOf, commentSchema, holds, idSchema, isFull, loadExamSettings, num, reasonSchema, resolveTerm, rosterOf, loadAssignment, type Actor,
+  MAX_COMMENT, classNameOf, commentSchema, holds, idSchema, loadExamSettings, num, reasonSchema, resolveTerm, rosterOf, loadAssignment, type Actor,
 } from '@/lib/exams/common';
 
 // ─── Subject comments ────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ export async function saveSubjectComments(user: Actor, raw: unknown) {
     if (!settings.subjectCommentsEnabled) throw new ServiceError('Subject comments are switched off for this school', 409);
     const a = await loadAssignment(tx, user.schoolId, input.assignmentId);
     const mine = a.teacherId === user.id || a.coTeacherId === user.id;
-    if (!isFull(user) && !(holds(user, 'exams.comments.subject') && mine)) throw new ServiceError('Class not found', 404);
+    if (!(holds(user, 'exams.comments.subject') && mine)) throw new ServiceError('Class not found', 404);
     if (a.term.status === 'CLOSED') throw new ServiceError(`${a.term.name} is closed`, 409);
     const sheet = await tx.markSheet.upsert({ where: { assignmentId_termId: { assignmentId: a.id, termId: a.termId } }, update: {}, create: { schoolId: user.schoolId, assignmentId: a.id, termId: a.termId } });
     if (sheet.status === 'PUBLISHED') throw new ServiceError('These results are published. Unpublish the class before changing comments.', 409);
@@ -93,7 +93,7 @@ export async function classComments(user: Actor, classId: string, termId?: strin
     const klass = await tx.schoolClass.findFirst({ where: { id: classId, schoolId: user.schoolId }, select: { id: true, name: true } });
     if (!klass) throw new ServiceError('Class not found', 404);
     const own = await isClassTeacher(tx, user.schoolId, user.id, classId, term.id);
-    const wide = isFull(user) || holds(user, 'exams.comments.head') || holds(user, 'exams.results.view') && !own;
+    const wide = holds(user, 'exams.comments.head') || holds(user, 'exams.results.view') && !own;
     if (!own && !wide) throw new ServiceError('Class not found', 404);
     const ct = await tx.classTeacher.findFirst({ where: { classId, termId: term.id }, select: { user: { select: { fullName: true } } } });
     const enrol = await tx.enrollment.findMany({ where: { schoolId: user.schoolId, classId, termId: term.id, status: 'ACTIVE' }, select: { student: { select: { id: true, firstName: true, surname: true, admissionNumber: true } } } });
@@ -120,7 +120,7 @@ export async function classComments(user: Actor, classId: string, termId?: strin
     const group = (cat: string) => bank.filter((b) => b.category === cat).map((b) => b.text);
     return {
       classId, className: klass.name, termId: term.id, termName: term.name, classTeacher: ct?.user.fullName ?? null,
-      canWriteClass: isFull(user) || (own && holds(user, 'exams.comments.class')), canWriteHead: isFull(user) || holds(user, 'exams.comments.head'),
+      canWriteClass: (own && holds(user, 'exams.comments.class')), canWriteHead: holds(user, 'exams.comments.head'),
       rows, bank: { SUBJECT: group('SUBJECT'), CLASS_TEACHER: group('CLASS_TEACHER'), HEAD: group('HEAD') },
     };
   });
@@ -154,7 +154,7 @@ export async function saveClassComments(user: Actor, raw: unknown) {
     if (!(await tx.schoolClass.findFirst({ where: { id: input.classId, schoolId: user.schoolId }, select: { id: true } }))) throw new ServiceError('Class not found', 404);
     if (input.kind === 'CLASS_TEACHER') {
       const own = await isClassTeacher(tx, user.schoolId, user.id, input.classId, term.id);
-      if (!isFull(user) && !(own && holds(user, 'exams.comments.class'))) throw new ServiceError('Class not found', 404);
+      if (!(own && holds(user, 'exams.comments.class'))) throw new ServiceError('Class not found', 404);
     } else if (!holds(user, 'exams.comments.head')) throw new ServiceError('Forbidden', 403);
     await writeComments(tx, user, input.classId, term.id, input.kind, input.comments);
     return { saved: input.comments.length };
@@ -243,7 +243,7 @@ export async function checkClass(tx: Db, schoolId: string, classId: string, term
 }
 
 export async function prePublishCheck(user: Actor, classId: string, termId?: string): Promise<PublishCheck> {
-  if (!holds(user, 'exams.results.publish') && !holds(user, 'exams.results.view') && !isFull(user)) throw new ServiceError('Forbidden', 403);
+  if (!holds(user, 'exams.results.publish') && !holds(user, 'exams.results.view')) throw new ServiceError('Forbidden', 403);
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const term = await resolveTerm(tx, user.schoolId, termId);
     if (!(await tx.schoolClass.findFirst({ where: { id: classId, schoolId: user.schoolId }, select: { id: true } }))) throw new ServiceError('Class not found', 404);
@@ -425,10 +425,10 @@ export async function reportCardData(user: Actor, studentId: string, termId?: st
     const tr = await tx.termResult.findFirst({ where: { schoolId: sid, termId: term.id, studentId } });
     if (!tr || !tr.classId) throw new ServiceError('There is no result for this student this term', 404);
     const own = await isClassTeacher(tx, sid, user.id, tr.classId, term.id);
-    const mayRead = isFull(user) || holds(user, 'exams.results.view') || holds(user, 'exams.reports.view') || holds(user, 'exams.results.publish') || own;
+    const mayRead = holds(user, 'exams.results.view') || holds(user, 'exams.reports.view') || holds(user, 'exams.results.publish') || own;
     if (!mayRead) throw new ServiceError('Student not found', 404);
     const draft = !tr.published;
-    if (draft && !(opts.draft && (isFull(user) || holds(user, 'exams.results.publish')))) throw new ServiceError('These results have not been published yet', 409);
+    if (draft && !(opts.draft && (holds(user, 'exams.results.publish')))) throw new ServiceError('These results have not been published yet', 409);
     const [student, klass, subjects, settings, school, comment] = await Promise.all([
       tx.student.findFirstOrThrow({ where: { id: studentId, schoolId: sid }, select: { id: true, fullName: true, admissionNumber: true, photoUrl: true } }),
       tx.schoolClass.findFirstOrThrow({ where: { id: tr.classId, schoolId: sid }, select: { name: true, levelId: true, level: { select: { category: true } } } }),
@@ -513,7 +513,7 @@ export interface ResultsClass {
 
 /** Every class with whether it can be published, and what stops it. A class teacher sees only their own classes. */
 export async function resultsOverview(user: Actor, termId?: string): Promise<{ termId: string; termName: string; classes: ResultsClass[] }> {
-  const wide = isFull(user) || holds(user, 'exams.results.publish') || holds(user, 'exams.results.view') || holds(user, 'exams.results.unpublish');
+  const wide = holds(user, 'exams.results.publish') || holds(user, 'exams.results.view') || holds(user, 'exams.results.unpublish');
   if (!wide && !holds(user, 'exams.comments.class')) throw new ServiceError('Forbidden', 403);
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const term = await resolveTerm(tx, user.schoolId, termId);

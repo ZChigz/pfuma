@@ -20,7 +20,7 @@ const day = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : 
 
 async function reachable(db: Db, user: AccessUser, studentId: string) {
   const open = await db.academicTerm.findFirst({ where: { schoolId: user.schoolId, status: 'OPEN' }, select: { id: true, name: true, startDate: true } });
-  const student = await db.student.findFirst({ where: { AND: [studentScope(user, open?.id), { id: studentId }] }, select: { id: true } });
+  const student = await db.student.findFirst({ where: { AND: [await studentScope(user, open?.id, undefined, db), { id: studentId }] }, select: { id: true } });
   if (!student) throw new ServiceError('Student not found', 404);
   return open;
 }
@@ -133,7 +133,7 @@ export async function profileOverview(user: AccessUser, studentId: string): Prom
   const sharedGuardianIds = s.guardians.map((g) => g.guardianId);
   const siblings = sharedGuardianIds.length
     ? await db.student.findMany({
-        where: { AND: [studentScope(user), { id: { not: s.id } }, { guardians: { some: { guardianId: { in: sharedGuardianIds } } } }] },
+        where: { AND: [await studentScope(user, undefined, undefined, db), { id: { not: s.id } }, { guardians: { some: { guardianId: { in: sharedGuardianIds } } } }] },
         select: { id: true, fullName: true, status: true, currentClass: { select: { name: true } } },
         orderBy: { fullName: 'asc' },
       })

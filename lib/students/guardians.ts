@@ -209,7 +209,7 @@ export async function addGuardianToStudent(user: AccessUser, studentId: string, 
   const { schoolId } = user;
   return getScopedDb(schoolId, user.id).$tx(async (tx) => {
     const open = await tx.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } });
-    await loadReachable(tx, user, [studentId], open?.id);
+    await loadReachable(tx, user, [studentId], open?.id, 'students.guardians.edit');
     let guardianId = input.guardianId;
     if (guardianId) {
       if (!(await tx.guardian.findFirst({ where: { id: guardianId, schoolId }, select: { id: true } }))) throw new ServiceError('Guardian not found', 404);

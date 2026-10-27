@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { useSidebarStore } from '@/lib/sidebar-store';
 import { termLabel } from '@/lib/term-label';
 import type { NavGroup } from '@/lib/nav';
-import { icons, type RoleNav } from './nav-config';
+import { icons, type Workspace } from './nav-config';
 
 function Icon({ path, className }: { path: string; className?: string }) {
   return (
@@ -39,7 +39,7 @@ interface SidebarProps {
   /** Groups the user may see (lib/nav.ts buildNav). */
   groups: NavGroup[];
   /** The pages that already exist for the user's role, outside Dashboard & System. */
-  workspace: RoleNav | null;
+  workspace: Workspace | null;
   openTermName?: string;
 }
 

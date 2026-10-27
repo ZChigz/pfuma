@@ -17,8 +17,8 @@ let n = 0;
 beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
 }, 120_000);
 
 afterAll(async () => {
@@ -91,7 +91,7 @@ describe('5.1 — student members: created on admission, suspended on leaving', 
         guardianPhone: '0771234567', houseNumber: '12', suburb: 'Mbare', city: 'Harare',
       },
     };
-    const r = await call('admin/students', 'POST', { as: A.users.ADMIN, body });
+    const r = await call('admin/students', 'POST', { as: A.operator!, body });
     expect(r.status).toBe(201);
     const member = await prisma.libraryMember.findFirstOrThrow({ where: { student: { firstName: 'Rudo', surname: 'Ncube' } } });
     expect(member).toMatchObject({ memberType: 'STUDENT', userId: null, borrowingSuspended: false, schoolId: A.schoolId });
@@ -100,8 +100,8 @@ describe('5.1 — student members: created on admission, suspended on leaving', 
 
   it('withdrawing or transferring out suspends the membership; others stay active', async () => {
     const [w, tr, stays] = [await newStudent(), await newStudent(), await newStudent()];
-    expect((await call('admin/students/lifecycle', 'POST', { as: A.users.ADMIN, body: { action: 'WITHDRAW', studentIds: [w.student.id], reason: 'Moved' } })).status).toBe(200);
-    expect((await call('admin/students/lifecycle', 'POST', { as: A.users.ADMIN, body: { action: 'TRANSFER_OUT', studentIds: [tr.student.id] } })).status).toBe(200);
+    expect((await call('admin/students/lifecycle', 'POST', { as: A.operator!, body: { action: 'WITHDRAW', studentIds: [w.student.id], reason: 'Moved' } })).status).toBe(200);
+    expect((await call('admin/students/lifecycle', 'POST', { as: A.operator!, body: { action: 'TRANSFER_OUT', studentIds: [tr.student.id] } })).status).toBe(200);
     const get = (id: string) => prisma.libraryMember.findUniqueOrThrow({ where: { id } });
     expect(await get(w.member.id)).toMatchObject({ borrowingSuspended: true, suspensionReason: 'Student withdrawn' });
     expect(await get(tr.member.id)).toMatchObject({ borrowingSuspended: true, suspensionReason: 'Student transferred out' });
@@ -113,14 +113,14 @@ describe('5.1 — student members: created on admission, suspended on leaving', 
     const { suspendStudentMembers } = await import('@/lib/library');
     const { getScopedDb } = await import('@/lib/scoped-db');
     const g = await newStudent();
-    await getScopedDb(A.schoolId, A.users.ADMIN.id).$tx((tx) => suspendStudentMembers(tx, A.schoolId, A.users.ADMIN.id, [g.student.id], 'Student graduated'));
+    await getScopedDb(A.schoolId, A.operator!.id).$tx((tx) => suspendStudentMembers(tx, A.schoolId, A.operator!.id, [g.student.id], 'Student graduated'));
     expect((await prisma.libraryMember.findUniqueOrThrow({ where: { id: g.member.id } })).suspensionReason).toBe('Student graduated');
   });
 
   it('a suspended student cannot borrow, but can still return what they hold', async () => {
     const s = await newStudent();
     const held = await lend(s.member.id);
-    await call('admin/students/lifecycle', 'POST', { as: A.users.ADMIN, body: { action: 'WITHDRAW', studentIds: [s.student.id] } });
+    await call('admin/students/lifecycle', 'POST', { as: A.operator!, body: { action: 'WITHDRAW', studentIds: [s.student.id] } });
     const { copies } = await newBook();
     const r = await checkout(copies[0].id, s.member.id);
     expect(r.status).toBe(403);

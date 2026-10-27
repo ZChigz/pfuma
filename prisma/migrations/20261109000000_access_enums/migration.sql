@@ -1,0 +1,14 @@
+-- Access control, part 1 of 3: new audit actions and the STORE scope for a role. Own file: a new enum value cannot be used in the
+-- transaction that adds it.
+ALTER TYPE "AuditAction" ADD VALUE 'ACCESS_ROLE_ASSIGNED';
+ALTER TYPE "AuditAction" ADD VALUE 'ACCESS_ROLE_REMOVED';
+ALTER TYPE "AuditAction" ADD VALUE 'ACCESS_ROLE_SAVED';
+ALTER TYPE "AuditAction" ADD VALUE 'ACCESS_OVERRIDE_SAVED';
+ALTER TYPE "AuditAction" ADD VALUE 'ACCESS_OVERRIDE_REVOKED';
+ALTER TYPE "AuditAction" ADD VALUE 'ACCESS_REQUESTED';
+ALTER TYPE "AuditAction" ADD VALUE 'ACCESS_REQUEST_DECIDED';
+ALTER TYPE "AuditAction" ADD VALUE 'ACCESS_DENIED';
+ALTER TYPE "AuditAction" ADD VALUE 'ACCESS_SETTINGS_CHANGED';
+ALTER TYPE "AuditAction" ADD VALUE 'PAY_VIEWED';
+ALTER TYPE "AuditAction" ADD VALUE 'EXPORT_DATA';
+ALTER TYPE "RoleScopeType" ADD VALUE 'STORE';

@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/Badge';
@@ -8,7 +9,6 @@ import { AssignSubjectModal } from '@/components/admin/AssignSubjectModal';
 import { RemoveAssignmentButton } from '@/components/admin/RemoveAssignmentButton';
 import { GradeBoundariesManager } from '@/components/results/GradeBoundariesManager';
 import { ResultsSettings } from '@/components/results/ResultsSettings';
-import { canManageSubjects } from '@/lib/permissions';
 import { getOpenTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 
@@ -18,7 +18,7 @@ export default async function AdminSubjectsPage() {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageSubjects(user.role); } catch { redirect('/'); }
+  await guardPage(user, 'academics.subjects.manage');
 
   const { schoolId } = user;
 

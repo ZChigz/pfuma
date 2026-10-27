@@ -9,7 +9,7 @@ import { logAudit } from '@/lib/audit';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { notifyUsers } from '@/lib/system/notifications';
 import {
-  assertClassReachable, dedupe, holds, idSchema, initialsOf, isFull, isoDateSchema, isoOf, noteSchema, peopleWith, resolveTerm, todayInHarare, toDay,
+  assertClassReachable, dedupe, holds, idSchema, initialsOf, isoDateSchema, isoOf, noteSchema, peopleWith, resolveTerm, todayInHarare, toDay,
   weekdayOf, writableTerm, type Actor,
 } from '@/lib/academics/common';
 import { applicableSchedule } from '@/lib/academics/bell';
@@ -161,7 +161,7 @@ export async function timetableView(user: Actor, raw: z.input<typeof ViewSchema>
   const q = ViewSchema.parse(raw);
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const term = await resolveTerm(tx, user.schoolId, q.termId);
-    const editor = isFull(user) || holds(user, 'academics.timetable.edit') || holds(user, 'academics.timetable.approve');
+    const editor = holds(user, 'academics.timetable.edit') || holds(user, 'academics.timetable.approve');
     const asOf = q.date ?? todayInHarare();
 
     // Who may look at which view: an editor anything; everyone else their own week and their own classes.
@@ -459,7 +459,7 @@ export interface DayLesson {
 /** A teacher's lessons for a day from the published timetable (with cover lessons), and which one is next. */
 export async function myDay(user: Actor, dateIn?: string, forUserId?: string) {
   const date = isoDateSchema.parse(dateIn ?? todayInHarare());
-  const userId = forUserId && (isFull(user) || holds(user, 'academics.timetable.approve') || holds(user, 'academics.timetable.edit')) ? forUserId : user.id;
+  const userId = forUserId && (holds(user, 'academics.timetable.approve') || holds(user, 'academics.timetable.edit')) ? forUserId : user.id;
   const db = getScopedDb(user.schoolId, user.id);
   const day = await schoolDayInfo(db, user, date);
   return db.$tx(async (tx) => {

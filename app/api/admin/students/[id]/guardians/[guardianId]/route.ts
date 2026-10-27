@@ -10,9 +10,7 @@ type Ctx = { params: { id: string; guardianId: string } };
 async function currentUser() {
   const s = await auth();
   if (!s?.user?.id) return null;
-  const user = s.user as unknown as SessionUser;
-  await requirePermission('students.guardians.edit');
-  return user;
+  return s.user as unknown as SessionUser;
 }
 
 // Body { link: {...} } changes the relationship/flags or makes the guardian
@@ -20,6 +18,7 @@ async function currentUser() {
 async function _PATCH(req: Request, { params }: Ctx) {
   const user = await currentUser();
   if (!user) return apiUnauthorized();
+  await requirePermission('students.guardians.edit', { model: 'Student', id: params.id });
 
   const body = await req.json().catch(() => ({})) as { link?: unknown; guardian?: unknown };
   const guardian = body.guardian ? GuardianDetailsSchema.partial().safeParse(body.guardian) : null;
@@ -39,6 +38,7 @@ async function _PATCH(req: Request, { params }: Ctx) {
 async function _DELETE(_req: Request, { params }: Ctx) {
   const user = await currentUser();
   if (!user) return apiUnauthorized();
+  await requirePermission('students.guardians.edit', { model: 'Student', id: params.id });
   await unlinkGuardian(user.schoolId, user.id, params.id, params.guardianId);
   return apiSuccess({ removed: true });
 }

@@ -42,17 +42,17 @@ export const fileRouter = {
     'application/pdf': { maxFileSize: '8MB', maxFileCount: 1, acl: 'private' },
   })
     .middleware(async ({ files }) => {
-      const session = await auth();
-      if (!session?.user) throw new UploadThingError('Unauthorized');
+      let user;
+      try { user = await requirePermission('finance.payments.record'); } catch (e) { throw new UploadThingError(e instanceof Response && e.status === 401 ? 'Unauthorized' : 'You cannot record payments'); }
       for (const file of files) {
         if (!(POP_ALLOWED_TYPES as readonly string[]).includes(file.type)) {
           throw new UploadThingError('Only JPG, PNG, WebP or PDF files are allowed');
         }
         if (file.size > POP_MAX_BYTES) throw new UploadThingError('The file must be 5 MB or smaller');
       }
-      const schoolId = session.user.schoolId;
+      const schoolId = user.schoolId;
       return {
-        userId: session.user.id,
+        userId: user.id,
         schoolId,
         [UTFiles]: files.map((file) => ({ ...file, customId: newProofKey(schoolId) })),
       };
@@ -121,25 +121,27 @@ export const fileRouter = {
 
   assetImage: f({ image: { maxFileSize: '8MB', maxFileCount: 1 } })
     .middleware(async () => {
-      const session = await auth();
-      if (!session?.user) throw new Error('Unauthorized');
-      return { userId: session.user.id };
+      let user;
+      try { user = await requirePermission('facilities.assets.manage'); } catch { throw new UploadThingError('You cannot keep the asset register'); }
+      return { userId: user.id };
     })
     .onUploadComplete(() => {}),
 
   studentPhoto: f({ image: { maxFileSize: '4MB', maxFileCount: 1 } })
     .middleware(async () => {
-      const session = await auth();
-      if (!session?.user) throw new Error('Unauthorized');
-      return { userId: session.user.id };
+      let user;
+      try { user = await requirePermission('students.profiles.edit'); } catch {
+        try { user = await requirePermission('students.profiles.create'); } catch { throw new UploadThingError('You cannot change student details'); }
+      }
+      return { userId: user.id };
     })
     .onUploadComplete(() => {}),
 
   bookCover: f({ image: { maxFileSize: '4MB', maxFileCount: 1 } })
     .middleware(async () => {
-      const session = await auth();
-      if (!session?.user) throw new Error('Unauthorized');
-      return { userId: session.user.id };
+      let user;
+      try { user = await requirePermission('facilities.library.manage'); } catch { throw new UploadThingError('You cannot run the library catalogue'); }
+      return { userId: user.id };
     })
     .onUploadComplete(() => {}),
 

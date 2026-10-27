@@ -23,7 +23,7 @@ let groupPhy: string;
 let deputy: string;
 let deputyAs: Awaited<ReturnType<typeof sessionFor>>;
 
-const admin = () => A.users.ADMIN;
+const admin = () => A.operator!;
 const at = (ms: number) => new Date(NOW.getTime() - 3_600_000 + ms).toISOString();
 const place = (assignmentId: string, d: number, no: number, o: object = {}, as = admin()) =>
   call('academics/timetable/place', 'POST', { as, body: { assignmentId, periodId: periodAt(W, d, no), ...o } });
@@ -34,8 +34,8 @@ beforeAll(async () => {
   ({ prisma } = await import('@/lib/prisma'));
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   W = await buildWorld(prisma, A);
   kids1 = [A.studentId, ...(await students(prisma, A, W.f1North, 5, 'Kid'))];
   f3 = await students(prisma, A, W.f3North, 4, 'Three');
@@ -583,9 +583,9 @@ describe('per-lesson attendance', () => {
 describe('another school', () => {
   it('cannot see or change this school\'s timetable', async () => {
     const slot = await prisma.timetableSlot.findFirstOrThrow({ where: { schoolId: A.schoolId } });
-    expect((await call('academics/timetable/slots/[id]', 'DELETE', { as: B.users.ADMIN, params: { id: slot.id } })).status).toBe(404);
-    expect((await call('academics/timetable/place', 'POST', { as: B.users.ADMIN, body: { assignmentId: a.eng1, periodId: periodAt(W, 5, 5) } })).status).toBe(404);
-    expect((await call('academics/timetable/view', 'GET', { as: B.users.ADMIN, query: `?view=class&id=${W.f1North}` })).status).toBe(404);
-    expect((await call('academics/timetable', 'GET', { as: B.users.ADMIN })).json.data.working).toBeNull();
+    expect((await call('academics/timetable/slots/[id]', 'DELETE', { as: B.operator!, params: { id: slot.id } })).status).toBe(404);
+    expect((await call('academics/timetable/place', 'POST', { as: B.operator!, body: { assignmentId: a.eng1, periodId: periodAt(W, 5, 5) } })).status).toBe(404);
+    expect((await call('academics/timetable/view', 'GET', { as: B.operator!, query: `?view=class&id=${W.f1North}` })).status).toBe(404);
+    expect((await call('academics/timetable', 'GET', { as: B.operator! })).json.data.working).toBeNull();
   });
 });

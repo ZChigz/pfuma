@@ -8,10 +8,10 @@ import { approverIds } from '@/lib/students/common';
 import { ServiceError } from '@/lib/api';
 import type { PermissionKey } from '@/lib/access-core';
 import type { Db } from '@/lib/scoped-db';
-import { holds, isFull, type Actor } from '@/lib/academics/common';
+import { holds, type Actor } from '@/lib/academics/common';
 import { MAX_CENTS, parseCents, type Cur } from '@/lib/finance/money';
 
-export { holds, isFull };
+export { holds };
 export type { Actor };
 export { idSchema, isoDateSchema, reasonSchema, noteSchema } from '@/lib/students/common';
 export { resolveTerm, writableTerm, assertWritable, todayInHarare, toDay, isoOf } from '@/lib/academics/common';

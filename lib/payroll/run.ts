@@ -8,7 +8,7 @@ import type { Employee, EmployeePay, HrPayrollLine, HrPayrollRun, Prisma } from 
 import { ServiceError } from '@/lib/api';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import {
-  audit, centsSchema, currencySchema, daysBetween, fullName, hrHolds, idSchema, isOwner, isoOf, loadHrSettings, monthRange, monthSchema, need, optText, tellHolders,
+  audit, centsSchema, currencySchema, daysBetween, fullName, hrHolds, idSchema, isoOf, loadHrSettings, monthRange, monthSchema, need, optText, tellHolders,
   toDay, type Actor,
 } from '@/lib/hr/common';
 import { ensureHrDefaults } from '@/lib/hr/defaults';
@@ -396,7 +396,8 @@ export const ReopenSchema = z.object({ reason: z.string().trim().min(5, 'Give a 
 /** Only the Owner, and only before anything has been paid: the Finance hand-over is cancelled and the run goes back to draft. */
 export async function reopenRun(user: Actor, runId: string, raw: unknown) {
   const { reason } = ReopenSchema.parse(raw);
-  if (!isOwner(user) || !hrHolds(user, 'hr.payroll.approve')) throw new ServiceError('Only the Owner can reopen an approved payroll run', 403);
+  // Approving payroll is the Owner's (hr.payroll.approve), so reopening an approved run is too.
+  if (!hrHolds(user, 'hr.payroll.approve')) throw new ServiceError('Only the Owner can reopen an approved payroll run', 403);
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const run = await loadRun(tx, user.schoolId, runId);
     if (run.status === 'PAID') throw new ServiceError('This payroll has been paid and can no longer be reopened. Correct it in next month\'s run with an adjustment line.', 409);

@@ -1,7 +1,8 @@
 import Link from 'next/link';
+import { AccessDeniedDetails } from '@/components/access/AccessDeniedDetails';
 
-/** Shown instead of a page when can() says no. */
-export function AccessDenied({ message }: { message?: string }) {
+/** Shown instead of a page when can() says no. Says in plain words what is missing, lists the person's roles and lets them ask for access. */
+export function AccessDenied({ message, permission }: { message?: string; permission?: string }) {
   return (
     <div role="alert" className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-2xl bg-white px-6 py-14 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-bg text-danger" aria-hidden="true">
@@ -10,7 +11,8 @@ export function AccessDenied({ message }: { message?: string }) {
         </svg>
       </div>
       <h1 className="text-lg font-semibold text-ink">You do not have access to this page</h1>
-      <p className="text-sm text-muted">{message ?? 'Ask a school administrator if you need it.'}</p>
+      {message && <p className="text-sm text-muted">{message}</p>}
+      <AccessDeniedDetails permission={permission} />
       <Link
         href="/"
         className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-full bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover"

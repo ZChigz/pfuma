@@ -4,84 +4,27 @@ import { authConfig } from '@/lib/auth.config';
 import { clientIp, getLimiters } from '@/lib/rate-limit';
 import { supportBlocked } from '@/lib/support-guard';
 import type { NextRequest } from 'next/server';
-import type { UserRole } from '@/types';
 
 // The middleware runs on the edge, so it verifies the JWT signature only. The
-// "is this user still active / same role" check happens in lib/auth.ts, which
+// "is this user still active / still holds these roles" check happens in lib/auth.ts, which
 // every API route and page reaches through auth().
 const { auth } = NextAuth(authConfig);
 
-// ─── Role-based route protection ──────────────────────────────────────────────
-
-const ROLE_HOME: Record<UserRole, string> = {
-  ADMIN:     '/system/dashboard',
-  DIRECTOR:  '/director',
-  HEAD:      '/head',
-  BURSAR:    '/bursar/students',
-  TEACHER:   '/teacher/marks',
-  LIBRARIAN: '/library',
-};
+// ─── Where a signed-in person lands ──────────────────────────────────────────
+// Every member of staff holds system.dashboard.view, so the dashboard is home for everyone. What a person may open beyond it is
+// decided by their permissions, not by a role: every page and every API route asks can() / requirePermission() itself
+// (lib/access.ts), and the menu shows only what they may use.
+const HOME = '/system/dashboard';
 
 function startsWithAny(pathname: string, prefixes: string[]): boolean {
   return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-// Director may void verified payments/expenses via the accounting API.
-const VOID_API_PATTERN = /^\/api\/accounting\/(payments|expenses)\/[^/]+\/void$/;
-
-// Directors also open a payment's proof of payment before verifying or voiding it.
-const PROOF_API_PATTERN = /^\/api\/accounting\/payments\/[^/]+\/proof$/;
-
-// Portal link / PIN management: ADMIN, HEAD and BURSAR only.
-const PORTAL_ADMIN_API = ['/api/portal-links'];
-
-const ROLE_ALLOWED: Record<UserRole, (pathname: string) => boolean> = {
-  // Admin subjects page manages grade boundaries via the results API.
-  ADMIN: (p) => startsWithAny(p, ['/admin', '/api/admin', '/api/results/grade-boundaries', '/api/results/settings', ...PORTAL_ADMIN_API]),
-
-  DIRECTOR: (p) =>
-    startsWithAny(p, ['/director', '/api/director', '/accounting/dashboard', '/api/accounting/dashboard', '/api/accounting/requests']) ||
-    VOID_API_PATTERN.test(p) ||
-    PROOF_API_PATTERN.test(p),
-
-  HEAD: (p) =>
-    startsWithAny(p, [
-      '/head',
-      '/accounting/students',
-      '/accounting/payments',
-      '/accounting/expenses',
-      '/accounting/settings',
-      '/results',
-      '/assets',
-      '/api/accounting',
-      '/api/results',
-      '/api/assets',
-      ...PORTAL_ADMIN_API,
-    ]) ||
-    // Bulk fee modal previews the student list from the admin students API.
-    p === '/api/admin/students',
-
-  BURSAR: (p) =>
-    startsWithAny(p, [
-      '/bursar',
-      '/api/accounting/students',
-      '/api/accounting/payments',
-      '/api/accounting/expenses',
-      '/api/accounting/exchange-rate',
-      '/api/accounting/requests',
-      ...PORTAL_ADMIN_API,
-    ]),
-
-  TEACHER: (p) =>
-    startsWithAny(p, ['/teacher', '/api/results/marks', '/api/results/remarks', '/api/accounting/requests']),
-
-  LIBRARIAN: (p) => startsWithAny(p, ['/library', '/api/library']),
-};
-
-// Reachable by any signed-in user, whatever their role.
+// Reachable by a user who still has to change their password: the change-password page and the areas whose pages and routes check
+// permissions themselves.
 // /system and /api/system: every signed-in user reaches them, and can() (lib/access.ts) decides what they may do.
 // /students and /api/students (Student Information), /academics and /api/academics, /exams and /api/exams (Examinations) /finance and /api/finance (Finance), and /hr and /api/hr (HR & Staff) work the same way: every route and page asks can().
-const ANY_ROLE = ['/change-password', '/api/account', '/system', '/api/system', '/students', '/api/students', '/academics', '/api/academics', '/exams', '/api/exams', '/finance', '/api/finance', '/hr', '/api/hr', '/print'];
+const OPEN_AREAS = ['/change-password', '/api/account', '/system', '/api/system', '/students', '/api/students', '/academics', '/api/academics', '/exams', '/api/exams', '/finance', '/api/finance', '/hr', '/api/hr', '/print'];
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 
@@ -94,7 +37,7 @@ function tooManyRequests(retryAfter: number): Response {
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
-export default auth(async (req: NextRequest & { auth: { user?: { id?: string; role: UserRole; mustChangePassword?: boolean; support?: boolean } } | null }) => {
+export default auth(async (req: NextRequest & { auth: { user?: { id?: string; mustChangePassword?: boolean; support?: boolean } } | null }) => {
   const { nextUrl } = req;
   const { pathname } = nextUrl;
   const ip = clientIp(req.headers);
@@ -119,8 +62,7 @@ export default auth(async (req: NextRequest & { auth: { user?: { id?: string; ro
     }
   }
 
-  const role = req.auth?.user?.role;
-  const isLoggedIn = !!role;
+  const isLoggedIn = !!req.auth?.user?.id;
 
   // A Pfuma support person looks in read-only: no change request gets through.
   if (isLoggedIn && req.auth?.user?.support && supportBlocked(req.method, pathname)) {
@@ -155,7 +97,7 @@ export default auth(async (req: NextRequest & { auth: { user?: { id?: string; ro
   }
 
   // Accounts created or reset by an admin must pick their own password first.
-  if (isLoggedIn && req.auth?.user?.mustChangePassword && !startsWithAny(pathname, [...ANY_ROLE, '/api/auth'])) {
+  if (isLoggedIn && req.auth?.user?.mustChangePassword && !startsWithAny(pathname, [...OPEN_AREAS, '/api/auth'])) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ success: false, message: 'Change your password to continue' }, { status: 403 });
     }
@@ -163,14 +105,7 @@ export default auth(async (req: NextRequest & { auth: { user?: { id?: string; ro
   }
 
   if (isLoggedIn && pathname.startsWith('/login')) {
-    return Response.redirect(new URL(ROLE_HOME[role], nextUrl));
-  }
-
-  // Each role only sees their own routes — anything else bounces home.
-  if (isLoggedIn && !isPublic && pathname !== '/' && !startsWithAny(pathname, ANY_ROLE)) {
-    if (!ROLE_ALLOWED[role](pathname)) {
-      return Response.redirect(new URL(ROLE_HOME[role], nextUrl));
-    }
+    return Response.redirect(new URL(HOME, nextUrl));
   }
 });
 

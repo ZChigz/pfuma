@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
-import { canReopenTerm } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { reopenTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 
@@ -12,7 +12,7 @@ async function _POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
-  try { await canReopenTerm(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'system.terms.reopen');
 
   const parsed = await parseBody(req, Schema);
   if ('error' in parsed) return parsed.error;

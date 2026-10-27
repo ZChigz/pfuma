@@ -28,7 +28,7 @@ let A: SeededSchool;
 let B: SeededSchool;
 let prisma: typeof import('@/lib/prisma').prisma;
 
-const admin = () => A.users.ADMIN;
+const admin = () => A.operator!;
 const owner = () => A.users.DIRECTOR;
 const grant = async (schoolId: string, roleKey: string, permissionKey: string) => {
   const role = await prisma.roleDefinition.findFirstOrThrow({ where: { schoolId, key: roleKey } });
@@ -36,6 +36,8 @@ const grant = async (schoolId: string, roleKey: string, permissionKey: string) =
 };
 const ungrant = (schoolId: string, roleKey: string, permissionKey: string) =>
   prisma.rolePermission.deleteMany({ where: { schoolId, permissionKey, role: { key: roleKey } } });
+/** Audit entries other than the record of a refused attempt. */
+const changeEntries = () => prisma.auditLog.count({ where: { action: { not: 'ACCESS_DENIED' } } });
 const OTHERS = ['HEAD', 'BURSAR', 'TEACHER', 'LIBRARIAN'] as const;
 
 const auditCount = (where: Record<string, unknown> = {}) => prisma.auditLog.count({ where: { schoolId: A.schoolId, ...where } });
@@ -45,8 +47,8 @@ beforeAll(async () => {
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
 }, 120_000);
 
 afterAll(async () => {
@@ -90,15 +92,16 @@ describe('every System route goes through the permission check', () => {
 
   for (const role of OTHERS) {
     it(`refuses ${role} on all of them, and changes nothing`, async () => {
-      const before = { users: await prisma.user.count(), audits: await prisma.auditLog.count(), school: (await prisma.school.findUniqueOrThrow({ where: { id: A.schoolId } })).name };
+      const before = { users: await prisma.user.count(), audits: await changeEntries(), school: (await prisma.school.findUniqueOrThrow({ where: { id: A.schoolId } })).name };
       for (const [file, method, body, who] of routes) {
+        if (role === 'HEAD' && (file === 'system/calendar' || file === 'system/audit-log')) continue; // the Head keeps the calendar and reads the audit log
         const r = await call(file, method, { as: A.users[role], body, params: target(who) });
         expect(r.status, `${role} ${method} ${file}`).toBe(403);
       }
       const csv = await call('system/audit-log', 'GET', { as: A.users[role], query: '?format=csv' });
       expect(csv.status).toBe(403);
       expect(await prisma.user.count()).toBe(before.users);
-      expect(await prisma.auditLog.count()).toBe(before.audits);
+      expect(await changeEntries()).toBe(before.audits); // a refusal of a sensitive key is itself logged (ACCESS_DENIED), nothing else
       expect((await prisma.school.findUniqueOrThrow({ where: { id: A.schoolId } })).name).toBe(before.school);
     });
   }
@@ -151,7 +154,7 @@ describe('school settings', () => {
     district: 'Chinhoyi', physicalAddress: '12 Main Street, Chinhoyi', postalAddress: 'P O Box 1, Chinhoyi', phone: '0242 700 123', email: 'Office@Chinhoyi.test',
     website: 'https://www.chinhoyi.co.zw', headName: 'Mrs T. Moyo', headSignatureUrl: 'https://utfs.io/f/sign.png',
   };
-  const save = (body: object, as: typeof A.users.ADMIN | null = admin()) => call('system/settings/profile', 'PATCH', { as, body });
+  const save = (body: object, as: typeof A.operator! | null = admin()) => call('system/settings/profile', 'PATCH', { as, body });
 
   it('saves the whole profile, with the phone as +263…, and logs before and after', async () => {
     const n = await auditCount({ action: 'UPDATE_SCHOOL_SETTINGS' });
@@ -181,7 +184,7 @@ describe('school settings', () => {
 
   it('never touches another school', async () => {
     expect((await prisma.school.findUniqueOrThrow({ where: { id: B.schoolId } })).name).toBe('School B');
-    expect((await call('system/settings', 'GET', { as: B.users.ADMIN })).json.data.school.name).toBe('School B');
+    expect((await call('system/settings', 'GET', { as: B.operator! })).json.data.school.name).toBe('School B');
   });
 
   it('rejects bad input without changing anything', async () => {
@@ -286,7 +289,7 @@ describe('calendar', () => {
 
   it('keeps schools apart', async () => {
     const mine = (await call('system/calendar', 'POST', { as: admin(), body: ev })).json.data.event.id;
-    const theirs = (await call('system/calendar', 'POST', { as: B.users.ADMIN, body: { ...ev, title: 'B only' } })).json.data.event.id;
+    const theirs = (await call('system/calendar', 'POST', { as: B.operator!, body: { ...ev, title: 'B only' } })).json.data.event.id;
     const listA = await call('system/calendar', 'GET', { as: admin(), query: '?from=2026-08-01&to=2026-08-31' });
     expect(listA.json.data.items.map((i: { title: string }) => i.title)).not.toContain('B only');
     expect((await call('system/calendar/[id]', 'PATCH', { as: admin(), params: { id: theirs }, body: ev })).status).toBe(404);
@@ -332,7 +335,7 @@ describe('module switches', () => {
     expect(buildNav(user).map((g) => g.module)).toContain('students');
 
     // School B is untouched.
-    session.current = { ...B.users.ADMIN };
+    session.current = { ...B.operator! };
     await expect(requirePermission('finance.payments.view')).resolves.toBeTruthy();
 
     await setModule(A.schoolId, 'finance', true);
@@ -474,7 +477,7 @@ describe('notifications', () => {
 
 describe('audit log', () => {
   it('shows this school only', async () => {
-    await prisma.auditLog.create({ data: { schoolId: B.schoolId, actorId: B.users.ADMIN.id, action: 'UPDATE_USER', entityType: 'User', entityId: 'x', detail: 'B-secret-detail' } });
+    await prisma.auditLog.create({ data: { schoolId: B.schoolId, actorId: B.operator!.id, action: 'UPDATE_USER', entityType: 'User', entityId: 'x', detail: 'B-secret-detail' } });
     const r = await call('system/audit-log', 'GET', { as: admin(), query: '?pageSize=100' });
     expect(r.status).toBe(200);
     expect(JSON.stringify(r.json)).not.toContain('B-secret-detail');

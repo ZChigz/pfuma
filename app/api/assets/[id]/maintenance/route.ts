@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
-import { canManageAssets } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
 import { CreateMaintenanceSchema } from '@/lib/validations/assets';
 import type { SessionUser } from '@/types';
@@ -16,7 +16,7 @@ async function _POST(
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageAssets(user.role); } catch (res) { return res as Response; }
+  await authorize(user, 'facilities.assets.maintain');
 
   const asset = await db.asset.findFirst({
     where: { id: params.id, schoolId: user.schoolId },

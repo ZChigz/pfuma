@@ -16,6 +16,10 @@ declare module 'next-auth' {
       role: UserRole;
       fullName: string;
       mustChangePassword: boolean;
+      /** Keys of the roles held, as of the last check (at most a minute old). The server reads the grants themselves. */
+      roles: string[];
+      /** Moves whenever the person's access changes; a stale token is rebuilt within a minute. */
+      permVersion: number;
       /** A Pfuma support person looking in read-only (set by the platform console, never by sign-in). */
       support?: boolean;
       supportAdminId?: string;
@@ -29,6 +33,8 @@ declare module 'next-auth' {
     fullName: string;
     tokenVersion: number;
     mustChangePassword: boolean;
+    roles: string[];
+    permVersion: number;
   }
 }
 
@@ -40,6 +46,8 @@ declare module '@auth/core/jwt' {
     fullName: string;
     tokenVersion: number;
     mustChangePassword: boolean;
+    roles?: string[];
+    permVersion?: number;
     checkedAt: number;
     support?: boolean;
     supportAdminId?: string;
@@ -59,6 +67,8 @@ export const authConfig = {
         token.fullName = user.fullName;
         token.tokenVersion = user.tokenVersion;
         token.mustChangePassword = user.mustChangePassword;
+        token.roles = user.roles;
+        token.permVersion = user.permVersion;
         token.checkedAt = Date.now();
       }
       return token;
@@ -69,6 +79,8 @@ export const authConfig = {
       session.user.role = token.role;
       session.user.fullName = token.fullName;
       session.user.mustChangePassword = token.mustChangePassword === true;
+      session.user.roles = Array.isArray(token.roles) ? token.roles : [];
+      session.user.permVersion = typeof token.permVersion === 'number' ? token.permVersion : 0;
       session.user.support = token.support === true;
       session.user.supportAdminId = typeof token.supportAdminId === 'string' ? token.supportAdminId : undefined;
       return session;

@@ -52,7 +52,7 @@ export async function assignHouse(user: AccessUser, rawInput: z.input<typeof Ass
     const house = input.houseId ? await tx.house.findFirst({ where: { id: input.houseId, schoolId } }) : null;
     if (input.houseId && !house) throw new ServiceError('House not found', 404);
     const open = await tx.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } });
-    const students = await loadReachable(tx, user, input.studentIds, open?.id);
+    const students = await loadReachable(tx, user, input.studentIds, open?.id, 'students.profiles.edit');
     const away = students.filter((s) => !isAtSchool(s.status));
     if (away.length) throw new ServiceError(`Only students at the school can join a house: ${away.map((s) => s.fullName).join(', ')}`, 409);
 

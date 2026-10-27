@@ -18,17 +18,17 @@ let year2026: string;
 const ids: Record<string, string> = {};
 const cls: Record<string, string> = {};
 
-const state = (as = A.users.ADMIN, query = '') => call('students/promotion', 'GET', { as, query });
+const state = (as = A.operator!, query = '') => call('students/promotion', 'GET', { as, query });
 const lineOf = (r: { json: { data: { promotion: { lines: { studentId: string }[] } } } }, studentId: string) =>
   r.json.data.promotion.lines.find((l) => l.studentId === studentId) as unknown as Record<string, unknown>;
-const save = (decisions: unknown[], as = A.users.ADMIN) => call('students/promotion', 'PUT', { as, body: { fromYearId: year2026, decisions } });
-const confirm = (runId: string, body: Record<string, unknown> = {}, as = A.users.ADMIN) => call('students/promotion/[runId]/confirm', 'POST', { as, params: { runId }, body });
+const save = (decisions: unknown[], as = A.operator!) => call('students/promotion', 'PUT', { as, body: { fromYearId: year2026, decisions } });
+const confirm = (runId: string, body: Record<string, unknown> = {}, as = A.operator!) => call('students/promotion/[runId]/confirm', 'POST', { as, params: { runId }, body });
 
 beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
-  A = await seedSchool(prisma, 'School A');
-  B = await seedSchool(prisma, 'School B');
+  A = await seedSchool(prisma, 'School A', { operator: true });
+  B = await seedSchool(prisma, 'School B', { operator: true });
   year2026 = A.yearId;
 
   // The seeded term becomes Term 3 2026, closed; 2027 and its Term 1 exist.
@@ -69,13 +69,13 @@ describe('step 1: the new year', () => {
   it('says what is missing', async () => {
     await prisma.academicTerm.update({ where: { id: A.termId }, data: { status: 'OPEN' } });
     expect((await state()).json.data.promotion).toBeNull(); // no closed Term 3 yet to promote from
-    const named = (await state(A.users.ADMIN, `?fromYearId=${year2026}`)).json.data.promotion;
+    const named = (await state(A.operator!, `?fromYearId=${year2026}`)).json.data.promotion;
     expect(named.problems.join()).toContain('Term 3 2026 is not closed');
     await prisma.academicTerm.update({ where: { id: A.termId }, data: { status: 'CLOSED' } });
     await prisma.academicTerm.update({ where: { id: term1_2027 }, data: { termNumber: 2 } });
     expect((await state()).json.data.promotion.problems.join()).toContain('has no Term 1');
     await prisma.academicTerm.update({ where: { id: term1_2027 }, data: { termNumber: 1 } });
-    const other = (await call('students/promotion', 'GET', { as: B.users.ADMIN, query: `?fromYearId=${year2026}` }));
+    const other = (await call('students/promotion', 'GET', { as: B.operator!, query: `?fromYearId=${year2026}` }));
     expect(other.status).toBe(404); // another school's year
   });
 });
@@ -165,13 +165,13 @@ describe('step 5: confirm', () => {
   it('needs the Head: someone who may only manage cannot confirm, and neither can another school', async () => {
     runId = (await prisma.promotionRun.findFirstOrThrow({ where: { schoolId: A.schoolId, status: 'DRAFT' } })).id;
     expect((await confirm(runId, {}, A.users.TEACHER)).status).toBe(403);
-    expect((await confirm(runId, {}, B.users.ADMIN)).status).toBe(404);
+    expect((await confirm(runId, {}, B.operator!)).status).toBe(404);
     expect((await confirm(runId, {}, null as never)).status).toBe(401);
     expect(await prisma.promotionRun.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({ status: 'DRAFT', approvedById: null });
   });
 
   it('refuses while a student has a leaving process open, and when the draft is out of date, changing nothing', async () => {
-    const exit = await prisma.studentExit.create({ data: { schoolId: A.schoolId, studentId: ids.Dan!, reason: 'OTHER', reasonNote: 'x', lastDay: new Date('2026-12-01'), startedById: A.users.ADMIN.id, state: 'STARTED' } });
+    const exit = await prisma.studentExit.create({ data: { schoolId: A.schoolId, studentId: ids.Dan!, reason: 'OTHER', reasonNote: 'x', lastDay: new Date('2026-12-01'), startedById: A.operator!.id, state: 'STARTED' } });
     const r = await confirm(runId);
     expect(r.status).toBe(409);
     expect(r.json.message).toContain('leaving process open');
@@ -233,13 +233,13 @@ describe('step 5: confirm', () => {
     expect(await status('Kate')).toBe('SUSPENDED'); // carried over
     const exits = await prisma.studentExit.findMany({ where: { studentId: { in: [ids.Gift!, ids.Joe!, ids.Eve!] }, state: 'COMPLETED' } });
     const exitOf = (key: string) => exits.find((x) => x.studentId === ids[key])!;
-    expect(exitOf('Joe')).toMatchObject({ reason: 'COMPLETED_A_LEVEL', approvedById: A.users.ADMIN.id });
+    expect(exitOf('Joe')).toMatchObject({ reason: 'COMPLETED_A_LEVEL', approvedById: A.operator!.id });
     expect(exitOf('Gift')).toMatchObject({ reason: 'COMPLETED_O_LEVEL', resultingStatus: 'GRADUATED' });
     expect(exitOf('Eve')).toMatchObject({ reason: 'TRANSFER', resultingStatus: 'TRANSFERRED' });
     expect((await prisma.alumnus.findMany({ where: { schoolId: A.schoolId } })).map((a) => [a.studentId, a.yearLeft, a.lastClass]).sort()).toEqual([[ids.Gift, 2026, 'Form 4 North'], [ids.Joe, 2026, 'Form 6 Arts']].sort());
 
     const run = await prisma.promotionRun.findUniqueOrThrow({ where: { id: runId } });
-    expect(run).toMatchObject({ status: 'CONFIRMED', approvedById: A.users.ADMIN.id });
+    expect(run).toMatchObject({ status: 'CONFIRMED', approvedById: A.operator!.id });
     expect((run.lines as unknown[]).length).toBe(12); // the full record is kept
     const audits = await prisma.auditLog.findMany({ where: { schoolId: A.schoolId, action: { in: ['PROMOTE_STUDENT', 'REPEAT_STUDENT', 'GRADUATE_STUDENT', 'TRANSFER_OUT_STUDENT'] }, entityType: 'Student' } });
     expect(audits).toHaveLength(12);
@@ -251,13 +251,13 @@ describe('step 5: confirm', () => {
     expect((await confirm(runId, { acknowledgeFull: true })).status).toBe(409);
     expect((await save([{ studentId: ids.Anna, outcome: 'REPEAT' }])).status).toBe(409);
     expect((await state()).json.data.promotion).toBeNull(); // nothing left to promote
-    const named = (await state(A.users.ADMIN, `?fromYearId=${year2026}`)).json.data.promotion;
-    expect(named.confirmed).toMatchObject({ approvedBy: A.users.ADMIN.fullName });
+    const named = (await state(A.operator!, `?fromYearId=${year2026}`)).json.data.promotion;
+    expect(named.confirmed).toMatchObject({ approvedBy: A.operator!.fullName });
   });
 
   it('leaves the new year ready to open: no student is without a decision', async () => {
     const { openTerm } = await import('@/lib/academic/terms');
-    await openTerm(A.schoolId, A.users.ADMIN.id, term1_2027);
+    await openTerm(A.schoolId, A.operator!.id, term1_2027);
     const open = await prisma.student.findMany({ where: { schoolId: A.schoolId, status: { in: ['ACTIVE', 'SUSPENDED'] } }, select: { id: true, currentClassId: true } });
     for (const s of open) {
       const rows = await prisma.enrollment.findMany({ where: { studentId: s.id, termId: term1_2027 } });
@@ -267,18 +267,18 @@ describe('step 5: confirm', () => {
   });
 
   it('gives a report of the confirmed promotion as a PDF', async () => {
-    const r = await call('students/promotion/[runId]/report', 'GET', { as: A.users.ADMIN, params: { runId } });
+    const r = await call('students/promotion/[runId]/report', 'GET', { as: A.operator!, params: { runId } });
     expect(r.status).toBe(200);
     expect(r.response.headers.get('content-type')).toBe('application/pdf');
     expect(r.text.startsWith('%PDF')).toBe(true);
     expect((await call('students/promotion/[runId]/report', 'GET', { as: A.users.BURSAR, params: { runId } })).status).toBe(403);
-    expect((await call('students/promotion/[runId]/report', 'GET', { as: B.users.ADMIN, params: { runId } })).status).toBe(404);
+    expect((await call('students/promotion/[runId]/report', 'GET', { as: B.operator!, params: { runId } })).status).toBe(404);
   });
 });
 
 describe('a draft that is not finished', () => {
   it('cannot be turned into a report', async () => {
-    const run = await prisma.promotionRun.create({ data: { schoolId: A.schoolId, fromYearId: year2026, toYearId: (await prisma.academicYear.findFirstOrThrow({ where: { schoolId: A.schoolId, year: 2027 } })).id, status: 'DRAFT', lines: [], createdById: A.users.ADMIN.id } });
-    expect((await call('students/promotion/[runId]/report', 'GET', { as: A.users.ADMIN, params: { runId: run.id } })).status).toBe(409);
+    const run = await prisma.promotionRun.create({ data: { schoolId: A.schoolId, fromYearId: year2026, toYearId: (await prisma.academicYear.findFirstOrThrow({ where: { schoolId: A.schoolId, year: 2027 } })).id, status: 'DRAFT', lines: [], createdById: A.operator!.id } });
+    expect((await call('students/promotion/[runId]/report', 'GET', { as: A.operator!, params: { runId: run.id } })).status).toBe(409);
   });
 });

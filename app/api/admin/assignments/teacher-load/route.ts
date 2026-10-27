@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { authorize } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, apiError, withApi } from '@/lib/api';
 import type { SessionUser } from '@/types';
@@ -9,6 +10,7 @@ async function _GET(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorize(user, 'academics.assignments.view');
 
   const { searchParams } = new URL(req.url);
   const teacherId = searchParams.get('teacherId');

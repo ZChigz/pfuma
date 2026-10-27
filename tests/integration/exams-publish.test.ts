@@ -46,7 +46,7 @@ beforeAll(async () => {
   marks = await import('@/lib/exams/marks');
   sheets = await import('@/lib/exams/sheets');
   publish = await import('@/lib/exams/publish');
-  A = await seedSchool(prisma, 'School A');
+  A = await seedSchool(prisma, 'School A', { operator: true });
   W = await examWorld(prisma, A);
   const maths = await classWith(prisma, A, { classId: W.f2East, subjectId: W.subjects.maths, teacherId: W.teachers.chikore, count: 4, prefix: 'Kid' });
   kids = maths.kids;
@@ -61,7 +61,7 @@ beforeAll(async () => {
   englishTeacher = await actorOf(prisma, W.teachers.moyo);
   hod = await actorOf(prisma, W.hod);
   head = await actorOf(prisma, A.users.HEAD.id);
-  admin = await actorOf(prisma, A.users.ADMIN.id);
+  admin = await actorOf(prisma, A.operator!.id);
   officer = await actorOf(prisma, W.examsOfficer);
   await setup.listTypes(officer);
   T = await typeIds(prisma, A);
@@ -110,7 +110,7 @@ describe('getting the sheets verified', () => {
     await sheets.verifySheet(hod, mathsA);
     // Languages has no Head of Department: an administrator verifies (and is recorded).
     await sheets.verifySheet(admin, englishA);
-    expect((await prisma.markSheet.findFirstOrThrow({ where: { assignmentId: englishA } })).verifiedById).toBe(A.users.ADMIN.id);
+    expect((await prisma.markSheet.findFirstOrThrow({ where: { assignmentId: englishA } })).verifiedById).toBe(A.operator!.id);
   });
 
   it('works out the overall average over both subjects, class and form positions, and positions', async () => {
@@ -319,7 +319,7 @@ describe('a Form 4 class and the 5-passes flag', () => {
       // student 1 passes everything (60); student 2 fails Mathematics (30) but passes the rest.
       await marks.saveMarks(dube, { assignmentId: ta.id, cells: [{ studentId: kidsF4[0]!, assessmentId: a.id, value: 60, code: null }, { studentId: kidsF4[1]!, assessmentId: a.id, value: subjectId === W.subjects.maths ? 30 : 60, code: null }] });
       await sheets.submitSheet(dube, ta.id);
-      await sheets.verifySheet(admin, ta.id);
+      await sheets.verifySheet([W.subjects.maths, W.subjects.science].includes(subjectId) ? hod : admin, ta.id); // the Head of Sciences, or the alternate of the other departments
       n++;
     }
     const rows = await prisma.termResult.findMany({ where: { schoolId: A.schoolId, termId: A.termId, classId: klass.id } });

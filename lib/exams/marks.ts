@@ -15,7 +15,7 @@ import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { classStats, outliers, previewTermMarks, markKey, type CalcAssessment, type PlanLine, type ScaleBand, type StoredMark, type StudentPreview } from '@/lib/results';
 import { columnKey, parseCell } from '@/lib/exams/cell';
 import {
-  EDITABLE, STATUS_LABEL, assertOwnAssignment, assessmentsOf, classNameOf, ensureSheet, holds, idSchema, isFull, levelIdOf, loadAssignment,
+  EDITABLE, STATUS_LABEL, assertOwnAssignment, assessmentsOf, classNameOf, ensureSheet, holds, idSchema, levelIdOf, loadAssignment,
   loadExamSettings, num, rosterOf, type Actor, type LoadedAssignment, type RosterStudent,
 } from '@/lib/exams/common';
 import { planAndScale } from '@/lib/exams/scales';
@@ -85,7 +85,7 @@ export const nameFor = (s: Pick<RosterStudent, 'surname' | 'firstName'>) => `${s
 export async function loadGrid(user: Actor, assignmentId: string): Promise<Grid> {
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const a = await loadAssignment(tx, user.schoolId, assignmentId);
-    const mayEdit = isFull(user) || (holds(user, 'exams.marks.enter') && (a.teacherId === user.id || a.coTeacherId === user.id));
+    const mayEdit = (holds(user, 'exams.marks.enter') && (a.teacherId === user.id || a.coTeacherId === user.id));
     if (!mayEdit && !holds(user, 'exams.marks.view') && !holds(user, 'exams.marks.verify')) assertOwnAssignment(user, a, 'exams.marks.enter');
     return buildGrid(tx, user, a, mayEdit);
   });

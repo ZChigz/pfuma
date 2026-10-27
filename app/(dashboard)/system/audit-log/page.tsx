@@ -14,7 +14,7 @@ export default async function AuditLogPage({ searchParams }: { searchParams: Rec
   const db = getScopedDb(user.schoolId, user.id);
 
   const q = parseTableQuery(searchParams, { sortable: AUDIT_SORTABLE, filterKeys: AUDIT_FILTER_KEYS, defaultSort: 'createdAt', defaultDir: 'desc' });
-  const [{ total, rows }, options] = await Promise.all([listAuditLog(db, q), auditFilterOptions(db)]);
+  const [{ total, rows }, options] = await Promise.all([listAuditLog(db, q, { user }), auditFilterOptions(db)]);
 
   return (
     <div className="flex flex-col gap-4 pb-6">

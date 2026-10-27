@@ -7,8 +7,9 @@ import {
 import { buildNav } from '@/lib/nav';
 import { PRESETS, presetModules } from '@/lib/platform/presets';
 import { cleanScan, createDebouncer, expectScan, labelPayload, parseScan } from '@/lib/facilities/scan';
+import { PERMISSION_KEYS } from '@/lib/access-core';
 
-const user = (extra: Partial<AccessUser> = {}): AccessUser => ({ id: 'u1', schoolId: 's1', role: 'ADMIN', grants: ['*'], ...extra });
+const user = (extra: Partial<AccessUser> = {}): AccessUser => ({ id: 'u1', schoolId: 's1', role: 'ADMIN', grants: [...PERMISSION_KEYS], ...extra });
 
 /** The permission keys the brief lists, by part. */
 const KEYS: Record<string, string[]> = {

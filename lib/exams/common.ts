@@ -8,9 +8,9 @@ import type { ExamSettings, MarkSheetStatus, Prisma } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
 import type { PermissionKey } from '@/lib/access-core';
 import type { Db } from '@/lib/scoped-db';
-import { holds, isFull, type Actor } from '@/lib/academics/common';
+import { holds, type Actor } from '@/lib/academics/common';
 
-export { holds, isFull };
+export { holds };
 export type { Actor };
 export { idSchema, isoDateSchema, reasonSchema } from '@/lib/students/common';
 export { resolveTerm, writableTerm, assertWritable, previousTerm, initialsOf, todayInHarare, toDay, isoOf } from '@/lib/academics/common';
@@ -91,7 +91,6 @@ export const isTeacherOf = (a: Pick<LoadedAssignment, 'teacherId' | 'coTeacherId
  * teacher or second teacher. Anyone else is told the class was not found, so other teachers' classes are never revealed.
  */
 export function assertOwnAssignment(user: Actor, a: Pick<LoadedAssignment, 'teacherId' | 'coTeacherId'>, permission: PermissionKey): void {
-  if (isFull(user)) return;
   if (holds(user, permission) && isTeacherOf(a, user.id)) return;
   throw new ServiceError('Class not found', 404);
 }

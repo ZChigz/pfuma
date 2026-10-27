@@ -17,7 +17,7 @@ import { logAudit } from '@/lib/audit';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import { notifyUsers } from '@/lib/system/notifications';
 import {
-  addDays, currentTimetableId, dedupe, holds, idSchema, initialsOf, isFull, isoDateSchema, isoOf, loadSettings, noteSchema,
+  addDays, currentTimetableId, dedupe, holds, idSchema, initialsOf, isoDateSchema, isoOf, loadSettings, noteSchema,
   ownScope, peopleWith, requireTeacher, resolveTerm, todayInHarare, toDay, writableTerm, type Actor,
 } from '@/lib/academics/common';
 import { classSubjects, findGaps } from '@/lib/academics/coverage';
@@ -398,7 +398,7 @@ async function rows(tx: Db, where: Prisma.TeacherAssignmentWhereInput, termId: s
 export async function listAssignments(user: Actor, opts: { termId?: string; classId?: string; teacherId?: string; includeEnded?: boolean } = {}) {
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const term = await resolveTerm(tx, user.schoolId, opts.termId);
-    const own = !holds(user, 'academics.assignments.manage') && !isFull(user);
+    const own = !holds(user, 'academics.assignments.manage');
     const where: Prisma.TeacherAssignmentWhereInput = {
       termId: term.id, ...(opts.includeEnded ? {} : { status: 'ACTIVE' }),
       ...(opts.classId ? { classId: opts.classId } : {}), ...(opts.teacherId ? { teacherId: opts.teacherId } : {}),
@@ -420,7 +420,7 @@ export async function assignmentGrid(user: Actor, termId?: string) {
     const term = await resolveTerm(tx, user.schoolId, termId);
     const manage = holds(user, 'academics.assignments.manage');
     let classFilter: string[] | undefined;
-    if (!manage && !isFull(user)) {
+    if (!manage) {
       const s = await ownScope(tx, user, term.id);
       classFilter = dedupe([...s.classTeacherOf, ...s.taughtClasses]);
     }
@@ -480,7 +480,7 @@ export async function teacherWorkload(user: Actor, termId?: string) {
   return getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const term = await resolveTerm(tx, user.schoolId, termId);
     const settings = await loadSettings(tx, user.schoolId);
-    const own = !holds(user, 'academics.assignments.manage') && !isFull(user);
+    const own = !holds(user, 'academics.assignments.manage');
     const assignments = await rows(tx, { termId: term.id, status: 'ACTIVE', ...(own ? { OR: [{ teacherId: user.id }, { coTeacherId: user.id }] } : {}) }, term.id);
     const teachers = await tx.user.findMany({
       where: { active: true, isSupport: false, ...(own ? { id: user.id } : {}), OR: [{ userRoles: { some: { role: { key: 'TEACHER' } } } }, { id: { in: dedupe(assignments.map((a) => a.teacherId)) } }] },
@@ -508,7 +508,7 @@ export async function gapsReport(user: Actor, termId?: string) {
   const load = await teacherWorkload(user, termId);
   const gaps = await getScopedDb(user.schoolId, user.id).$tx(async (tx) => {
     const term = await resolveTerm(tx, user.schoolId, load.term.id);
-    const own = !holds(user, 'academics.assignments.manage') && !isFull(user);
+    const own = !holds(user, 'academics.assignments.manage');
     let classIds: string[] | undefined;
     if (own) { const s = await ownScope(tx, user, term.id); classIds = dedupe([...s.classTeacherOf, ...s.taughtClasses]); if (classIds.length === 0) return []; }
     return findGaps(tx, term.id, classIds);
@@ -524,7 +524,7 @@ export async function gapsReport(user: Actor, termId?: string) {
 export async function assertAssignmentReachable(tx: Db, user: Actor, assignmentId: string) {
   const a = await tx.teacherAssignment.findFirst({ where: { id: assignmentId } });
   if (!a) throw new ServiceError('Assignment not found', 404);
-  if (isFull(user) || holds(user, 'academics.assignments.manage')) return a;
+  if (holds(user, 'academics.assignments.manage')) return a;
   if (a.teacherId !== user.id && a.coTeacherId !== user.id) throw new ServiceError('Assignment not found', 404);
   return a;
 }

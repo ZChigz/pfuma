@@ -324,7 +324,8 @@ describe('payroll reports', () => {
     const w = await reports.runHrReport(W.owner, 'wage-bill', { year: 2026 });
     expect(w.rows.length).toBeGreaterThan(0);
     await fails(reports.runHrReport(W.admin, 'wage-bill', {}), 403);
-    await fails(reports.runHrReport(W.head, 'statutory', {}), 403);
+    await fails(reports.runHrReport(W.teacher2, 'statutory', {}), 403);
+    expect((await reports.runHrReport(W.head, 'statutory', { year: 2026 })).rows.length).toBeGreaterThan(0); // the Head holds hr.payroll.view: the totals, not the payslips
   });
 });
 

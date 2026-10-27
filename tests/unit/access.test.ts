@@ -13,7 +13,7 @@ import { CalendarEventSchema, ModulesSchema } from '@/lib/validations/system';
 import { z } from 'zod';
 
 const user = (role: AccessUser['role'], extra: Partial<AccessUser> = {}): AccessUser => ({ id: 'u1', schoolId: 's1', role, ...extra });
-const ALL = ['*'];
+const ALL = Object.keys(PERMISSIONS);
 const BASIC = ['system.dashboard.view', 'system.calendar.view'];
 const SYSTEM_KEYS = Object.keys(PERMISSIONS).filter((k) => moduleOf(k) === 'system');
 
@@ -85,7 +85,7 @@ describe('can()', () => {
 });
 
 // The parts of Facilities & Operations that have pages so far; the others show "Coming soon".
-const LIVE_FACILITIES = ['Inventory'];
+const LIVE_FACILITIES = ['Inventory', 'Library'];
 
 describe('sidebar', () => {
   it('lists the groups in the required order', () => {

@@ -3,7 +3,7 @@ import { assertLegacyWritable } from '@/lib/finance/legacy-guard';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiError, apiSuccess, apiUnauthorized, parseBody, withApi } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
-import { canBulkApplyFees } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { CreateFeeStructureSchema } from '@/lib/validations/accounting';
 import { requireTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
@@ -16,7 +16,7 @@ async function _POST(req: NextRequest) {
   const db = getScopedDb(user.schoolId, user.id);
   await assertLegacyWritable(db, user.schoolId);
 
-  try { await canBulkApplyFees(user.role); } catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'finance.fees.manage');
 
   const parsed = await parseBody(req, CreateFeeStructureSchema);
   if ('error' in parsed) return parsed.error;

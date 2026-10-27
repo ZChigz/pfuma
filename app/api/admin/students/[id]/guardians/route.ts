@@ -13,6 +13,7 @@ async function _GET(_req: Request, { params }: Ctx) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await requirePermission('students.guardians.view', { model: 'Student', id: params.id });
 
   const student = await db.student.findFirst({
     where: { id: params.id, schoolId: user.schoolId },

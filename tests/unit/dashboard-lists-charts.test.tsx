@@ -5,6 +5,7 @@ import { enrolmentByForm, sortBySize, type ClassSize } from '@/lib/system/charts
 import { EnrolmentBars } from '@/components/system/charts/EnrolmentChart';
 import { ClassSizeBars } from '@/components/system/charts/ClassSizeChart';
 import { QuickActions } from '@/components/system/QuickActions';
+import { PERMISSION_KEYS } from '@/lib/access-core';
 
 const NOW = new Date('2026-05-10T12:00:00Z');
 const ago = (ms: number) => new Date(NOW.getTime() - ms);
@@ -110,7 +111,7 @@ describe('chart drawing', () => {
 });
 
 describe('quick actions', () => {
-  const admin = { id: 'u', schoolId: 's', role: 'ADMIN' as const, grants: ['*'] };
+  const admin = { id: 'u', schoolId: 's', role: 'ADMIN' as const, grants: [...PERMISSION_KEYS] };
   it('offers the four actions to an administrator', () => {
     const html = renderToStaticMarkup(<QuickActions user={admin} />);
     for (const label of ['Add user', 'Import students', 'Add event', 'Open settings']) expect(html).toContain(label);

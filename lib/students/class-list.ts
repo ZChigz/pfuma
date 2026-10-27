@@ -44,7 +44,7 @@ export async function classLists(user: AccessUser, classIds: string[], opts: { t
     const enrollments = await tx.enrollment.findMany({
       where: {
         termId: term.id, classId: { in: ids }, status: 'ACTIVE',
-        student: { AND: [studentScope(user, term.status === 'OPEN' ? term.id : null), { status: { in: ['ACTIVE', 'SUSPENDED'] } }] },
+        student: { AND: [await studentScope(user, term.status === 'OPEN' ? term.id : null, undefined, tx), { status: { in: ['ACTIVE', 'SUSPENDED'] } }] },
       },
       select: { classId: true, student: { select: { admissionNumber: true, firstName: true, surname: true, fullName: true, gender: true } } },
     });

@@ -2,7 +2,7 @@
 // The Users page: several roles, invites and temporary passwords, the list, and import from a file.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startTestDb, type TestDb } from '../helpers/test-db';
-import { grantPermission, revokePermission, seedSchool, type SeededSchool } from '../helpers/seed';
+import { grantPermission, revokePermission, seedSchool, userWithRoles, type SeededSchool } from '../helpers/seed';
 import { call } from '../helpers/route';
 import { session } from '../helpers/session';
 
@@ -20,7 +20,9 @@ let B: SeededSchool;
 let prisma: typeof import('@/lib/prisma').prisma;
 
 const admin = () => A.users.ADMIN;
-const post = (body: object, as: object | null = admin()) => call('system/users', 'POST', { as: as as never, body });
+// Only the Owner gives the Owner, Head, Bursar and Administrator roles, so adding people is done as the Owner unless a test says otherwise.
+const owner = () => A.users.DIRECTOR;
+const post = (body: object, as: object | null = owner()) => call('system/users', 'POST', { as: as as never, body });
 const person = (over: object = {}) => ({ fullName: 'Rudo Chari', email: 'rudo@a.test', phone: '0771234567', roles: ['TEACHER'], ...over });
 const tokenOf = (url: string) => /reset-password\/([A-Za-z0-9_-]+)/.exec(url)![1];
 const csv = (...lines: string[]) => lines.join('\n');
@@ -75,8 +77,8 @@ describe('adding a person with an invite', () => {
     const text = JSON.stringify(logs);
     expect(text).not.toContain(tokenOf(created.url));
     expect(text).not.toMatch(/passwordHash|invited!/);
-    expect(await prisma.notification.count({ where: { userId: A.users.DIRECTOR.id, title: 'User added' } })).toBeGreaterThan(0);
-    expect(await prisma.notification.count({ where: { userId: admin().id, title: 'User added' } })).toBe(0);
+    expect(await prisma.notification.count({ where: { userId: A.users.ADMIN.id, title: 'User added' } })).toBeGreaterThan(0);
+    expect(await prisma.notification.count({ where: { userId: owner().id, title: 'User added' } })).toBe(0);
   });
 
   it('cannot be signed into before the invite is used', async () => {
@@ -233,7 +235,7 @@ describe('changing a person', () => {
     const made = await post(person({ email: 'edit@a.test', roles: ['TEACHER'] }));
     const id = made.json.data.user.id;
     const v = (await prisma.user.findUniqueOrThrow({ where: { id } })).tokenVersion;
-    const r = await call('system/users/[id]', 'PATCH', { as: admin(), params: { id }, body: { fullName: 'rudo MOYO-chari', phone: '0712345678', title: 'Dr', roles: ['HEAD', 'TEACHER'] } });
+    const r = await call('system/users/[id]', 'PATCH', { as: owner(), params: { id }, body: { fullName: 'rudo MOYO-chari', phone: '0712345678', title: 'Dr', roles: ['HEAD', 'TEACHER'] } });
     expect(r.status, JSON.stringify(r.json)).toBe(200);
     const row = await prisma.user.findUniqueOrThrow({ where: { id } });
     expect(row).toMatchObject({ fullName: 'Rudo Moyo-Chari', phone: '+263712345678', title: 'Dr', role: 'HEAD' });
@@ -256,32 +258,36 @@ describe('changing a person', () => {
     expect((await patch({ email: A.users.HEAD.email })).status).toBe(409);
     expect((await patch({})).status).toBe(422);
     for (const b of [{ roles: [] }, { roles: ['NOPE'] }, { phone: '12345' }, { fullName: 'x' }, { title: 'Prof' }]) expect((await patch(b)).status, JSON.stringify(b)).toBe(422);
-    expect((await patch({ roles: ['TEACHER'] }, admin().id)).status).toBe(409);
+    expect((await patch({ roles: ['TEACHER'] }, admin().id)).status).toBe(403); // rule 8: nobody changes their own roles
     expect((await patch({ fullName: 'Taken Over' }, B.users.TEACHER.id)).status).toBe(404);
   });
 
   it('keeps at least one active Owner and one active Administrator when roles change', async () => {
     // Earlier tests made others; only the seeded Administrator and Owner should hold these two roles.
     await prisma.userRole.deleteMany({ where: { schoolId: A.schoolId, role: { key: { in: ['OWNER', 'ADMINISTRATOR'] } }, userId: { notIn: [admin().id, A.users.DIRECTOR.id] } } });
-    await grantPermission(prisma, A.schoolId, 'HEAD', 'system.users.edit');
+    // Only an Owner changes the Owner and Administrator roles, and nobody changes their own, so a second Owner does the changing.
     await grantPermission(prisma, A.schoolId, 'HEAD', 'system.users.deactivate');
+    // The seeded Head stands in as the second Owner for this test (no new person, so the list tests below are unaffected).
+    const second = A.users.HEAD;
+    const headRows = await prisma.userRole.findMany({ where: { userId: second.id } });
+    await prisma.userRole.create({ data: { schoolId: A.schoolId, userId: second.id, roleId: (await prisma.roleDefinition.findFirstOrThrow({ where: { schoolId: A.schoolId, key: 'OWNER' } })).id } });
     try {
-      const patch = (id: string, roles: string[]) => call('system/users/[id]', 'PATCH', { as: A.users.HEAD, params: { id }, body: { roles } });
-      const lastAdmin = await patch(admin().id, ['TEACHER']);
+      const patch = (as: object, id: string, roles: string[]) => call('system/users/[id]', 'PATCH', { as: as as never, params: { id }, body: { roles } });
+      const lastAdmin = await patch(owner(), admin().id, ['TEACHER']);
       expect(lastAdmin.status).toBe(409);
       expect(lastAdmin.json.message).toMatch(/at least one active Administrator/);
-      const lastOwner = await patch(A.users.DIRECTOR.id, ['TEACHER']);
-      expect(lastOwner.status).toBe(409);
-      expect(lastOwner.json.message).toMatch(/at least one active Owner/);
-      expect((await call('system/users/[id]/deactivate', 'POST', { as: A.users.HEAD, params: { id: A.users.DIRECTOR.id } })).status).toBe(409);
+      expect((await patch(A.users.TEACHER, admin().id, ['TEACHER'])).status).toBe(403);            // not for just anyone
+      expect((await patch(second, A.users.DIRECTOR.id, ['TEACHER'])).status).toBe(200);            // the second Owner remains
+      expect((await call('system/users/[id]/deactivate', 'POST', { as: admin(), params: { id: second.id } })).status).toBe(409);   // now the last one
       expect(await rolesOf(admin().id)).toContain('ADMINISTRATOR');
-      expect((await patch(A.users.DIRECTOR.id, ['OWNER', 'ADMINISTRATOR'])).status).toBe(200); // adding a role is fine
-      expect((await patch(admin().id, ['TEACHER'])).status).toBe(200);                        // now another Administrator exists
+      expect((await patch(second, A.users.DIRECTOR.id, ['OWNER', 'ADMINISTRATOR'])).status).toBe(200); // adding a role is fine
+      expect((await patch(second, admin().id, ['TEACHER'])).status).toBe(200);                     // now another Administrator exists
     } finally {
-      await prisma.userRole.deleteMany({ where: { userId: admin().id } });
-      await prisma.userRole.create({ data: { schoolId: A.schoolId, userId: admin().id, roleId: (await prisma.roleDefinition.findFirstOrThrow({ where: { schoolId: A.schoolId, key: 'ADMINISTRATOR' } })).id } });
-      await prisma.userRole.deleteMany({ where: { userId: A.users.DIRECTOR.id, role: { key: 'ADMINISTRATOR' } } });
-      await revokePermission(prisma, A.schoolId, 'HEAD', 'system.users.edit');
+      await prisma.userRole.deleteMany({ where: { userId: { in: [admin().id, A.users.DIRECTOR.id, second.id] } } });
+      await prisma.userRole.createMany({ data: headRows.map(({ id, schoolId, userId, roleId, scopeType, scopeId }) => ({ id, schoolId, userId, roleId, scopeType, scopeId })) });
+      const roleId = async (key: string) => (await prisma.roleDefinition.findFirstOrThrow({ where: { schoolId: A.schoolId, key } })).id;
+      await prisma.userRole.create({ data: { schoolId: A.schoolId, userId: admin().id, roleId: await roleId('ADMINISTRATOR') } });
+      await prisma.userRole.create({ data: { schoolId: A.schoolId, userId: A.users.DIRECTOR.id, roleId: await roleId('OWNER') } });
       await revokePermission(prisma, A.schoolId, 'HEAD', 'system.users.deactivate');
     }
   });
@@ -372,7 +378,7 @@ describe('the list', () => {
 });
 
 describe('import from a file', () => {
-  const imp = (text: string, as: object | null = admin()) => call('system/users/import', 'POST', { as: as as never, body: { csv: text } });
+  const imp = (text: string, as: object | null = owner()) => call('system/users/import', 'POST', { as: as as never, body: { csv: text } });
   const header = 'name,email,phone,roles';
 
   it('adds the good rows, reports the rejected ones with the reason, and returns an invite for each new person', async () => {

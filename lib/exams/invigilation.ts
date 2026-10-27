@@ -16,11 +16,11 @@ import { deputyIds, peopleWith } from '@/lib/academics/common';
 import { allocateSeats, endTime } from '@/lib/exams/clashes';
 import { writeCells, type CellInput } from '@/lib/exams/marks';
 import { candidatesOf, type Candidate } from '@/lib/exams/timetable';
-import { classNameOf, ensureSheet, EDITABLE, holds, idSchema, isFull, loadAssignment, todayInHarare, type Actor } from '@/lib/exams/common';
+import { classNameOf, ensureSheet, EDITABLE, holds, idSchema, loadAssignment, todayInHarare, type Actor } from '@/lib/exams/common';
 
 const dayText = (d: Date) => d.toISOString().slice(0, 10);
 
-const canManage = (u: Actor) => isFull(u) || holds(u, 'exams.invigilation.manage') || holds(u, 'exams.timetable.manage');
+const canManage = (u: Actor) => holds(u, 'exams.invigilation.manage') || holds(u, 'exams.timetable.manage');
 
 // ─── Who invigilates ─────────────────────────────────────────────────────────
 

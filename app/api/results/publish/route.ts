@@ -2,7 +2,7 @@ import { type NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound, parseBody, withApi } from '@/lib/api';
-import { canPublishResults } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { logAudit } from '@/lib/audit';
 import { PublishResultsSchema } from '@/lib/validations/results';
 import { assignPositions, boundariesFor, getLetterGrade, gradeFor, passThreshold, summariseStudent, type OfferedSubject } from '@/lib/results';
@@ -17,8 +17,7 @@ async function _POST(req: NextRequest) {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canPublishResults(user.role); }
-  catch (e) { if (e instanceof Response) return e; throw e; }
+  await authorize(user, 'exams.results.publish');
 
   const parsed = await parseBody(req, PublishResultsSchema);
   if ('error' in parsed) return parsed.error;

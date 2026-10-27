@@ -24,7 +24,7 @@ let prisma: typeof import('@/lib/prisma').prisma;
 beforeAll(async () => {
   t = await startTestDb();
   ({ prisma } = await import('@/lib/prisma'));
-  A = await seedSchool(prisma, 'School A');
+  A = await seedSchool(prisma, 'School A', { operator: true });
 }, 120_000);
 
 afterAll(async () => {
@@ -104,7 +104,7 @@ describe('private proof of payment is opened only through short-lived signed URL
       data: { schoolId: A.schoolId, studentId: A.studentId, currency: 'USD', amount: 5, method: 'ZIPIT', feeLabel: 'Tuition', recordedBy: A.users.BURSAR.id, popKey },
     });
     utapi.generateSignedURL.mockResolvedValueOnce({ ufsUrl: 'https://utfs.io/f/signed?expires=1' });
-    const r = await call('accounting/payments/[id]/proof', 'GET', { as: A.users.HEAD, params: { id: p.id } });
+    const r = await call('accounting/payments/[id]/proof', 'GET', { as: A.users.BURSAR, params: { id: p.id } });
     expect(r.status).toBe(200);
     expect(r.json.data.url).toBe('https://utfs.io/f/signed?expires=1');
     expect(r.json.data.expiresIn).toBe('5m');
@@ -124,7 +124,7 @@ describe('private proof of payment is opened only through short-lived signed URL
       data: { schoolId: A.schoolId, studentId: A.studentId, currency: 'USD', amount: 5, method: 'ZIPIT', feeLabel: 'Tuition', recordedBy: A.users.BURSAR.id, popKey: 'pop:evil:333' },
     });
     utapi.generateSignedURL.mockClear();
-    expect((await call('accounting/payments/[id]/proof', 'GET', { as: A.users.HEAD, params: { id: p.id } })).status).toBe(404);
+    expect((await call('accounting/payments/[id]/proof', 'GET', { as: A.users.BURSAR, params: { id: p.id } })).status).toBe(404);
     expect(utapi.generateSignedURL).not.toHaveBeenCalled();
   });
 
@@ -132,14 +132,14 @@ describe('private proof of payment is opened only through short-lived signed URL
     const p = await prisma.payment.create({
       data: { schoolId: A.schoolId, studentId: A.studentId, currency: 'USD', amount: 5, method: 'ZIPIT', feeLabel: 'Tuition', recordedBy: A.users.BURSAR.id, popUrl: 'https://utfs.io/f/old-proof.png' },
     });
-    const r = await call('accounting/payments/[id]/proof', 'GET', { as: A.users.HEAD, params: { id: p.id } });
+    const r = await call('accounting/payments/[id]/proof', 'GET', { as: A.users.BURSAR, params: { id: p.id } });
     expect(r.json.data.url).toBe('https://utfs.io/f/old-proof.png');
   });
 
   it('404s when a payment has no proof', async () => {
     const p = await prisma.payment.findUniqueOrThrow({ where: { id: A.paymentId } });
     expect(p.popKey).toBeNull();
-    expect((await call('accounting/payments/[id]/proof', 'GET', { as: A.users.HEAD, params: { id: p.id } })).status).toBe(404);
+    expect((await call('accounting/payments/[id]/proof', 'GET', { as: A.users.BURSAR, params: { id: p.id } })).status).toBe(404);
   });
 });
 
@@ -168,20 +168,20 @@ describe('every create, update and delete of the core tables is audited with bef
 
   it('Payment: verifying one records the status change', async () => {
     const p = await prisma.payment.create({
-      data: { schoolId: A.schoolId, studentId: A.studentId, currency: 'USD', amount: 7, method: 'ECOCASH', reference: 'X', feeLabel: 'Levy', recordedBy: A.users.BURSAR.id },
+      data: { schoolId: A.schoolId, studentId: A.studentId, currency: 'USD', amount: 7, method: 'ECOCASH', reference: 'X', feeLabel: 'Levy', recordedBy: A.users.DIRECTOR.id },
     });
-    await call('accounting/payments/[id]/verify', 'POST', { as: A.users.HEAD, params: { id: p.id } });
+    await call('accounting/payments/[id]/verify', 'POST', { as: A.users.BURSAR, params: { id: p.id } });
     const rows = await rowsFor('Payment', p.id);
     expect(rows.map((x) => x.action)).toEqual(['DATA_UPDATE']);
     expect(rows[0].before).toMatchObject({ status: 'PENDING', verifiedBy: null });
-    expect(rows[0].after).toMatchObject({ status: 'VERIFIED', verifiedBy: A.users.HEAD.id });
+    expect(rows[0].after).toMatchObject({ status: 'VERIFIED', verifiedBy: A.users.BURSAR.id });
     // and the business-level entry still exists next to it
     expect(await rowsFor('Payment', p.id, 'VERIFY_PAYMENT')).toHaveLength(1);
   });
 
   it('Charge', async () => {
     const r = await call('accounting/students/[id]/charges', 'POST', {
-      as: A.users.HEAD, params: { id: A.studentId }, body: { studentId: A.studentId, label: 'Sports levy', currency: 'USD', amount: 12, termId: A.termId },
+      as: A.users.BURSAR, params: { id: A.studentId }, body: { studentId: A.studentId, label: 'Sports levy', currency: 'USD', amount: 12, termId: A.termId },
     });
     const [row] = await rowsFor('Charge', r.json.data.charge.id);
     expect(row.action).toBe('DATA_CREATE');
@@ -215,7 +215,7 @@ describe('every create, update and delete of the core tables is audited with bef
   });
 
   it('Student', async () => {
-    await call('accounting/students/[id]', 'PATCH', { as: A.users.HEAD, params: { id: A.studentId }, body: { previousSchool: 'Mbare Primary' } });
+    await call('accounting/students/[id]', 'PATCH', { as: A.operator!, params: { id: A.studentId }, body: { previousSchool: 'Mbare Primary' } });
     const rows = await rowsFor('Student', A.studentId);
     const last = rows[rows.length - 1];
     expect(last.action).toBe('DATA_UPDATE');
@@ -224,7 +224,7 @@ describe('every create, update and delete of the core tables is audited with bef
   });
 
   it('Student: private columns are recorded as changed, never as values', async () => {
-    const r = await call('students/[id]', 'PATCH', { as: A.users.ADMIN, params: { id: A.studentId }, body: { specialNeeds: true, specialNeedsNote: 'Needs a front-row seat', birthCertificateNumber: '63-999999 A 42' } });
+    const r = await call('students/[id]', 'PATCH', { as: A.operator!, params: { id: A.studentId }, body: { specialNeeds: true, specialNeedsNote: 'Needs a front-row seat', birthCertificateNumber: '63-999999 A 42' } });
     expect(r.status).toBe(200);
     const rows = await rowsFor('Student', A.studentId);
     const last = rows[rows.length - 1];
@@ -243,7 +243,7 @@ describe('every create, update and delete of the core tables is audited with bef
 
   it('Guardian (and student admission creates Student, Guardian and Enrollment rows)', async () => {
     const r = await call('admin/students/[id]/guardians', 'POST', {
-      as: A.users.ADMIN, params: { id: A.studentId }, body: { fullName: 'Uncle Tendai', phone: '0772223333', relationship: 'UNCLE' },
+      as: A.operator!, params: { id: A.studentId }, body: { fullName: 'Uncle Tendai', phone: '0772223333', relationship: 'UNCLE' },
     });
     expect(r.status).toBe(201);
     const guardianId = r.json.data.guardian?.id ?? r.json.data.guardianId;
@@ -254,7 +254,7 @@ describe('every create, update and delete of the core tables is audited with bef
 
   it('Enrollment: moving a student to another class', async () => {
     const other = await prisma.schoolClass.create({ data: { schoolId: A.schoolId, name: 'Form 1 South', levelId: A.levelId, stream: 'South' } });
-    const r = await call('admin/students/move', 'POST', { as: A.users.ADMIN, body: { studentIds: [A.studentId], classId: other.id } });
+    const r = await call('admin/students/move', 'POST', { as: A.operator!, body: { studentIds: [A.studentId], classId: other.id } });
     expect(r.status).toBe(200);
     const enrollment = await prisma.enrollment.findFirstOrThrow({ where: { studentId: A.studentId, termId: A.termId } });
     const rows = await rowsFor('Enrollment', enrollment.id);
@@ -265,10 +265,10 @@ describe('every create, update and delete of the core tables is audited with bef
   });
 
   it('User: creating, changing role, resetting a password — and never any password hash', async () => {
-    const created = await call('admin/users', 'POST', { as: A.users.ADMIN, body: { fullName: 'Audit Me', email: 'auditme@schoola.test', role: 'TEACHER' } });
+    const created = await call('admin/users', 'POST', { as: A.operator!, body: { fullName: 'Audit Me', email: 'auditme@schoola.test', role: 'TEACHER' } });
     const id = created.json.data.user.id;
-    await call('admin/users/[id]', 'PATCH', { as: A.users.ADMIN, params: { id }, body: { role: 'BURSAR' } });
-    await call('admin/users/[id]/reset-password', 'POST', { as: A.users.ADMIN, params: { id } });
+    await call('admin/users/[id]', 'PATCH', { as: A.operator!, params: { id }, body: { role: 'BURSAR' } });
+    await call('admin/users/[id]/reset-password', 'POST', { as: A.operator!, params: { id } });
     const rows = await rowsFor('User', id);
     expect(rows.map((x) => x.action)).toEqual(['DATA_CREATE', 'DATA_UPDATE', 'DATA_UPDATE']);
     expect(rows[1].before).toMatchObject({ role: 'TEACHER' });
@@ -280,7 +280,7 @@ describe('every create, update and delete of the core tables is audited with bef
 
   it('deletes are recorded too (the old row is kept in "before")', async () => {
     const { getScopedDb } = await import('@/lib/scoped-db');
-    const db = getScopedDb(A.schoolId, A.users.ADMIN.id);
+    const db = getScopedDb(A.schoolId, A.operator!.id);
     const c = await db.charge.create({ data: { studentId: A.studentId, termId: A.termId, label: 'Mistake', currency: 'USD', amount: 1 } as never });
     await db.charge.delete({ where: { id: c.id } });
     const rows = await rowsFor('Charge', c.id);

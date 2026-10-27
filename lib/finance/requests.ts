@@ -5,10 +5,11 @@ import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
+import * as guards from '@/lib/access/guards';
 import { notifyUsers } from '@/lib/system/notifications';
 import { proofKeyBelongsTo } from '@/lib/proof-of-payment';
 import {
-  activeFund, amountSchema, assertCurrencyOn, audit, currencySchema, dayOf, holds, idSchema, isFull, isoDateSchema, loadFinSettings, nameMap, nameOf, need, nextRequestNumber, tellApprovers, textSchema,
+  activeFund, amountSchema, assertCurrencyOn, audit, currencySchema, dayOf, holds, idSchema, isoDateSchema, loadFinSettings, nameMap, nameOf, need, nextRequestNumber, tellApprovers, textSchema,
   todayInHarare, whySchema, ymd, type Actor,
 } from '@/lib/finance/common';
 import { fundBudgetView } from '@/lib/finance/spending';
@@ -153,7 +154,7 @@ export async function cancelRequest(user: Actor, id: string) {
 
 async function ownerIds(tx: Db, schoolId: string, exceptUserId?: string): Promise<string[]> {
   const rows = await tx.user.findMany({
-    where: { schoolId, active: true, isSupport: false, ...(exceptUserId ? { id: { not: exceptUserId } } : {}), userRoles: { some: { role: { permissions: { some: { permissionKey: '*' } } } } } },
+    where: { schoolId, active: true, isSupport: false, ...(exceptUserId ? { id: { not: exceptUserId } } : {}), userRoles: { some: { role: { key: 'OWNER' } } } },
     select: { id: true },
   });
   return rows.map((r) => r.id);
@@ -164,7 +165,7 @@ async function otherApprovers(tx: Db, schoolId: string, except: string[]): Promi
   return tx.user.count({
     where: {
       schoolId, active: true, isSupport: false, id: { notIn: except },
-      userRoles: { some: { role: { permissions: { some: { permissionKey: 'finance.requests.approve' } }, NOT: { permissions: { some: { permissionKey: '*' } } } } } },
+      userRoles: { some: { role: { permissions: { some: { permissionKey: 'finance.requests.approve' } }, key: { not: 'OWNER' } } } },
     },
   });
 }
@@ -189,7 +190,7 @@ export async function decideRequest(user: Actor, id: string, decision: 'approve'
     const settings = await loadFinSettings(tx, user.schoolId);
     const limit = limitFor(settings, r.currency);
     const above = limit !== null && r.estimatedCents > limit;
-    if (above && !isFull(user)) {
+    if (above && !guards.isOwner(user)) {
       // The Head's approval is the first of two; the Owner's follows.
       if (r.firstApprovedById) throw new ServiceError('The Head has already approved this request. It now waits for the Owner.', 409);
       await tx.finExpenseRequest.update({ where: { id }, data: { firstApprovedById: user.id, firstApprovedAt: new Date() } });

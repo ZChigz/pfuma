@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import type { AcademicTerm, AcademicsSettings } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
-import { WILDCARD, type AccessUser, type PermissionKey } from '@/lib/access-core';
+import { heldAt, type AccessUser, type PermissionKey } from '@/lib/access-core';
 import type { Db } from '@/lib/scoped-db';
 import { idSchema, isoDateSchema } from '@/lib/students/common';
 import { todayInHarare } from '@/lib/students/registration';
@@ -17,9 +17,8 @@ export type Actor = AccessUser & { fullName?: string; /** Keys of the roles the 
 export const timeSchema = z.string().trim().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, 'Enter a time as HH:MM');
 export const colourSchema = z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, 'Choose a colour');
 
-/** Owner and Administrator ("*") reach everything in the module. */
-export const isFull = (user: AccessUser) => (user.grants ?? []).includes(WILDCARD);
-export const holds = (user: AccessUser, permission: PermissionKey) => isFull(user) || (user.grants ?? []).includes(permission);
+/** Whether the person holds the permission (at any scope). Nobody holds everything: the Owner and the Administrator hold the keys listed for them. */
+export const holds = (user: AccessUser, permission: PermissionKey) => (user.grants ?? []).includes(permission);
 
 export const toDay = (iso: string) => new Date(`${iso}T00:00:00Z`);
 export const isoOf = (d: Date) => d.toISOString().slice(0, 10);
@@ -100,12 +99,12 @@ export async function requireTeacher(tx: Db, schoolId: string, userId: string, l
   return u;
 }
 
-/** Active people whose roles grant `permission` (or everything). */
+/** Active people whose roles grant `permission`. */
 export async function peopleWith(tx: Db, schoolId: string, permission: PermissionKey, exceptUserId?: string): Promise<string[]> {
   const rows = await tx.user.findMany({
     where: {
       schoolId, active: true, isSupport: false, ...(exceptUserId ? { id: { not: exceptUserId } } : {}),
-      userRoles: { some: { role: { permissions: { some: { permissionKey: { in: [permission, '*'] } } } } } },
+      userRoles: { some: { role: { permissions: { some: { permissionKey: permission } } } } },
     },
     select: { id: true },
   });
@@ -163,20 +162,18 @@ export async function ownScope(tx: Db, user: AccessUser, termId: string): Promis
   };
 }
 
-const TEACHING_ROLES = ['TEACHER', 'CLASS_TEACHER'];
-const teachesByRole = (user: Actor | AccessUser) => ((user as Actor).roles ?? []).some((r) => TEACHING_ROLES.includes(r));
-
 /**
  * Whether a person looks after the whole school's classes rather than only their own: the administrator, anyone who runs classes
- * (classes.manage) or corrects registers, and anyone given the permission who is not a teacher by role (a Deputy, a Registrar).
+ * (classes.manage) or corrects registers, and anyone who holds classes.view for the whole school (a Deputy, a Registrar), as against a teacher,
+ * who holds it for the classes they teach.
  */
 export function seesAllClasses(user: Actor | AccessUser): boolean {
-  return isFull(user) || holds(user, 'academics.classes.manage') || holds(user, 'academics.attendance.correct') || (holds(user, 'academics.classes.view') && !teachesByRole(user));
+  return holds(user, 'academics.classes.manage') || holds(user, 'academics.attendance.correct') || heldAt(user, 'academics.classes.view', 'SCHOOL');
 }
 
 /** The same for registers: the Deputy (who corrects them) and non-teaching viewers see every class; a class teacher only their own. */
 export function seesAllRegisters(user: Actor | AccessUser): boolean {
-  return isFull(user) || holds(user, 'academics.attendance.correct') || (holds(user, 'academics.attendance.view') && !teachesByRole(user));
+  return holds(user, 'academics.attendance.correct') || heldAt(user, 'academics.attendance.view', 'SCHOOL');
 }
 
 /** The classes a person may see in the classes list: all for the administrator and the Deputy, else the ones they are class teacher of or teach. */

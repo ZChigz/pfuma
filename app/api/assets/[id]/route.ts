@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
-import { canManageAssets } from '@/lib/permissions';
+import { authorize } from '@/lib/access';
 import { resolveCustodian, sameCustodian } from '@/lib/assets';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi, apiError } from '@/lib/api';
 import { UpdateAssetSchema } from '@/lib/validations/assets';
@@ -16,6 +16,7 @@ async function _GET(
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorize(user, 'facilities.assets.view');
 
   const asset = await db.asset.findFirst({
     where: { id: params.id, schoolId: user.schoolId },
@@ -48,7 +49,7 @@ async function _PATCH(
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  try { await canManageAssets(user.role); } catch (res) { return res as Response; }
+  await authorize(user, 'facilities.assets.manage');
 
   const existing = await db.asset.findFirst({
     where: { id: params.id, schoolId: user.schoolId },

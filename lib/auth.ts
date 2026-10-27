@@ -83,6 +83,7 @@ export async function authorizeCredentials(
     }
   }
 
+  const held = await prisma.userRole.findMany({ where: { userId: matched.id }, select: { role: { select: { key: true } } } });
   return {
     id: matched.id,
     email: matched.email,
@@ -91,6 +92,8 @@ export async function authorizeCredentials(
     fullName: matched.fullName,
     tokenVersion: matched.tokenVersion,
     mustChangePassword: matched.mustChangePassword,
+    roles: Array.from(new Set(held.map((r) => r.role.key))),
+    permVersion: matched.permVersion,
   };
 }
 
@@ -110,7 +113,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt(params) {
       const token = await authConfig.callbacks.jwt(params);
       if (params.user) return token;
-      // Re-read active / role / tokenVersion at most every 5 minutes.
+      // Re-read active / roles / tokenVersion / permVersion at most every minute.
       return (await revalidateToken(token as unknown as SessionToken)) as typeof token | null;
     },
   },

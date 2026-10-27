@@ -22,13 +22,13 @@ export function weekStart(date: string): string {
   return iso(new Date(d.getTime() - back * DAY));
 }
 
-export interface ScheduledResult { schools: number; termReminders: number; setupReminders: number; suspensionsStarted: number; suspensionsEnded: number; recordReminders: number }
+export interface ScheduledResult { schools: number; termReminders: number; setupReminders: number; suspensionsStarted: number; suspensionsEnded: number; recordReminders: number; accessSummaries: number }
 
 export async function runScheduledNotifications(now = new Date()): Promise<ScheduledResult> {
   const today = harareDate(now);
   const tomorrow = iso(new Date(new Date(`${today}T00:00:00Z`).getTime() + DAY));
   const week = weekStart(today);
-  const result: ScheduledResult = { schools: 0, termReminders: 0, setupReminders: 0, suspensionsStarted: 0, suspensionsEnded: 0, recordReminders: 0 };
+  const result: ScheduledResult = { schools: 0, termReminders: 0, setupReminders: 0, suspensionsStarted: 0, suspensionsEnded: 0, recordReminders: 0, accessSummaries: 0 };
 
   const schools = await prisma.school.findMany({ where: { status: { not: 'SUSPENDED' } }, select: { id: true } });
   for (const { id: schoolId } of schools) {
@@ -60,6 +60,26 @@ export async function runScheduledNotifications(now = new Date()): Promise<Sched
 
     // Fridays (Academics): teachers whose week is not recorded yet are reminded to record the work covered.
     result.recordReminders += await remindRecordOfWork(schoolId, today);
+
+    // Weekly: the Owner is told which exceptions to access are in force, which end this week, and what waits for a decision.
+    const nowAt = now;
+    const weekAhead = new Date(nowAt.getTime() + 7 * DAY);
+    const [activeExceptions, endingSoon, openRequests, refusals] = await Promise.all([
+      db.userPermissionOverride.count({ where: { revokedAt: null, expiresAt: { gt: nowAt } } }),
+      db.userPermissionOverride.count({ where: { revokedAt: null, expiresAt: { gt: nowAt, lte: weekAhead } } }),
+      db.accessRequest.count({ where: { status: 'PENDING' } }),
+      db.auditLog.count({ where: { action: 'ACCESS_DENIED', createdAt: { gte: new Date(nowAt.getTime() - 7 * DAY) } } }),
+    ]);
+    if (activeExceptions > 0 || openRequests > 0) {
+      const owners = (await db.user.findMany({ where: { active: true, isSupport: false, userRoles: { some: { role: { key: 'OWNER' } } } }, select: { id: true } })).map((u) => u.id);
+      result.accessSummaries += await db.$tx((tx) =>
+        notifyUsers(tx, schoolId, owners, {
+          type: 'ACCESS_SUMMARY', title: 'Access exceptions this week',
+          body: `${activeExceptions} exception${activeExceptions === 1 ? '' : 's'} in force (${endingSoon} ending this week), ${openRequests} request${openRequests === 1 ? '' : 's'} waiting, ${refusals} refused attempt${refusals === 1 ? '' : 's'} on protected data.`,
+          link: '/system/roles?tab=exceptions', dedupeKey: `access-week:${week}`,
+        }),
+      );
+    }
 
     // Weekly: a setup step is still incomplete, to the administrators.
     const open = await db.academicTerm.findFirst({ where: { status: 'OPEN' }, select: { startDate: true, endDate: true } });

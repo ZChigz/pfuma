@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
-import { Permission } from '@/lib/permissions';
 import { formatDateTime } from '@/lib/utils';
 import { rateFor } from '@/lib/exchange-rate';
 import { UpdateRateForm } from '@/components/accounting/UpdateRateForm';
@@ -13,7 +13,7 @@ export default async function SettingsPage() {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  if (!Permission.manageStudents.includes(user.role)) redirect('/accounting');
+  await guardPage(user, 'finance.settings.manage', '/accounting');
 
   const [current, history] = await Promise.all([
     rateFor(db, new Date()),

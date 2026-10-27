@@ -5,9 +5,10 @@
 import { z } from 'zod';
 import type { Contract, Employee, EmployeeCategory } from '@prisma/client';
 import { ServiceError } from '@/lib/api';
+import * as guards from '@/lib/access/guards';
 import { getScopedDb, type Db } from '@/lib/scoped-db';
 import {
-  audit, centsSchema, currencySchema, employeeById, fullName, hrHolds, idSchema, isFull, isOwner, isoDateSchema, isoOf, nextEmployeeNo, need, optText, tellHolders, textSchema, toDay, todayInHarare,
+  audit, centsSchema, currencySchema, employeeById, fullName, hrHolds, idSchema, isoDateSchema, isoOf, nextEmployeeNo, need, optText, tellHolders, textSchema, toDay, todayInHarare,
   type Actor,
 } from '@/lib/hr/common';
 import { ensureHrDefaults } from '@/lib/hr/defaults';
@@ -62,7 +63,8 @@ export async function decidePost(user: Actor, id: string, raw: unknown) {
       await audit(tx, user, 'HR_APPROVE_POST', 'Post', id, `Rejected the post ${p.title}: ${v.reason}`, { status: 'PENDING' }, { status: 'REJECTED' });
       return { id, status: 'REJECTED' as const };
     }
-    const asHead = (user.roles ?? []).includes('HEAD'), asOwner = isOwner(user);
+    const seats = guards.postApprovalSeats(user);
+    const asHead = seats.includes('head'), asOwner = seats.includes('owner');
     if (!asHead && !asOwner) throw new ServiceError('A new post is approved by the Head and by the Owner.', 403);
     // Fill the slot this person can fill; one person can never fill both.
     let slot: 'head' | 'owner';
@@ -451,7 +453,7 @@ export async function endEmployment(user: Actor, employeeId: string, raw: unknow
     if (e.userId) {
       const holdsTop = await tx.userRole.findFirst({ where: { userId: e.userId, role: { key: { in: ['OWNER', 'ADMINISTRATOR'] } } }, select: { id: true } });
       if (!holdsTop && e.userId !== user.id) {
-        await tx.user.update({ where: { id: e.userId }, data: { active: false, tokenVersion: { increment: 1 } } });
+        await tx.user.update({ where: { id: e.userId }, data: { active: false, tokenVersion: { increment: 1 }, permVersion: { increment: 1 } } });
         loginOff = true;
       }
     }
@@ -460,5 +462,4 @@ export async function endEmployment(user: Actor, employeeId: string, raw: unknow
   });
 }
 
-export { isFull };
 export type { Employee, EmployeeCategory };

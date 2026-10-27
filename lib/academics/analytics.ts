@@ -42,7 +42,7 @@ export async function analytics(user: Actor, rawFilter: AnalyticsFilter = {}) {
   const today = todayInHarare();
   const days = await schoolDaysOf(db, user, termRow, { to: today });
   // The load is read school-wide here; the panel below keeps only the teachers the person's department scope covers.
-  const loadAll = await teacherWorkload({ ...user, grants: ['*'] }, termRow.id);
+  const loadAll = await teacherWorkload({ ...user, grants: [...(user.grants ?? []), 'academics.assignments.manage'] }, termRow.id);
 
   return db.$tx(async (tx) => {
     const term = await resolveTerm(tx, user.schoolId, termRow.id);

@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { guardPage, can } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
@@ -30,7 +31,7 @@ export default async function HeadResultsPage({
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
-  if (user.role !== 'HEAD') redirect('/');
+  const access = await guardPage(user, 'exams.results.publish');
 
   const { schoolId } = user;
 
@@ -98,7 +99,7 @@ export default async function HeadResultsPage({
 
   // Report-card extras (remarks, days present / absent) for everyone in the class.
   let detailRows: DetailRow[] = [];
-  if (selectedClass && term && user.role === 'HEAD') {
+  if (selectedClass && term && can(access, 'exams.comments.head')) {
     const roster = await classRoster(selectedClass.id, selectedTermId, db);
     const saved = await db.termResult.findMany({ where: { schoolId, termId: selectedTermId, studentId: { in: roster.map((s) => s.id) } } });
     const byStudent = new Map(saved.map((r) => [r.studentId, r]));
@@ -168,7 +169,7 @@ export default async function HeadResultsPage({
                 ✓ Published
               </span>
             )}
-            {isPublished && term?.status !== 'CLOSED' && user.role === 'HEAD' && (
+            {isPublished && term?.status !== 'CLOSED' && can(access, 'exams.results.unpublish') && (
               <ReopenResultsButton classId={selectedClass.id} className={selectedClass.name} termId={selectedTermId} termName={selectedTerm} />
             )}
             {isPublished && <ExportResultsButton classId={selectedClass.id} className={selectedClass.name} termId={selectedTermId} termName={selectedTerm} />}
@@ -246,7 +247,7 @@ export default async function HeadResultsPage({
           {absences.length > 0 && (
             <div className="overflow-hidden rounded-2xl bg-white">
               <p className="border-b border-line px-4 py-3 text-xs font-medium text-muted">
-                Absences — count as 0 unless excused{user.role === 'HEAD' && !isPublished ? '' : ' (unpublish the class to change)'}
+                Absences — count as 0 unless excused{can(access, 'exams.marks.unlock') && !isPublished ? '' : ' (unpublish the class to change)'}
               </p>
               <table className="w-full text-left text-sm text-ink">
                 <tbody className="divide-y divide-line">
@@ -257,7 +258,7 @@ export default async function HeadResultsPage({
                       <td className="px-4 py-3 text-muted">{m.absenceReason ?? '—'}</td>
                       <td className="px-4 py-3">{m.excused ? 'Excused' : 'Counts as 0'}</td>
                       <td className="px-4 py-3">
-                        {user.role === 'HEAD' && !isPublished && term?.status !== 'CLOSED' && (
+                        {can(access, 'exams.marks.unlock') && !isPublished && term?.status !== 'CLOSED' && (
                           <ExcuseAbsenceButton markId={m.id} excused={m.excused} />
                         )}
                       </td>

@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
+import { guardPage } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { redirect } from 'next/navigation';
-import { canManageAcademicCalendar } from '@/lib/permissions';
 import { isoDate } from '@/lib/academic/terms';
 import { AcademicCalendar } from '@/components/admin/AcademicCalendar';
 import type { SessionUser } from '@/types';
@@ -11,7 +11,7 @@ export default async function AcademicCalendarPage() {
   if (!session?.user?.id) redirect('/login');
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
-  try { await canManageAcademicCalendar(user.role); } catch { redirect('/'); }
+  await guardPage(user, 'system.settings.edit');
 
   const years = await db.academicYear.findMany({
     where: { schoolId: user.schoolId },

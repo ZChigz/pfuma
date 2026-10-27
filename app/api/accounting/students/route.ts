@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { authorizeAny } from '@/lib/access';
 import { getScopedDb } from '@/lib/scoped-db';
 import { apiSuccess, apiUnauthorized, withApi } from '@/lib/api';
 import { getDaysOverdue } from '@/lib/utils';
@@ -13,6 +14,7 @@ async function _GET(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  await authorizeAny(user, ['finance.accounts.view', 'finance.payments.record', 'finance.charges.create']);
 
   const { searchParams } = req.nextUrl;
   const includeInactive = searchParams.get('includeInactive') === 'true';
