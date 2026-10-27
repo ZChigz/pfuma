@@ -215,7 +215,7 @@ describe('the roll call', () => {
 
   it('fills in learners on exeat, in the sick bay or suspended, and locks them', async () => {
     const out = new Date(Date.now() - 3_600_000);
-    await prisma.facExeat.create({ data: { schoolId: A.schoolId, studentId: kid.b1!, type: 'WEEKEND', outAt: out, dueBackAt: new Date(Date.now() + 86_400_000), reason: 'Family function', collectedBy: { guardianId: 'g' }, requestedById: bm.id, approvedById: bm.id, approvedAt: out, signedOutAt: out, signedOutById: bm.id, status: 'SIGNED_OUT' } });
+    await prisma.facExeat.create({ data: { schoolId: A.schoolId, studentId: kid.b1!, type: 'WEEKEND', outAt: out, dueBackAt: new Date(Date.now() + 86_400_000), reason: 'Family function', collectedBy: { kind: 'OTHER', name: 'Mr Collector', idNumber: '63-1234567X63', phone: '+263773000111', primaryConfirmedAt: new Date().toISOString(), primaryConfirmedBy: 'Mother', confirmMethod: 'PHONE' }, requestedById: bm.id, approvedById: bm.id, approvedAt: out, signedOutAt: out, signedOutById: bm.id, status: 'SIGNED_OUT' } });
     await prisma.facSickBayVisit.create({ data: { schoolId: A.schoolId, studentId: kid.d1!, visitedAt: out, complaint: 'FEVER', outcome: 'REST_IN_SICK_BAY', admittedAt: out, recordedById: matron.id } });
     const r = await rows();
     expect(r.Alpha).toMatchObject({ status: 'EXEAT', locked: true });

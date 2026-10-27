@@ -133,7 +133,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
       // One item per part. Each part is switched on or off for the school (can() checks it), and an item gets its href when its
       // pages are built; until then it shows as "Coming soon".
       { label: 'Hostel',         href: '/facilities/hostel', permission: 'facilities.hostel.view',      or: ['facilities.hostel.manage', 'facilities.hostel.allocate', 'facilities.hostel.rollcall', 'facilities.hostel.inspect'], icon: 'classes' },
-      { label: 'Exeats',         permission: 'facilities.exeats.request',   or: ['facilities.exeats.approve', 'facilities.exeats.signout', 'facilities.visitors.log'], icon: 'calendar' },
+      { label: 'Exeats',         href: '/facilities/exeats', permission: 'facilities.exeats.request',   or: ['facilities.exeats.approve', 'facilities.exeats.signout', 'facilities.visitors.log'], icon: 'calendar' },
       { label: 'Sick bay',       permission: 'facilities.sickbay.record',    or: ['facilities.sickbay.view'], icon: 'shield' },
       { label: 'Tuck shop',      permission: 'facilities.tuckshop.sell',     or: ['facilities.tuckshop.cashup', 'facilities.wallets.manage', 'facilities.wallets.view'], icon: 'card' },
       { label: 'Library',        href: '/facilities/library', permission: 'facilities.library.view',     or: ['facilities.library.desk', 'facilities.library.manage', 'facilities.textbooks.issue'], icon: 'library' },

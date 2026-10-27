@@ -514,6 +514,22 @@ const ATTACKS: Attack[] = [
   { name: 'inspect a room of another school', file: 'facilities/hostel/inspections', method: 'POST', as: 'OPERATOR', body: () => ({ hostelId: 'not-in-this-school', roomId: 'x', items: [{ item: 'LOCKERS', score: 3 }] }), expect: 404 },
   { name: 'decide damage of another school', file: 'facilities/hostel/inspections/items/[id]/decide', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ decision: 'REJECT', reason: 'Not mine' }), expect: 404 },
   { name: 'hostel dashboard', file: 'facilities/hostel/dashboard', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  // Facilities exeats
+  { name: 'exeats (list)', file: 'facilities/exeats', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'exeat for a learner of another school', file: 'facilities/exeats', method: 'POST', as: 'OPERATOR', body: () => ({ studentId: b().studentId, type: 'WEEKEND', outAt: new Date(Date.now()+3600000).toISOString(), dueBackAt: new Date(Date.now()+86400000*2).toISOString(), reason: 'Not mine' }), expect: 404 },
+  { name: 'decide an exeat of another school', file: 'facilities/exeats/[id]/decide', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ decision: 'APPROVE' }), expect: 404 },
+  { name: 'cancel an exeat of another school', file: 'facilities/exeats/[id]/cancel', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ reason: 'Not mine' }), expect: 404 },
+  { name: 'sign out an exeat of another school', file: 'facilities/exeats/sign-out', method: 'POST', as: 'OPERATOR', body: () => ({ exeatId: 'not-in-this-school' }), expect: 404 },
+  { name: 'sign in an exeat of another school', file: 'facilities/exeats/sign-in', method: 'POST', as: 'OPERATOR', body: () => ({ exeatId: 'not-in-this-school' }), expect: 404 },
+  { name: 'gate lookup of a learner of another school', file: 'facilities/exeats/gate', method: 'GET', as: 'OPERATOR', url: () => `?code=${encodeURIComponent(b().studentId)}`, expect: 404 },
+  { name: 'bulk exeats into a hostel of another school', file: 'facilities/exeats/bulk', method: 'POST', as: 'OPERATOR', body: () => ({ hostelId: 'not-in-this-school', calendarEventId: 'x' }), expect: 404 },
+  { name: 'visitor for a learner of another school', file: 'facilities/exeats/visitors', method: 'POST', as: 'OPERATOR', body: () => ({ studentId: b().studentId, visitorName: 'Nobody Here' }), expect: 404 },
+  { name: 'visitor leaving of another school', file: 'facilities/exeats/visitors/[id]/out', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
+  // Facilities exeats-2
+  { name: 'collector of an exeat of another school', file: 'facilities/exeats/[id]/collector', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ kind: 'GUARDIAN', guardianId: 'x' }), expect: 404 },
+  { name: 'decide many exeats of another school', file: 'facilities/exeats/decide-many', method: 'POST', as: 'OPERATOR', body: () => ({ ids: ['not-in-this-school'], decision: 'APPROVE' }), expect: 404 },
+  { name: 'calendar options', file: 'facilities/exeats/calendar', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'visiting days', file: 'facilities/exeats/visiting-days', method: 'GET', as: 'OPERATOR', expect: 'ok' },
 ];
 
 function academicsAttacks(): Attack[] {
@@ -656,6 +672,7 @@ const EXEMPT: Record<string, string> = {
   'account/change-password': "changes the signed-in user's own password; no id is accepted",
   'password-reset': 'public; the single-use reset link is the credential (tests/integration/rates-resets-assets.test.ts)',
   'cron/hr': 'scheduler only (secret in the Authorization header); each school uses its own scoped client (tests/integration/hr-records.test.ts)',
+  'cron/facilities': 'scheduler only (secret in the Authorization header); each school uses its own scoped client (tests/integration/facilities-exeats.test.ts)',
   'cron/finance': 'scheduler only (secret in the Authorization header); each school uses its own scoped client (tests/integration/finance-full.test.ts)',
   'portal/paynow/start': 'public; the school and learner come from the hash of a secret portal link token (tests/integration/portal.test.ts)',
   'portal/paynow/callback': 'public; the school comes from the attempt reference and the post is refused unless it carries the school Paynow hash (tests/integration/finance-full.test.ts)',
