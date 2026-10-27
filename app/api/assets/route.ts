@@ -5,7 +5,7 @@ import { logAudit } from '@/lib/audit';
 import { authorize } from '@/lib/access';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, apiError, withApi } from '@/lib/api';
 import { CreateAssetSchema } from '@/lib/validations/assets';
-import { resolveCustodian } from '@/lib/assets';
+import { resolveCustodian, assetsMoved, ASSETS_MOVED_MESSAGE } from '@/lib/assets';
 import type { SessionUser } from '@/types';
 
 async function _GET(req: NextRequest) {
@@ -50,6 +50,7 @@ async function _POST(req: NextRequest) {
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  if (await assetsMoved(db, user.schoolId)) return apiError(ASSETS_MOVED_MESSAGE, 409);
 
   await authorize(user, 'facilities.assets.manage');
 

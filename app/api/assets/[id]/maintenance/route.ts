@@ -1,9 +1,10 @@
 import type { NextRequest } from 'next/server';
+import { assetsMoved, ASSETS_MOVED_MESSAGE } from '@/lib/assets';
 import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { authorize } from '@/lib/access';
-import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi } from '@/lib/api';
+import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi, apiError } from '@/lib/api';
 import { CreateMaintenanceSchema } from '@/lib/validations/assets';
 import type { SessionUser } from '@/types';
 
@@ -15,6 +16,7 @@ async function _POST(
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  if (await assetsMoved(db, user.schoolId)) return apiError(ASSETS_MOVED_MESSAGE, 409);
 
   await authorize(user, 'facilities.assets.maintain');
 

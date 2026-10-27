@@ -140,3 +140,41 @@ export async function ensureFacilityFunds(tx: Db, schoolId: string): Promise<Fac
   const tuckshop = await make('TUCKSHOP', 'Tuck shop', 'TUCKSHOP', order + 1);
   return { trust, tuckshop };
 }
+
+// ─── Money the school spends because of a facilities service ─────────────────
+// Maintenance work on an asset, fuel for a vehicle: the cost becomes an expense in Finance (never a second record of spending). Where Finance
+// is off the cost stays on the job or the fuel log, which is what the report reads.
+
+export interface FacilityExpense {
+  schoolId: string;
+  actorId: string;
+  /** The expense category the school already has ("Maintenance and repairs", "Transport and fuel"). */
+  category: string;
+  description: string;
+  currency: Cur;
+  amountCents: number;
+  paidOn: Date;
+  payee?: string | null;
+  receiptKey?: string | null;
+}
+
+export async function recordFacilityExpense(tx: Db, e: FacilityExpense): Promise<{ where: 'FINANCE' | 'LEGACY' | 'NONE'; expenseId: string | null }> {
+  if (!Number.isInteger(e.amountCents) || e.amountCents <= 0) throw new ServiceError('The cost must be more than zero', 422);
+  if (!(await financeIsOn(tx, e.schoolId))) return { where: 'NONE', expenseId: null };
+  if (!(await onFinance(tx, e.schoolId))) {
+    await tx.expense.create({ data: { schoolId: e.schoolId, category: e.category, currency: e.currency, amount: e.amountCents / 100, note: e.description, spentOn: e.paidOn, recordedBy: e.actorId } });
+    return { where: 'LEGACY', expenseId: null };
+  }
+  const funds = await ensureFunds(tx, e.schoolId);
+  const fund = funds.find((f) => f.code === 'GENERAL' && f.active) ?? funds.find((f) => f.active);
+  if (!fund) throw new ServiceError('The school has no fund that can take expenses', 409);
+  const cat = await tx.expenseCategory.findFirst({ where: { schoolId: e.schoolId, name: e.category } });
+  const row = await tx.finExpense.create({
+    data: {
+      schoolId: e.schoolId, fundId: fund.id, category: e.category, categoryId: cat?.id ?? null, description: e.description.slice(0, 200), payee: e.payee ?? null, currency: e.currency,
+      amountCents: e.amountCents, paidOn: e.paidOn, method: 'CASH', source: 'DIRECT', receiptKey: e.receiptKey ?? null, recordedById: e.actorId,
+    },
+    select: { id: true },
+  });
+  return { where: 'FINANCE', expenseId: row.id };
+}

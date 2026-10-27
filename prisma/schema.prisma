@@ -1088,29 +1088,29 @@ model User {
   closedTerms         AcademicTerm[]      @relation("ClosedTerms")
 
   exchangeRates         ExchangeRate[]
-  resetTokens           PasswordResetToken[]  @relation("ResetTokenUser")
-  resetTokensCreated    PasswordResetToken[]  @relation("ResetTokenCreator")
-  custodianOf           Asset[]               @relation("AssetCustodian")
-  transfersFrom         AssetTransfer[]       @relation("TransferFrom")
-  transfersTo           AssetTransfer[]       @relation("TransferTo")
-  transfersRecorded     AssetTransfer[]       @relation("TransfersRecorded")
+  resetTokens           PasswordResetToken[]     @relation("ResetTokenUser")
+  resetTokensCreated    PasswordResetToken[]     @relation("ResetTokenCreator")
+  custodianOf           Asset[]                  @relation("AssetCustodian")
+  transfersFrom         AssetTransfer[]          @relation("TransferFrom")
+  transfersTo           AssetTransfer[]          @relation("TransferTo")
+  transfersRecorded     AssetTransfer[]          @relation("TransfersRecorded")
   incomeRecorded        Income[]
   userRoles             UserRole[]
   notifications         Notification[]
   calendarEventsCreated CalendarEvent[]
   classTeacherOf        ClassTeacher[]
-  departmentsHeaded     Department[]          @relation("DepartmentHod")
-  teachingAssignments   TeacherAssignment[]   @relation("AssignmentTeacher")
-  coTeachingAssignments TeacherAssignment[]   @relation("AssignmentCoTeacher")
-  timetableSlots        TimetableSlot[]       @relation("SlotTeacher")
+  departmentsHeaded     Department[]             @relation("DepartmentHod")
+  teachingAssignments   TeacherAssignment[]      @relation("AssignmentTeacher")
+  coTeachingAssignments TeacherAssignment[]      @relation("AssignmentCoTeacher")
+  timetableSlots        TimetableSlot[]          @relation("SlotTeacher")
   unavailablePeriods    TeacherAvailability[]
-  coversAbsent          CoverLesson[]         @relation("CoverAbsent")
-  coversTaken           CoverLesson[]         @relation("CoverTeacher")
-  rolesAssigned         UserRole[]            @relation("UserRoleAssignedBy")
+  coversAbsent          CoverLesson[]            @relation("CoverAbsent")
+  coversTaken           CoverLesson[]            @relation("CoverTeacher")
+  rolesAssigned         UserRole[]               @relation("UserRoleAssignedBy")
   permissionOverrides   UserPermissionOverride[] @relation("OverrideSubject")
   overridesCreated      UserPermissionOverride[] @relation("OverrideCreator")
-  accessRequests        AccessRequest[]       @relation("AccessRequester")
-  accessRequestsDecided AccessRequest[]       @relation("AccessDecider")
+  accessRequests        AccessRequest[]          @relation("AccessRequester")
+  accessRequestsDecided AccessRequest[]          @relation("AccessDecider")
 
   @@unique([schoolId, email])
   @@index([schoolId])
@@ -2120,16 +2120,16 @@ model SchoolModule {
 // The roles of a school (OWNER, TEACHER ...). The 13 system roles are created for every school and
 // cannot be deleted. Display name and description are what people see.
 model RoleDefinition {
-  id          String   @id @default(cuid())
-  schoolId    String
-  key         String
-  name        String
-  description String
-  isSystem    Boolean  @default(true)
+  id               String   @id @default(cuid())
+  schoolId         String
+  key              String
+  name             String
+  description      String
+  isSystem         Boolean  @default(true)
   // A custom role is made by copying a role; this is the one it was copied from (kept when that role is later deleted: null).
   copiedFromRoleId String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   school      School           @relation(fields: [schoolId], references: [id])
   copiedFrom  RoleDefinition?  @relation("RoleCopies", fields: [copiedFromRoleId], references: [id], onDelete: SetNull)
@@ -2161,14 +2161,14 @@ model Permission {
 }
 
 model RolePermission {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   schoolId      String
   roleId        String
   permissionKey String
   // How far the grant reaches. Worked out from records (class teacher, timetable, hostel ...), never typed in: see lib/access/scopes.ts.
   scope         AccessScope @default(SCHOOL)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now()) @updatedAt
 
   school     School         @relation(fields: [schoolId], references: [id])
   role       RoleDefinition @relation(fields: [roleId], references: [id], onDelete: Cascade)
@@ -2182,16 +2182,16 @@ model RolePermission {
 // class or hostel; they are stored now and used when those screens are built (scopeId is empty for the
 // whole school).
 model UserRole {
-  id        String        @id @default(cuid())
-  schoolId  String
-  userId    String
-  roleId    String
-  scopeType RoleScopeType @default(SCHOOL)
-  scopeId   String        @default("")
+  id           String        @id @default(cuid())
+  schoolId     String
+  userId       String
+  roleId       String
+  scopeType    RoleScopeType @default(SCHOOL)
+  scopeId      String        @default("")
   // Who gave the role (null for roles made by migrations and imports).
   assignedById String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   school     School         @relation(fields: [schoolId], references: [id])
   user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -2245,10 +2245,10 @@ model UserPermissionOverride {
   revokedAt     DateTime?
   createdAt     DateTime       @default(now())
 
-  school     School     @relation(fields: [schoolId], references: [id])
-  user       User       @relation("OverrideSubject", fields: [userId], references: [id], onDelete: Cascade)
-  createdBy  User       @relation("OverrideCreator", fields: [createdById], references: [id])
-  permission Permission @relation(fields: [permissionKey], references: [key])
+  school     School         @relation(fields: [schoolId], references: [id])
+  user       User           @relation("OverrideSubject", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy  User           @relation("OverrideCreator", fields: [createdById], references: [id])
+  permission Permission     @relation(fields: [permissionKey], references: [key])
   request    AccessRequest?
 
   @@index([schoolId, userId])
@@ -2258,20 +2258,20 @@ model UserPermissionOverride {
 // "Request access" on the access-denied page. The Administrator (the Owner for finance and staff-pay keys) approves it as a time-limited
 // override or declines it with a reason.
 model AccessRequest {
-  id                   String              @id @default(cuid())
-  schoolId             String
-  userId               String
-  permissionKey        String
+  id                  String              @id @default(cuid())
+  schoolId            String
+  userId              String
+  permissionKey       String
   // The page the person was trying to open.
-  page                 String
-  reason               String
-  status               AccessRequestStatus @default(PENDING)
-  decidedById          String?
-  decidedAt            DateTime?
+  page                String
+  reason              String
+  status              AccessRequestStatus @default(PENDING)
+  decidedById         String?
+  decidedAt           DateTime?
   // Why it was declined.
-  decisionNote         String?
-  resultingOverrideId  String?             @unique
-  createdAt            DateTime            @default(now())
+  decisionNote        String?
+  resultingOverrideId String?             @unique
+  createdAt           DateTime            @default(now())
 
   school     School                  @relation(fields: [schoolId], references: [id])
   user       User                    @relation("AccessRequester", fields: [userId], references: [id], onDelete: Cascade)
@@ -7555,6 +7555,7 @@ model FacAsset {
   purchasedAt   DateTime?         @db.Date
   supplierId    String?
   requestId     String?
+  requestItemId String?
   expenseId     String?
   condition     FacAssetCondition @default(GOOD)
   status        FacAssetStatus    @default(IN_USE)
@@ -7704,4 +7705,36 @@ model FacWriteoffRequest {
 
   @@index([schoolId, status])
   @@index([schoolId, storeId])
+}
+
+// A disposal waits here until the Head approves it (and the Owner too, above the school's value limit); only then is the asset's one
+// disposal made. Nothing is deleted: a refused request stays.
+model FacDisposalRequest {
+  id                String            @id @default(cuid())
+  schoolId          String
+  assetId           String
+  method            FacDisposalMethod
+  reason            String
+  date              DateTime          @db.Date
+  proceedsCents     Int?
+  currency          Currency?
+  // What the asset cost, to decide whether the Owner must approve too.
+  valueCents        Int
+  valueCurrency     Currency
+  needsOwner        Boolean           @default(false)
+  status            FacApproval       @default(PENDING)
+  requestedById     String
+  headApprovedById  String?
+  headApprovedAt    DateTime?
+  ownerApprovedById String?
+  ownerApprovedAt   DateTime?
+  rejectedById      String?
+  rejectedAt        DateTime?
+  rejectionReason   String?
+  disposalId        String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @default(now()) @updatedAt
+
+  @@index([schoolId, status])
+  @@index([schoolId, assetId])
 }

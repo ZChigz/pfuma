@@ -139,7 +139,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { label: 'Library',        href: '/facilities/library', permission: 'facilities.library.view',     or: ['facilities.library.desk', 'facilities.library.manage', 'facilities.textbooks.issue'], icon: 'library' },
       { label: 'Transport',      permission: 'facilities.transport.manage',  or: ['facilities.transport.trips', 'facilities.transport.assign'], icon: 'assets' },
       { label: 'Inventory',      href: '/facilities/inventory', permission: 'facilities.inventory.view',   or: ['facilities.inventory.manage', 'facilities.inventory.receive', 'facilities.inventory.issue', 'facilities.inventory.count', 'facilities.inventory.writeoff'], icon: 'assets' },
-      { label: 'Assets',         permission: 'facilities.assets.view',      or: ['facilities.assets.manage', 'facilities.assets.maintain', 'facilities.assets.dispose', 'facilities.assets.verify'], icon: 'assets' },
+      { label: 'Assets',         href: '/facilities/assets', permission: 'facilities.assets.view',      or: ['facilities.assets.manage', 'facilities.assets.maintain', 'facilities.assets.dispose', 'facilities.assets.verify'], icon: 'assets' },
     ],
   },
   {

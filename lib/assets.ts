@@ -34,3 +34,15 @@ export const sameCustodian = (a: Custodian, b: Custodian) =>
   a.custodianId !== null || b.custodianId !== null
     ? a.custodianId === b.custodianId
     : (a.custodian ?? '').toLowerCase() === (b.custodian ?? '').toLowerCase();
+
+// ─── The asset register moved to Facilities & Operations ─────────────────────
+// Once a school has assets in the Facilities register (the data step copies the old register across), the first asset screens stop
+// recording anything, so the two never disagree about where an asset is or whether it was disposed of. They can still be read.
+
+export const ASSETS_MOVED_MESSAGE = 'This school keeps its asset register in Facilities & Operations now, so the older asset screens no longer record anything. Open Facilities, Assets in the sidebar.';
+
+type MovedReader = { facAsset: { count: (args: { where: { schoolId: string } }) => PromiseLike<number> } };
+
+export async function assetsMoved(db: MovedReader, schoolId: string): Promise<boolean> {
+  return (await db.facAsset.count({ where: { schoolId } })) > 0;
+}

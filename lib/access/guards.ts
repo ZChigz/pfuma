@@ -79,7 +79,7 @@ export function teacherCannotVerifyOwnSheet(actor: Person, assignment: { teacher
 // ── People ───────────────────────────────────────────────────────────────────
 
 /** Rule 7: nobody approves their own leave, exeat request, duty swap or expense claim. */
-export function cannotApproveOwn(actor: Person, ownerId: string, what: 'leave' | 'exeat request' | 'duty swap' | 'expense claim'): void {
+export function cannotApproveOwn(actor: Person, ownerId: string, what: 'leave' | 'exeat request' | 'duty swap' | 'expense claim' | 'disposal request'): void {
   if (actor.id === ownerId) throw refuse(7, `This is your own ${what}, so someone else must approve it.`);
 }
 

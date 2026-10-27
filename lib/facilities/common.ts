@@ -6,6 +6,7 @@ import { ServiceError } from '@/lib/api';
 import { can, facilityModuleKey, type FacilityPart, type PermissionKey } from '@/lib/access-core';
 import type { Db } from '@/lib/scoped-db';
 import type { Actor } from '@/lib/academics/common';
+import { assertAllowed } from '@/lib/access/check';
 
 export type { Actor };
 export { audit, tellApprovers, currencySchema, centsSchema, amountSchema, textSchema, whySchema, idSchema, isoDateSchema, reasonSchema, noteSchema, todayInHarare, toDay, isoOf } from '@/lib/finance/common';
@@ -57,3 +58,13 @@ export async function nextFacNumber(tx: Db, schoolId: string, key: string): Prom
 }
 
 export const padNumber = (n: number, width = 5) => String(n).padStart(width, '0');
+
+// ─── Scope: the hostel, the store ────────────────────────────────────────────
+
+/**
+ * Checks that a record is inside the scope of the person's grant of `key`: a boarding master reaches their own hostel and its boarders,
+ * a storekeeper their own store. Someone whose grant covers the whole school passes. A record of another school is "not found".
+ */
+export async function within(tx: Db, user: Actor, key: PermissionKey, model: 'FacStore' | 'FacHostel' | 'FacExeat' | 'FacSickBayVisit' | 'FacBedAllocation' | 'Student', id: string): Promise<void> {
+  await assertAllowed(user, key, { model, id }, { db: tx });
+}
