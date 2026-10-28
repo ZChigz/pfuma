@@ -3,6 +3,7 @@
 import { ServiceError } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { classDisplayName, normalizeStream } from '@/lib/academic/rules';
+import { ensureLevels } from '@/lib/academic/terms';
 import type { Db, ScopedDb } from '@/lib/scoped-db';
 
 type Actor = { id: string; schoolId: string };
@@ -10,6 +11,8 @@ type Actor = { id: string; schoolId: string };
 export const NO_STREAM = '';
 
 export async function getStructure(db: ScopedDb, schoolId: string) {
+  // Form 1–6 may be missing for a new school or after a data wipe; without them nothing can be set up.
+  await ensureLevels(schoolId, db);
   const open = await db.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } });
   const [levels, streams, classes, everRows, nowRows, school] = await Promise.all([
     db.level.findMany({ where: { schoolId }, orderBy: { order: 'asc' }, select: { id: true, name: true, order: true, category: true, active: true } }),

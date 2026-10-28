@@ -60,6 +60,7 @@ async function _POST(req: NextRequest) {
     db.school.findUnique({ where: { id: user.schoolId }, select: { maxClassSize: true } }),
   ]);
   if (!level) return apiError('Level not found', 404);
+  if (!level.active) return apiError(`${level.name} is switched off. Switch it on under Settings → Forms, streams and classes first.`, 409);
 
   const name = classDisplayName(level.name, stream);
   const existing = await db.schoolClass.findFirst({
