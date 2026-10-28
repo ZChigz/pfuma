@@ -132,14 +132,14 @@ export const NAV_GROUPS: NavGroupDef[] = [
     items: [
       // One item per part. Each part is switched on or off for the school (can() checks it), and an item gets its href when its
       // pages are built; until then it shows as "Coming soon".
-      { label: 'Hostel',         permission: 'facilities.hostel.view',      or: ['facilities.hostel.manage', 'facilities.hostel.allocate', 'facilities.hostel.rollcall', 'facilities.hostel.inspect'], icon: 'classes' },
-      { label: 'Exeats',         permission: 'facilities.exeats.request',   or: ['facilities.exeats.approve', 'facilities.exeats.signout', 'facilities.visitors.log'], icon: 'calendar' },
-      { label: 'Sick bay',       permission: 'facilities.sickbay.record',    or: ['facilities.sickbay.view'], icon: 'shield' },
-      { label: 'Tuck shop',      permission: 'facilities.tuckshop.sell',     or: ['facilities.tuckshop.cashup', 'facilities.wallets.manage', 'facilities.wallets.view'], icon: 'card' },
+      { label: 'Hostel',         href: '/facilities/hostel', permission: 'facilities.hostel.view',      or: ['facilities.hostel.manage', 'facilities.hostel.allocate', 'facilities.hostel.rollcall', 'facilities.hostel.inspect'], icon: 'classes' },
+      { label: 'Exeats',         href: '/facilities/exeats', permission: 'facilities.exeats.request',   or: ['facilities.exeats.approve', 'facilities.exeats.signout', 'facilities.visitors.log'], icon: 'calendar' },
+      { label: 'Sick bay',       href: '/facilities/sickbay', permission: 'facilities.sickbay.record',    or: ['facilities.sickbay.view'], icon: 'shield' },
+      { label: 'Tuck shop',      href: '/facilities/tuckshop', permission: 'facilities.tuckshop.sell',     or: ['facilities.tuckshop.cashup', 'facilities.wallets.manage', 'facilities.wallets.view'], icon: 'card' },
       { label: 'Library',        href: '/facilities/library', permission: 'facilities.library.view',     or: ['facilities.library.desk', 'facilities.library.manage', 'facilities.textbooks.issue'], icon: 'library' },
       { label: 'Transport',      permission: 'facilities.transport.manage',  or: ['facilities.transport.trips', 'facilities.transport.assign'], icon: 'assets' },
       { label: 'Inventory',      href: '/facilities/inventory', permission: 'facilities.inventory.view',   or: ['facilities.inventory.manage', 'facilities.inventory.receive', 'facilities.inventory.issue', 'facilities.inventory.count', 'facilities.inventory.writeoff'], icon: 'assets' },
-      { label: 'Assets',         permission: 'facilities.assets.view',      or: ['facilities.assets.manage', 'facilities.assets.maintain', 'facilities.assets.dispose', 'facilities.assets.verify'], icon: 'assets' },
+      { label: 'Assets',         href: '/facilities/assets', permission: 'facilities.assets.view',      or: ['facilities.assets.manage', 'facilities.assets.maintain', 'facilities.assets.dispose', 'facilities.assets.verify'], icon: 'assets' },
     ],
   },
   {

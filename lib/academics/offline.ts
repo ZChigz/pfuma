@@ -4,7 +4,7 @@
 //
 // The storage is behind a small interface so the queue can be tested without a browser (memoryStore).
 
-export type MarkStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED' | 'SUSPENDED' | 'EXEAT';
+export type MarkStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED' | 'SUSPENDED' | 'EXEAT' | 'SICK_BAY';
 export interface DraftEntry { studentId: string; status: MarkStatus; reason?: string | null; arrivalTime?: string | null }
 
 export interface QueuedRegister {

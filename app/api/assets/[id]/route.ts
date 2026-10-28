@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getScopedDb } from '@/lib/scoped-db';
 import { logAudit } from '@/lib/audit';
 import { authorize } from '@/lib/access';
-import { resolveCustodian, sameCustodian } from '@/lib/assets';
+import { resolveCustodian, sameCustodian, assetsMoved, ASSETS_MOVED_MESSAGE } from '@/lib/assets';
 import { parseBody, apiSuccess, apiUnauthorized, apiNotFound, withApi, apiError } from '@/lib/api';
 import { UpdateAssetSchema } from '@/lib/validations/assets';
 import type { SessionUser } from '@/types';
@@ -48,6 +48,7 @@ async function _PATCH(
   if (!session?.user?.id) return apiUnauthorized();
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
+  if (await assetsMoved(db, user.schoolId)) return apiError(ASSETS_MOVED_MESSAGE, 409);
 
   await authorize(user, 'facilities.assets.manage');
 

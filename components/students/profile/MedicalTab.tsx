@@ -15,7 +15,7 @@ const CONDITIONS = ['Asthma', 'Epilepsy', 'Diabetes', 'Sickle cell', 'Heart cond
 const BLOOD = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const AIDS = ['CIMAS', 'PSMAS', 'First Mutual', 'Other'];
 const KEEPERS = [['STUDENT', 'Student'], ['MATRON', 'Matron'], ['OFFICE', 'Office']] as const;
-const OUTCOME: Record<string, string> = { RETURNED_TO_CLASS: 'Back to class', SENT_HOME: 'Sent home', SENT_TO_CLINIC: 'Sent to clinic' };
+const OUTCOME: Record<string, string> = { RETURNED_TO_CLASS: 'Back to class', SENT_HOME: 'Sent home', SENT_TO_CLINIC: 'Sent to clinic', REST_IN_SICK_BAY: 'Kept in the sick bay' };
 
 export function MedicalTab({ studentId, m, canEdit }: { studentId: string; m: MedicalView; canEdit: boolean }) {
   const router = useRouter();
