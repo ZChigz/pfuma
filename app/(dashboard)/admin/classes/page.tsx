@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/Badge';
 import { AddClassModal } from '@/components/admin/AddClassModal';
-import { getOpenTerm } from '@/lib/academic/terms';
+import { ensureLevels, getOpenTerm } from '@/lib/academic/terms';
 import type { SessionUser } from '@/types';
 
 export default async function AdminClassesPage() {
@@ -18,7 +18,8 @@ export default async function AdminClassesPage() {
 
   const [openTerm, levels, school] = await Promise.all([
     getOpenTerm(user.schoolId, db),
-    db.level.findMany({ where: { schoolId: user.schoolId }, select: { id: true, name: true }, orderBy: { order: 'asc' } }),
+    // Form 1–6 may be missing for a new school or after a data wipe. Only switched-on forms take classes.
+    ensureLevels(user.schoolId, db).then((all) => all.filter((l) => l.active).map((l) => ({ id: l.id, name: l.name }))),
     db.school.findUnique({ where: { id: user.schoolId }, select: { maxClassSize: true } }),
   ]);
   const [classes, teachers] = await Promise.all([

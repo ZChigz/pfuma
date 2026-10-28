@@ -383,6 +383,26 @@ describe('forms, streams and classes', () => {
     expect(north).toMatchObject({ studentsNow: 3, studentsEver: 3, active: true });
   });
 
+  it('gives a school with no forms (new, or after a data wipe) Form 1 to 6, so classes can be set up', async () => {
+    expect(await prisma.level.count({ where: { schoolId: C.schoolId } })).toBe(0);
+    const r = await call('system/structure', 'GET', { as: C as never });
+    expect(r.status).toBe(200);
+    expect(r.json.data.levels.map((l: { name: string; active: boolean }) => [l.name, l.active])).toEqual(
+      ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'].map((n) => [n, true]),
+    );
+    // Reading again does not add more.
+    await call('system/structure', 'GET', { as: C as never });
+    expect(await prisma.level.count({ where: { schoolId: C.schoolId } })).toBe(6);
+  });
+
+  it('the Add Class form refuses a form that is switched off', async () => {
+    const off = await prisma.level.update({ where: { schoolId_order: { schoolId: C.schoolId, order: 6 } }, data: { active: false } });
+    const r = await call('admin/classes', 'POST', { as: C as never, body: { levelId: off.id, stream: 'North', capacity: 40 } });
+    expect(r.status).toBe(409);
+    expect(await prisma.schoolClass.count({ where: { schoolId: C.schoolId } })).toBe(0);
+    await prisma.level.update({ where: { id: off.id }, data: { active: true } });
+  });
+
   it('keeps a list of streams, one spelling each', async () => {
     expect((await api.addStream('north')).status).toBe(201);
     expect((await api.addStream('NORTH')).status).toBe(409);
