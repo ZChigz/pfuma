@@ -555,6 +555,26 @@ const ATTACKS: Attack[] = [
   { name: 'cash-ups (list)', file: 'facilities/tuckshop/cashup', method: 'GET', as: 'OPERATOR', expect: 'ok' },
   { name: 'cash up with nothing sold', file: 'facilities/tuckshop/cashup', method: 'POST', as: 'OPERATOR', body: () => ({ currency: 'USD', countedCents: 0 }), expect: 201 },
   { name: 'confirm a cash-up of another school', file: 'facilities/tuckshop/cashup/[id]/confirm', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
+  // Facilities transport
+  { name: 'fleet', file: 'facilities/transport/fleet', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'routes (list)', file: 'facilities/transport/routes', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'route learners of another school', file: 'facilities/transport/routes/[id]/learners', method: 'GET', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), expect: 404 },
+  { name: 'document for a vehicle of another school', file: 'facilities/transport/vehicles/[id]/documents', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ type: 'LICENCE', expiry: '2030-01-01' }), expect: 404 },
+  { name: 'document for a driver of another school', file: 'facilities/transport/drivers/[id]/documents', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ type: 'DRIVING_LICENCE', expiry: '2030-01-01' }), expect: 404 },
+  { name: 'driver from the staff of another school', file: 'facilities/transport/drivers', method: 'POST', as: 'OPERATOR', body: () => ({ employeeId: 'not-in-this-school', licenceClass: '2' }), expect: 404 },
+  { name: 'stop on a route of another school', file: 'facilities/transport/stops', method: 'POST', as: 'OPERATOR', body: () => ({ routeId: 'not-in-this-school', name: 'Gate', sequence: 1 }), expect: 404 },
+  { name: 'put a learner of another school on a route', file: 'facilities/transport/assign', method: 'POST', as: 'OPERATOR', body: () => ({ studentId: b().studentId, routeId: 'x', amStopId: 'x' }), expect: 404 },
+  { name: 'take a learner of another school off a route', file: 'facilities/transport/assign', method: 'DELETE', as: 'OPERATOR', body: () => ({ studentId: b().studentId, reason: 'Not mine' }), expect: 404 },
+  { name: 'trips (list)', file: 'facilities/transport/trips', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'trip on a route of another school', file: 'facilities/transport/trips', method: 'POST', as: 'OPERATOR', body: () => ({ routeId: 'not-in-this-school' }), expect: 404 },
+  { name: 'fuel for a vehicle of another school', file: 'facilities/transport/fuel', method: 'POST', as: 'OPERATOR', body: () => ({ vehicleId: 'not-in-this-school', litres: 10, costCents: 1000 }), expect: 404 },
+  { name: 'bookings (list)', file: 'facilities/transport/bookings', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'booking a vehicle of another school', file: 'facilities/transport/bookings', method: 'POST', as: 'OPERATOR', body: () => ({ vehicleId: 'not-in-this-school', startAt: new Date(Date.now()+86400000).toISOString(), endAt: new Date(Date.now()+90000000).toISOString(), purpose: 'Trip' }), expect: 404 },
+  { name: 'decide a booking of another school', file: 'facilities/transport/bookings/[id]/decide', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ decision: 'APPROVE' }), expect: 404 },
+  { name: 'passengers on a booking of another school', file: 'facilities/transport/bookings/[id]/passengers', method: 'POST', as: 'OPERATOR', params: () => ({ id: 'not-in-this-school' }), body: () => ({ studentIds: ['x'] }), expect: 404 },
+  { name: 'transport report', file: 'facilities/transport/report', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  // Facilities transport-2
+  { name: 'add a vehicle', file: 'facilities/transport/vehicles', method: 'POST', as: 'OPERATOR', body: () => ({ registration: 'ATK 1', make: 'Isuzu', seats: 20 }), expect: 201 },
 ];
 
 function academicsAttacks(): Attack[] {
