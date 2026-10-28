@@ -1,4 +1,4 @@
-// The facilities job, every 15 minutes: late exeat alerts and service reminders for assets. One school's failure does not stop the others.
+// The facilities job, once a day at 18:00 in Harare (vercel.json; Vercel Hobby allows only daily crons): late exeat alerts, service reminders for assets and vehicle/driver papers. One school's failure does not stop the others.
 import { prisma } from '@/lib/prisma';
 import { getScopedDb } from '@/lib/scoped-db';
 import { exeatAlerts } from '@/lib/facilities/exeats';

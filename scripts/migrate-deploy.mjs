@@ -31,6 +31,7 @@ const RETRYABLE = [
   '20261109000200_access_core_backfill',
   '20261109000300_access_seed',
   '20261109000400_access_switch',
+  '20261116000000_platform_admin_first',
 ];
 
 async function failedRetryableMigrations() {

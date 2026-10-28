@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
-// Once a day, in the evening in Harare (vercel.json): see lib/facilities/schedule.ts.
+// Once a day, 18:00 in Harare (vercel.json): see lib/facilities/schedule.ts.
 async function _GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || !same(req.headers.get('authorization') ?? '', `Bearer ${secret}`)) return apiError('Unauthorized', 401);

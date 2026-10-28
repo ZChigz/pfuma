@@ -3,6 +3,6 @@
     { "path": "/api/cron/notifications", "schedule": "0 4 * * *" },
     { "path": "/api/cron/finance", "schedule": "0 5 * * *" },
     { "path": "/api/cron/hr", "schedule": "0 16 * * *" },
-    { "path": "/api/cron/facilities", "schedule": "*/15 * * * *" }
+    { "path": "/api/cron/facilities", "schedule": "0 16 * * *" }
   ]
 }
