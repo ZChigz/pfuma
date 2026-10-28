@@ -575,6 +575,9 @@ const ATTACKS: Attack[] = [
   { name: 'transport report', file: 'facilities/transport/report', method: 'GET', as: 'OPERATOR', expect: 'ok' },
   // Facilities transport-2
   { name: 'add a vehicle', file: 'facilities/transport/vehicles', method: 'POST', as: 'OPERATOR', body: () => ({ registration: 'ATK 1', make: 'Isuzu', seats: 20 }), expect: 201 },
+  // Facilities overview
+  { name: 'facilities overview', file: 'facilities/overview', method: 'GET', as: 'OPERATOR', expect: 'ok' },
+  { name: 'facilities report', file: 'facilities/report', method: 'GET', as: 'OPERATOR', expect: 'ok' },
 ];
 
 function academicsAttacks(): Attack[] {
