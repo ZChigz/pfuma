@@ -11,7 +11,7 @@ async function _POST(req: Request, ctx: { params: { id: string } }) {
   const parsed = await parseBody(req, SupportStartSchema);
   if ('error' in parsed) return parsed.error;
   const { cookie, schoolName, expiresInMinutes } = await startSupportAccess(admin, ctx.params.id, parsed.data.reason);
-  const res = NextResponse.json({ success: true, data: { schoolName, expiresInMinutes, redirect: '/system/dashboard' } });
+  const res = NextResponse.json({ success: true, data: { schoolName, expiresInMinutes, redirect: '/' } });
   res.headers.set('Set-Cookie', cookie);
   return res;
 }

@@ -107,7 +107,7 @@ function PeopleTab({ people }: { people: Awaited<ReturnType<typeof loadPeople>> 
             <tr key={p.id}>
               <td className="px-4 py-3"><span className="font-medium">{p.fullName}</span>{!p.active && <span className="ml-2 text-xs text-muted">deactivated</span>}<span className="block text-xs text-muted">{p.email}</span></td>
               <td className="px-4 py-3 text-muted">{p.userRoles.map((r) => (r.scopeType === 'SCHOOL' ? r.role.name : `${r.role.name} (one ${r.scopeType.toLowerCase()})`)).join(', ') || 'None'}</td>
-              <td className="px-4 py-3 text-right"><Link href={`/system/users/${p.id}/access`} className="inline-flex min-h-[44px] items-center text-sm font-medium text-primary hover:underline">Manage access</Link></td>
+              <td className="px-4 py-3 text-right"><Link href={`/admin/users/${p.id}/access`} className="inline-flex min-h-[44px] items-center text-sm font-medium text-primary hover:underline">Manage access</Link></td>
             </tr>
           ))}
         </tbody>

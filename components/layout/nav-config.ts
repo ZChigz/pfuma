@@ -46,7 +46,6 @@ export const LEGACY_SECTIONS: NavSection[] = [
     title: 'Setup',
     items: [
       { href: '/admin',          label: 'Dashboard',         icon: 'dashboard', permission: 'system.users.view' },
-      { href: '/admin/users',    label: 'Users',             icon: 'students',  permission: 'system.users.edit' },
       { href: '/admin/classes',  label: 'Classes',           icon: 'classes',   permission: 'academics.classes.manage' },
       { href: '/admin/subjects', label: 'Subjects',          icon: 'subjects',  permission: 'academics.subjects.manage' },
       { href: '/admin/academic', label: 'Academic calendar', icon: 'calendar',  permission: 'system.settings.edit' },

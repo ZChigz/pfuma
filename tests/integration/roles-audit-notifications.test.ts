@@ -177,7 +177,7 @@ describe('the Roles & Permissions page', () => {
   it('lists people with a way to manage their access, and a 404 for a role that does not exist', async () => {
     const tab = renderToStaticMarkup(await render(admin(), '@/app/(dashboard)/system/roles/page', { searchParams: { tab: 'users' } }));
     expect(tab).toContain('Manage access');
-    expect(tab).toContain(`/system/users/${A.users.TEACHER.id}/access`);
+    expect(tab).toContain(`/admin/users/${A.users.TEACHER.id}/access`);
     await expect(render(admin(), '@/app/(dashboard)/system/roles/[key]/page', { params: { key: 'NOPE' } })).rejects.toThrow();
     await expect(render(A.users.TEACHER, '@/app/(dashboard)/system/roles/[key]/page', { params: { key: 'OWNER' } })).resolves.toBeTruthy(); // denied page, not an error
   });

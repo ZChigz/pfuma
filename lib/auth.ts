@@ -67,7 +67,7 @@ export async function authorizeCredentials(
     if (!matched.lastLoginAt) {
       await notify([matched.id], {
         type: 'WELCOME', title: 'Welcome to Pfuma', body: 'Your account is ready. Start from the dashboard; your profile is under your name at the top right.',
-        link: '/system/dashboard', dedupeKey: 'welcome',
+        link: '/', dedupeKey: 'welcome',
       });
     }
   } catch {

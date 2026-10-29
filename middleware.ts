@@ -11,10 +11,9 @@ import type { NextRequest } from 'next/server';
 const { auth } = NextAuth(authConfig);
 
 // ─── Where a signed-in person lands ──────────────────────────────────────────
-// Every member of staff holds system.dashboard.view, so the dashboard is home for everyone. What a person may open beyond it is
-// decided by their permissions, not by a role: every page and every API route asks can() / requirePermission() itself
-// (lib/access.ts), and the menu shows only what they may use.
-const HOME = '/system/dashboard';
+// "/" works out each person's home from their permissions (lib/home.ts): the edge cannot, as it only sees the JWT. Every page and
+// every API route asks can() / requirePermission() itself (lib/access.ts), and the menu shows only what they may use.
+const HOME = '/';
 
 function startsWithAny(pathname: string, prefixes: string[]): boolean {
   return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));

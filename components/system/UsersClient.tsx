@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
@@ -56,6 +56,10 @@ interface Props {
   canUpdate: boolean;
   canDeactivate: boolean;
   canResetPassword: boolean;
+  /** Make a one-time temporary password instead of a reset link. */
+  canTempPassword?: boolean;
+  /** End every open session of one user. */
+  canSignOut?: boolean;
   canExport: boolean;
   canInvite: boolean;
   canImport: boolean;
@@ -68,7 +72,7 @@ type Shown =
   | { kind: 'password'; title: string; user: { fullName: string; email: string }; password: string }
   | null;
 
-type Pending = { kind: 'deactivate' | 'reactivate' | 'reset'; user: UserRowData } | null;
+type Pending = { kind: 'deactivate' | 'reactivate' | 'reset' | 'temp' | 'signout'; user: UserRowData } | null;
 
 interface ImportResult {
   created: number;
@@ -93,6 +97,7 @@ export function UsersClient(props: Props) {
   const router = useRouter();
   const mayManageAccess = useCan('system.roles.view');
   const params = useSearchParams();
+  const pathname = usePathname();
   const [drawer, setDrawer] = useState<{ mode: 'create' } | { mode: 'edit'; user: UserRowData } | null>(null);
   const [pending, setPending] = useState<Pending>(null);
   const [busy, setBusy] = useState(false);
@@ -150,10 +155,16 @@ export function UsersClient(props: Props) {
     if (!pending) return;
     setBusy(true);
     try {
-      const res = await fetch(`/api/system/users/${pending.user.id}/${pending.kind === 'reset' ? 'reset-password' : pending.kind}`, { method: 'POST' });
+      const url =
+        pending.kind === 'temp' ? `/api/admin/users/${pending.user.id}/reset-password`
+        : pending.kind === 'signout' ? `/api/admin/users/${pending.user.id}/logout`
+        : `/api/system/users/${pending.user.id}/${pending.kind === 'reset' ? 'reset-password' : pending.kind}`;
+      const res = await fetch(url, { method: 'POST' });
       const body = await res.json();
       if (!res.ok) { toast.error(body.message ?? 'That did not work'); return; }
-      if (pending.kind === 'reset') setShown({ kind: 'invite', title: 'Reset link ready', user: pending.user, invite: { ...body.data.reset, reset: true } });
+      if (pending.kind === 'temp') setShown({ kind: 'password', title: 'Temporary password', user: pending.user, password: body.data.tempPassword });
+      else if (pending.kind === 'signout') toast.success(`${pending.user.fullName} signed out everywhere`);
+      else if (pending.kind === 'reset') setShown({ kind: 'invite', title: 'Reset link ready', user: pending.user, invite: { ...body.data.reset, reset: true } });
       else toast.success(pending.kind === 'deactivate' ? 'User deactivated' : 'User reactivated');
       setPending(null);
       router.refresh();
@@ -208,7 +219,7 @@ export function UsersClient(props: Props) {
       render: (u) => (
         <div className="-ml-2.5 flex flex-wrap items-center">
           {props.canUpdate && <button type="button" className={action} onClick={() => openDrawer({ mode: 'edit', user: u })}>Edit</button>}
-          {mayManageAccess && <Link href={`/system/users/${u.id}/access`} className={cn(action, 'inline-flex items-center')}>Manage access</Link>}
+          {mayManageAccess && <Link href={`/admin/users/${u.id}/access`} className={cn(action, 'inline-flex items-center')}>Manage access</Link>}
           {props.canInvite && u.status === 'invited' && <button type="button" className={action} disabled={busy} onClick={() => newInvite(u)}>New invite</button>}
           {props.canDeactivate && u.id !== props.currentUserId && (
             <button type="button" className={action} onClick={() => setPending({ kind: u.status === 'deactivated' ? 'reactivate' : 'deactivate', user: u })}>
@@ -216,6 +227,8 @@ export function UsersClient(props: Props) {
             </button>
           )}
           {props.canResetPassword && u.status !== 'deactivated' && <button type="button" className={action} onClick={() => setPending({ kind: 'reset', user: u })}>Reset password</button>}
+          {props.canTempPassword && u.status !== 'deactivated' && u.id !== props.currentUserId && <button type="button" className={action} onClick={() => setPending({ kind: 'temp', user: u })}>Temporary password</button>}
+          {props.canSignOut && u.status === 'active' && u.id !== props.currentUserId && <button type="button" className={action} onClick={() => setPending({ kind: 'signout', user: u })}>Sign out</button>}
           {props.canViewActivity && <Link href={`/system/audit-log?user=${u.id}`} className={cn(action, 'inline-flex items-center')}>View activity</Link>}
         </div>
       ),
@@ -224,7 +237,7 @@ export function UsersClient(props: Props) {
 
   const tile = (label: string, n: number, status: UserStatus) => (
     <Link
-      href={`/system/users?status=${status}`}
+      href={`${pathname}?status=${status}`}
       aria-current={params.get('status') === status ? 'true' : undefined}
       className={cn('block rounded-2xl bg-white p-4 hover:bg-rowhover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40', params.get('status') === status && 'ring-2 ring-primary/50')}
     >
@@ -328,8 +341,20 @@ export function UsersClient(props: Props) {
 
       <ConfirmDialog
         open={pending !== null}
-        title={pending?.kind === 'deactivate' ? 'Deactivate user?' : pending?.kind === 'reactivate' ? 'Reactivate user?' : 'Reset password?'}
-        confirmLabel={pending?.kind === 'deactivate' ? 'Deactivate' : pending?.kind === 'reactivate' ? 'Reactivate' : 'Reset password'}
+        title={
+          pending?.kind === 'deactivate' ? 'Deactivate user?'
+          : pending?.kind === 'reactivate' ? 'Reactivate user?'
+          : pending?.kind === 'temp' ? 'Make a temporary password?'
+          : pending?.kind === 'signout' ? 'Sign this user out?'
+          : 'Reset password?'
+        }
+        confirmLabel={
+          pending?.kind === 'deactivate' ? 'Deactivate'
+          : pending?.kind === 'reactivate' ? 'Reactivate'
+          : pending?.kind === 'temp' ? 'Make password'
+          : pending?.kind === 'signout' ? 'Sign out'
+          : 'Reset password'
+        }
         destructive={pending?.kind !== 'reactivate'}
         loading={busy}
         onCancel={() => setPending(null)}
@@ -337,6 +362,8 @@ export function UsersClient(props: Props) {
       >
         {pending?.kind === 'deactivate' && <>{pending.user.fullName} will be signed out and cannot sign in until you reactivate the account.</>}
         {pending?.kind === 'reactivate' && <>{pending.user.fullName} will be able to sign in again.</>}
+        {pending?.kind === 'temp' && <>{pending.user.fullName}&apos;s current password stops working and they are signed out everywhere. You will see a temporary password once; they must change it when they next sign in.</>}
+        {pending?.kind === 'signout' && <>{pending.user.fullName} will be signed out on every device. They can sign in again with the same password.</>}
         {pending?.kind === 'reset' && <>You will get a link for {pending.user.fullName} to choose a new password. It works once and for 30 minutes, and you will see it only once.</>}
       </ConfirmDialog>
 

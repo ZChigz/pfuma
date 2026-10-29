@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { can, type AccessUser, type PermissionKey } from '@/lib/access-core';
 
 const ACTIONS: { label: string; href: string; permission: PermissionKey }[] = [
-  { label: 'Add user', href: '/system/users?new=1', permission: 'system.users.create' },
+  { label: 'Add user', href: '/admin/users?new=1', permission: 'system.users.create' },
   { label: 'Add student', href: '/students/new', permission: 'students.profiles.create' },
   { label: 'Record incident', href: '/students/discipline?new=1', permission: 'students.discipline.create' },
   { label: 'Import students', href: '/students/import', permission: 'students.profiles.import' },

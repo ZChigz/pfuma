@@ -8,7 +8,7 @@ export async function StaffCard({ user }: { user: AccessUser }) {
   if (!can(user, 'hr.staff.view')) return null;
   const s = await loadStaffSummary(getScopedDb(user.schoolId, user.id), user.schoolId);
   return (
-    <SummaryCard label="Staff" value={s.active} href={can(user, 'system.users.view') ? '/system/users' : undefined}>
+    <SummaryCard label="Staff" value={s.active} href={can(user, 'system.users.view') ? '/admin/users' : undefined}>
       <p>{s.loggedInThisWeek} logged in this week</p>
       <p>Active accounts</p>
     </SummaryCard>
