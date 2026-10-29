@@ -17,6 +17,8 @@ export const MAX_LEVEL_ORDER = 6;
 export const GRADUATING_LEVEL_ORDERS = [4, 6] as const;
 
 export const DEFAULT_STREAMS = ['North', 'South', 'East'] as const;
+// Form 5-6 classes are usually named for the subjects taken, not the O Level streams.
+export const DEFAULT_A_LEVEL_STREAMS = ['Sciences', 'Commercials', 'Arts'] as const;
 
 const WORD_NUMBERS = ['one', 'two', 'three', 'four', 'five', 'six'];
 

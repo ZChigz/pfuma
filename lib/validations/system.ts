@@ -300,6 +300,11 @@ export const StreamNameSchema = z.object({
     .regex(/^[A-Za-z0-9 ]+$/, 'Use letters, numbers and spaces only'),
 });
 
+// Adding a stream also says whether it is for O Level (Form 1-4) or A Level (Form 5-6).
+export const NewStreamSchema = StreamNameSchema.extend({
+  category: z.enum(['O_LEVEL', 'A_LEVEL']).default('O_LEVEL'),
+});
+
 export const ClassGridSchema = z.object({
   cells: z
     .array(

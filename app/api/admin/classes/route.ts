@@ -6,6 +6,7 @@ import { authorize } from '@/lib/access';
 import { CreateClassSchema } from '@/lib/validations/admin';
 import { classDisplayName, normalizeStream } from '@/lib/academic/rules';
 import { getOpenTerm } from '@/lib/academic/terms';
+import { assertStreamFitsLevel } from '@/lib/system/structure';
 import type { SessionUser } from '@/types';
 import type { NextRequest } from 'next/server';
 
@@ -67,6 +68,7 @@ async function _POST(req: NextRequest) {
     where: { schoolId: user.schoolId, OR: [{ name }, { levelId, stream: { equals: stream, mode: 'insensitive' } }] },
   });
   if (existing) return apiError(`A class for ${name} already exists`, 409);
+  await assertStreamFitsLevel(db, user.schoolId, level, stream);
 
   if (classTeacherId) {
     const teacher = await db.user.findUnique({ where: { id: classTeacherId } });

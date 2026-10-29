@@ -367,7 +367,7 @@ describe('grading scales', () => {
 describe('forms, streams and classes', () => {
   const api = {
     forms: (forms: { id: string; active: boolean }[], as: object | null = admin()) => call('system/structure/forms', 'PATCH', { as: as as never, body: { forms } }),
-    addStream: (name: string, as: object | null = admin()) => call('system/structure/streams', 'POST', { as: as as never, body: { name } }),
+    addStream: (name: string, as: object | null = admin(), category?: string) => call('system/structure/streams', 'POST', { as: as as never, body: { name, category } }),
     grid: (cells: object[], as: object | null = admin()) => call('system/structure/classes', 'PUT', { as: as as never, body: { cells } }),
   };
   const levelId = async (name: string) => (await prisma.level.findFirstOrThrow({ where: { schoolId: A.schoolId, name } })).id;
@@ -409,22 +409,28 @@ describe('forms, streams and classes', () => {
     expect((await api.addStream('  south ')).status).toBe(201);
     expect((await api.addStream('East')).status).toBe(201);
     for (const bad of ['', '   ', 'x'.repeat(31), 'North<script>', 'East-1']) expect((await api.addStream(bad)).status, bad).toBe(422);
-    const names = (await prisma.stream.findMany({ where: { schoolId: A.schoolId }, orderBy: { name: 'asc' } })).map((s) => s.name);
-    expect(names).toEqual(['East', 'North', 'South']);
-    expect(await auditCount(A.schoolId, { action: 'UPDATE_STREAMS' })).toBe(3);
+    // Form 5 and 6 have their own streams, named for what they study.
+    expect((await api.addStream('sciences', admin(), 'A_LEVEL')).status).toBe(201);
+    expect((await api.addStream('Arts', admin(), 'Form 5')).status).toBe(422);
+    const rows = await prisma.stream.findMany({ where: { schoolId: A.schoolId }, orderBy: { name: 'asc' } });
+    expect(rows.map((s) => [s.name, s.category])).toEqual([['East', 'O_LEVEL'], ['North', 'O_LEVEL'], ['Sciences', 'A_LEVEL'], ['South', 'O_LEVEL']]);
+    expect(await auditCount(A.schoolId, { action: 'UPDATE_STREAMS' })).toBe(4);
+    expect(await auditCount(A.schoolId, { action: 'UPDATE_STREAMS', detail: 'Added Sciences for A Level (Form 5 and 6)' })).toBe(1);
+    const read = await call('system/structure', 'GET', { as: admin() });
+    expect(read.json.data.streams.find((s: { name: string }) => s.name === 'Sciences').category).toBe('A_LEVEL');
     expect((await api.addStream('Blue', A.users.HEAD)).status).toBe(403);
   });
 
   it('builds classes from the grid: named automatically, with the capacity chosen', async () => {
     const [f1, f2, f5] = [await levelId('Form 1'), await levelId('Form 2'), await levelId('Form 5')];
-    const r = await api.grid([cell(f1, 'North', true, 38), cell(f1, 'South', true, 40), cell(f2, 'North', true, 45), cell(f2, 'east', true, 30), cell(f5, 'North', true, 25)]);
+    const r = await api.grid([cell(f1, 'North', true, 38), cell(f1, 'South', true, 40), cell(f2, 'North', true, 45), cell(f2, 'east', true, 30), cell(f5, 'Sciences', true, 25)]);
     expect(r.status, JSON.stringify(r.json)).toBe(200);
     expect(r.json.data).toMatchObject({ created: 4, updated: 1, archived: 0, deleted: 0 });
     expect((await klass('Form 1 North'))?.capacity).toBe(38);          // the existing class is changed, not duplicated
     expect(await prisma.schoolClass.count({ where: { schoolId: A.schoolId, levelId: f1, stream: 'North' } })).toBe(1);
     expect((await klass('Form 1 South'))?.capacity).toBe(40);
     expect((await klass('Form 2 East'))?.capacity).toBe(30);           // spelt the way the stream list spells it
-    expect((await klass('Form 5 North'))?.capacity).toBe(25);
+    expect((await klass('Form 5 Sciences'))?.capacity).toBe(25);
     expect(await auditCount(A.schoolId, { action: 'CREATE_CLASS' })).toBeGreaterThanOrEqual(4);
     expect(await auditCount(A.schoolId, { action: 'UPDATE_CLASS', entityId: A.classId })).toBe(1);
   });
@@ -438,6 +444,13 @@ describe('forms, streams and classes', () => {
     expect((await api.grid([cell(f3, 'North'), cell(f3, 'north')])).status).toBe(422);     // the same class twice
     for (const bad of [{ capacity: 0 }, { capacity: 201 }, { capacity: 12.5 }, { capacity: '45' }]) expect((await api.grid([{ ...cell(f3, 'North'), ...bad }])).status, JSON.stringify(bad)).toBe(422);
     expect((await api.grid([])).status).toBe(422);
+    // a new class takes a stream of its own level: no Form 3 Sciences, no Form 5 North
+    const wrong = await api.grid([cell(f3, 'North'), cell(f3, 'Sciences')]);
+    expect(wrong.status).toBe(422);
+    expect(wrong.json.message).toMatch(/Sciences is a stream for A Level/);
+    expect((await api.grid([cell(await levelId('Form 5'), 'North')])).status).toBe(422);
+    const legacy = await call('admin/classes', 'POST', { as: admin(), body: { levelId: f3, stream: 'Sciences', capacity: 40 } });
+    expect(legacy.status).toBe(422);
     // removing a class that has students in the open term
     const stuck = await api.grid([cell(f3, 'North'), cell(f1, 'North', false)]);
     expect(stuck.status).toBe(409);
@@ -510,19 +523,19 @@ describe('forms, streams and classes', () => {
     const r = await api.forms(set([f5, f6]));
     expect(r.status).toBe(200);
     expect(r.json.data.levels.filter((l: { active: boolean }) => !l.active).map((l: { name: string }) => l.name)).toEqual(['Form 5', 'Form 6']);
-    expect(await klass('Form 5 North')).toMatchObject({ active: false });                                  // archived, not deleted
+    expect(await klass('Form 5 Sciences')).toMatchObject({ active: false });                                  // archived, not deleted
     expect(await auditCount(A.schoolId, { action: 'UPDATE_FORMS' })).toBe(1);
     expect(await auditCount(A.schoolId, { action: 'ARCHIVE_CLASS', detail: { contains: 'Form 5 switched off' } })).toBe(1);
 
     // A form that is off offers no classes, through the grid or through admission.
-    expect((await api.grid([cell(f5, 'North')])).status).toBe(409);
+    expect((await api.grid([cell(f5, 'Sciences')])).status).toBe(409);
     const { findOrCreateClass } = await import('@/lib/students/server');
     const db = await dbOf(A.schoolId, admin().id);
     await expect(db.$tx((tx) => findOrCreateClass(tx, A.schoolId, admin().id, 'Form 6', 'East'))).rejects.toThrow(/switched off/);
 
     expect((await api.forms(set([]))).status).toBe(200);                                                     // switching them back on
     expect((await prisma.level.findFirstOrThrow({ where: { id: f5 } })).active).toBe(true);
-    expect((await klass('Form 5 North'))?.active).toBe(false);                                              // classes stay archived until ticked
+    expect((await klass('Form 5 Sciences'))?.active).toBe(false);                                              // classes stay archived until ticked
     expect((await api.forms(set([f6]), A.users.BURSAR)).status).toBe(403);
   });
 });
