@@ -2353,10 +2353,12 @@ model CalendarHolidayYear {
 
 // The streams a school uses (North, South, East ...). Classes take their stream from this list.
 model Stream {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   schoolId  String
   name      String
-  createdAt DateTime @default(now())
+  // O Level streams (North, South, East) are for Form 1-4; A Level ones (Sciences, Commercials, Arts) for Form 5-6.
+  category  LevelCategory @default(O_LEVEL)
+  createdAt DateTime      @default(now())
 
   school School @relation(fields: [schoolId], references: [id])
 

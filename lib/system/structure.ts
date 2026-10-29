@@ -5,6 +5,7 @@ import { logAudit } from '@/lib/audit';
 import { classDisplayName, normalizeStream } from '@/lib/academic/rules';
 import { ensureLevels } from '@/lib/academic/terms';
 import type { Db, ScopedDb } from '@/lib/scoped-db';
+import type { LevelCategory } from '@prisma/client';
 
 type Actor = { id: string; schoolId: string };
 
@@ -16,7 +17,7 @@ export async function getStructure(db: ScopedDb, schoolId: string) {
   const open = await db.academicTerm.findFirst({ where: { schoolId, status: 'OPEN' }, select: { id: true } });
   const [levels, streams, classes, everRows, nowRows, school] = await Promise.all([
     db.level.findMany({ where: { schoolId }, orderBy: { order: 'asc' }, select: { id: true, name: true, order: true, category: true, active: true } }),
-    db.stream.findMany({ where: { schoolId }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    db.stream.findMany({ where: { schoolId }, orderBy: { name: 'asc' }, select: { id: true, name: true, category: true } }),
     db.schoolClass.findMany({
       where: { schoolId },
       select: { id: true, name: true, levelId: true, stream: true, capacity: true, active: true, classTeacher: { select: { fullName: true } } },
@@ -94,17 +95,29 @@ export async function setForms(db: ScopedDb, actor: Actor, wanted: { id: string;
 
 // ─── Streams ─────────────────────────────────────────────────────────────────
 
-export async function addStream(db: ScopedDb, actor: Actor, rawName: string) {
+const LEVEL_LABEL: Record<LevelCategory, string> = { O_LEVEL: 'O Level (Form 1 to 4)', A_LEVEL: 'A Level (Form 5 and 6)' };
+
+export async function addStream(db: ScopedDb, actor: Actor, rawName: string, category: LevelCategory = 'O_LEVEL') {
   const name = normalizeStream(rawName);
   if (!name) throw new ServiceError('Enter a stream name', 422);
   if (await db.stream.findFirst({ where: { schoolId: actor.schoolId, name: { equals: name, mode: 'insensitive' } } })) {
     throw new ServiceError(`The stream ${name} already exists`, 409);
   }
   return db.$tx(async (tx) => {
-    const s = await tx.stream.create({ data: { schoolId: actor.schoolId, name } });
-    await logAudit({ schoolId: actor.schoolId, actorId: actor.id, action: 'UPDATE_STREAMS', entityType: 'Stream', entityId: s.id, detail: `Added ${name}` }, tx);
+    const s = await tx.stream.create({ data: { schoolId: actor.schoolId, name, category } });
+    await logAudit({ schoolId: actor.schoolId, actorId: actor.id, action: 'UPDATE_STREAMS', entityType: 'Stream', entityId: s.id, detail: `Added ${name} for ${LEVEL_LABEL[category]}` }, tx);
     return s;
   });
+}
+
+// A new class takes a stream of its own level: Form 5 Sciences, not Form 5 North. A stream that is
+// not in the school's list is not checked here (the older Add Class form allows any name).
+export async function assertStreamFitsLevel(tx: Db, schoolId: string, level: { name: string; category: LevelCategory }, stream: string) {
+  if (stream === NO_STREAM) return;
+  const s = await tx.stream.findFirst({ where: { schoolId, name: { equals: stream, mode: 'insensitive' } } });
+  if (s && s.category !== level.category) {
+    throw new ServiceError(`${s.name} is a stream for ${LEVEL_LABEL[s.category]}, so it cannot be used for ${level.name}`, 422);
+  }
 }
 
 export async function renameStream(db: ScopedDb, actor: Actor, id: string, rawName: string) {
@@ -183,6 +196,7 @@ export async function saveClassGrid(db: ScopedDb, actor: Actor, cells: GridCell[
       if (w.exists) {
         if (!w.level.active) throw new ServiceError(`${w.level.name} is switched off. Switch it on before adding classes to it.`, 409);
         if (!existing) {
+          await assertStreamFitsLevel(tx, actor.schoolId, w.level, w.stream);
           const c = await tx.schoolClass.create({ data: { schoolId: actor.schoolId, name, levelId: w.levelId, stream: w.stream, capacity: w.capacity } });
           await logAudit({ schoolId: actor.schoolId, actorId: actor.id, action: 'CREATE_CLASS', entityType: 'SchoolClass', entityId: c.id, detail: `${name}, capacity ${w.capacity}` }, tx);
           result.created++;

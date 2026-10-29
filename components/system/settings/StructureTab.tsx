@@ -8,12 +8,15 @@ import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
 import { toast } from '@/components/ui/Toast';
-import { DEFAULT_STREAMS, classDisplayName } from '@/lib/academic/rules';
+import { DEFAULT_A_LEVEL_STREAMS, DEFAULT_STREAMS, classDisplayName } from '@/lib/academic/rules';
+
+type Category = 'O_LEVEL' | 'A_LEVEL';
+type Level = { id: string; name: string; order: number; category: Category; active: boolean };
 
 export interface StructureData {
   defaultCapacity: number;
-  levels: { id: string; name: string; order: number; category: 'O_LEVEL' | 'A_LEVEL'; active: boolean }[];
-  streams: { id: string; name: string }[];
+  levels: Level[];
+  streams: { id: string; name: string; category: Category }[];
   classes: { id: string; name: string; levelId: string; stream: string; capacity: number; active: boolean; teacher: string | null; studentsEver: number; studentsNow: number }[];
 }
 
@@ -53,7 +56,7 @@ export function StructureTab({ data, canUpdate }: { data: StructureData; canUpda
   }
 
   // ── streams
-  const [newStream, setNewStream] = useState('');
+  const [newStream, setNewStream] = useState<Record<Category, string>>({ O_LEVEL: '', A_LEVEL: '' });
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
 
@@ -69,8 +72,8 @@ export function StructureTab({ data, canUpdate }: { data: StructureData; canUpda
       setBusy(false);
     }
   }
-  async function addStream(name: string) {
-    if (await streamCall('/api/system/structure/streams', 'POST', { name }, `${name} added`)) setNewStream('');
+  async function addStream(name: string, category: Category) {
+    if (await streamCall('/api/system/structure/streams', 'POST', { name, category }, `${name} added`)) setNewStream((n) => ({ ...n, [category]: '' }));
   }
 
   // ── classes grid
@@ -81,30 +84,36 @@ export function StructureTab({ data, canUpdate }: { data: StructureData; canUpda
   }, [data.classes]);
   const [cells, setCells] = useState<Record<string, Cell>>(initialCells);
   useEffect(() => setCells(initialCells), [initialCells]);
-  const columns = useMemo(() => {
-    const names = data.streams.map((s) => s.name);
-    // A form with a single class and no stream gets a column of its own, but only if one exists.
-    const noStream = data.classes.some((c) => c.stream === '') || names.length === 0;
+  // Each form offers the streams of its own level: North, South, East for Form 1 to 4, and
+  // Sciences, Commercials, Arts for Form 5 and 6.
+  const columnsFor = (l: Level) => {
+    const names = data.streams.filter((s) => s.category === l.category).map((s) => s.name);
+    // A class already made with another stream keeps showing, so nothing goes missing.
+    for (const c of data.classes) {
+      if (c.levelId === l.id && c.stream !== '' && !names.some((n) => n.toLowerCase() === c.stream.toLowerCase())) names.push(c.stream);
+    }
+    // A form with a single class and no stream gets a column of its own.
+    const noStream = names.length === 0 || data.classes.some((c) => c.levelId === l.id && c.stream === '');
     return noStream ? ['', ...names] : names;
-  }, [data.streams, data.classes]);
+  };
   const classAt = (levelId: string, stream: string) => data.classes.find((c) => c.levelId === levelId && c.stream.toLowerCase() === stream.toLowerCase());
   const cellOf = (levelId: string, stream: string): Cell => cells[keyOf(levelId, stream)] ?? { exists: false, capacity: String(data.defaultCapacity) };
   const setCell = (levelId: string, stream: string, change: Partial<Cell>) => setCells((all) => ({ ...all, [keyOf(levelId, stream)]: { ...cellOf(levelId, stream), ...change } }));
 
   const activeLevels = data.levels.filter((l) => l.active);
-  const gridChanged = activeLevels.some((l) => columns.some((s) => {
+  const gridChanged = activeLevels.some((l) => columnsFor(l).some((s) => {
     const was = initialCells[keyOf(l.id, s)];
     const now = cellOf(l.id, s);
     return (was?.exists ?? false) !== now.exists || (now.exists && was?.capacity !== now.capacity);
   }));
   const [confirmGrid, setConfirmGrid] = useState(false);
-  const removed = activeLevels.flatMap((l) => columns.filter((s) => classAt(l.id, s)?.active && !cellOf(l.id, s).exists).map((s) => classAt(l.id, s)!));
+  const removed = activeLevels.flatMap((l) => columnsFor(l).filter((s) => classAt(l.id, s)?.active && !cellOf(l.id, s).exists).map((s) => classAt(l.id, s)!));
 
   async function saveGrid() {
     setBusy(true);
     try {
       const body = {
-        cells: activeLevels.flatMap((l) => columns.map((s) => ({ levelId: l.id, stream: s, exists: cellOf(l.id, s).exists, capacity: Number(cellOf(l.id, s).capacity) || 0 }))),
+        cells: activeLevels.flatMap((l) => columnsFor(l).map((s) => ({ levelId: l.id, stream: s, exists: cellOf(l.id, s).exists, capacity: Number(cellOf(l.id, s).capacity) || 0 }))),
       };
       const { ok, json } = await send('/api/system/structure/classes', 'PUT', body);
       setConfirmGrid(false);
@@ -162,49 +171,62 @@ export function StructureTab({ data, canUpdate }: { data: StructureData; canUpda
         )}
       </Card>
 
-      <Card title="Streams" subtitle="The names your classes use, such as North, South and East, or Blue, Green and Red">
-        {data.streams.length === 0 ? (
-          <p className="text-sm text-muted">No streams yet.{canUpdate && ' Add your own below, or start with the usual three.'}</p>
-        ) : (
-          <ul className="flex flex-wrap gap-2">
-            {data.streams.map((s) => (
-              <li key={s.id} className="flex items-center gap-1 rounded-full bg-tint pl-4 text-sm text-ink">
-                {s.name}
-                {canUpdate && (
-                  <>
-                    <button type="button" onClick={() => setRenaming({ id: s.id, name: s.name })} className="min-h-[44px] px-2 text-xs font-semibold text-primary hover:underline">Rename</button>
-                    <button type="button" onClick={() => setRemoving(s)} aria-label={`Remove ${s.name}`} className="min-h-[44px] min-w-[44px] pr-2 text-danger hover:underline">×</button>
-                  </>
+      <Card title="Streams" subtitle="The names your classes use. Form 1 to 4 usually use North, South and East; Form 5 and 6 are named for what they study.">
+        <div className="flex flex-col gap-5">
+          {([
+            { category: 'O_LEVEL', title: 'O Level (Form 1 to 4)', defaults: DEFAULT_STREAMS },
+            { category: 'A_LEVEL', title: 'A Level (Form 5 and 6)', defaults: DEFAULT_A_LEVEL_STREAMS },
+          ] as const).map(({ category, title, defaults }) => {
+            const list = data.streams.filter((s) => s.category === category);
+            return (
+              <section key={category}>
+                <h3 className="mb-2 text-sm font-semibold text-ink">{title}</h3>
+                {list.length === 0 ? (
+                  <p className="text-sm text-muted">No streams yet.{canUpdate && ` Add your own below, or start with ${defaults.join(', ')}.`}</p>
+                ) : (
+                  <ul className="flex flex-wrap gap-2">
+                    {list.map((s) => (
+                      <li key={s.id} className="flex items-center gap-1 rounded-full bg-tint pl-4 text-sm text-ink">
+                        {s.name}
+                        {canUpdate && (
+                          <>
+                            <button type="button" onClick={() => setRenaming({ id: s.id, name: s.name })} className="min-h-[44px] px-2 text-xs font-semibold text-primary hover:underline">Rename</button>
+                            <button type="button" onClick={() => setRemoving(s)} aria-label={`Remove ${s.name}`} className="min-h-[44px] min-w-[44px] pr-2 text-danger hover:underline">×</button>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 )}
-              </li>
-            ))}
-          </ul>
-        )}
-        {canUpdate && (
-          <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); if (newStream.trim()) void addStream(newStream); }}>
-            <div className="min-w-[10rem] flex-1 sm:max-w-xs">
-              <Input id="stream-new" label="New stream" value={newStream} maxLength={30} onChange={(e) => setNewStream(e.target.value)} />
-            </div>
-            <Button type="submit" disabled={!newStream.trim()} loading={busy}>Add stream</Button>
-            {data.streams.length === 0 && (
-              <Button type="button" variant="secondary" disabled={busy} onClick={async () => { for (const n of DEFAULT_STREAMS) await addStream(n); }}>
-                Use {DEFAULT_STREAMS.join(', ')}
-              </Button>
-            )}
-          </form>
-        )}
+                {canUpdate && (
+                  <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); if (newStream[category].trim()) void addStream(newStream[category], category); }}>
+                    <div className="min-w-[10rem] flex-1 sm:max-w-xs">
+                      <Input id={`stream-new-${category}`} label={`New ${category === 'A_LEVEL' ? 'A Level' : 'O Level'} stream`} value={newStream[category]} maxLength={30} onChange={(e) => setNewStream((n) => ({ ...n, [category]: e.target.value }))} />
+                    </div>
+                    <Button type="submit" disabled={!newStream[category].trim()} loading={busy}>Add stream</Button>
+                    {list.length === 0 && (
+                      <Button type="button" variant="secondary" disabled={busy} onClick={async () => { for (const n of defaults) await addStream(n, category); }}>
+                        Use {defaults.join(', ')}
+                      </Button>
+                    )}
+                  </form>
+                )}
+              </section>
+            );
+          })}
+        </div>
       </Card>
 
       <Card title="Classes" subtitle="Tick the classes your school has and set how many students each can hold. The class name is made for you.">
-        {activeLevels.length === 0 || columns.length === 0 ? (
-          <p className="text-sm text-muted">{activeLevels.length === 0 ? 'Switch on at least one form.' : 'Add a stream first.'}</p>
+        {activeLevels.length === 0 ? (
+          <p className="text-sm text-muted">Switch on at least one form.</p>
         ) : (
           <div className="flex flex-col gap-3">
             {activeLevels.map((l) => (
               <fieldset key={l.id} className="rounded-xl border border-line p-3">
                 <legend className="px-1 text-sm font-semibold text-ink">{l.name}</legend>
                 <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {columns.map((s) => {
+                  {columnsFor(l).map((s) => {
                     const cell = cellOf(l.id, s);
                     const existing = classAt(l.id, s);
                     const label = classDisplayName(l.name, s);
