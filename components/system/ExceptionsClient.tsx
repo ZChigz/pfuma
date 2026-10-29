@@ -51,7 +51,7 @@ export function ExceptionsClient({ rows, history, canExport }: { rows: OverrideL
             <tbody className="divide-y divide-line">
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td className="px-4 py-3 font-medium"><Link href={`/system/users/${r.userId}/access`} className="hover:underline">{r.userName}</Link></td>
+                  <td className="px-4 py-3 font-medium"><Link href={`/admin/users/${r.userId}/access`} className="hover:underline">{r.userName}</Link></td>
                   <td className="px-4 py-3">
                     <span className="mr-2"><Badge variant={r.effect === 'GRANT' ? 'info' : 'danger'} label={r.effect === 'GRANT' ? 'Allowed' : 'Refused'} /></span>
                     {r.label}

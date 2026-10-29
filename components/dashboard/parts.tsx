@@ -129,6 +129,8 @@ export interface TodoItem {
   text: string;
   href: string;
   tone: string;
+  /** A short second line under the text. */
+  hint?: string;
 }
 
 export function TodoList({ items, emptyText }: { items: TodoItem[]; emptyText: string }) {
@@ -139,7 +141,10 @@ export function TodoList({ items, emptyText }: { items: TodoItem[]; emptyText: s
         <li key={n.text}>
           <Link href={n.href} className="flex items-start gap-3 rounded-2xl px-2 py-2.5 transition-colors hover:bg-rowhover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             <span className={cn('mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full', n.tone)} aria-hidden="true" />
-            <span className="text-sm leading-snug text-ink">{n.text}</span>
+            <span className="min-w-0">
+              <span className="block text-sm leading-snug text-ink">{n.text}</span>
+              {n.hint && <span className="block text-xs text-muted">{n.hint}</span>}
+            </span>
           </Link>
         </li>
       ))}

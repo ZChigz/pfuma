@@ -160,7 +160,7 @@ describe('audit log wording', () => {
   });
 
   it('links the records that have a page', () => {
-    expect(recordHref('User', 'u 1')).toBe('/system/users?q=u%201');
+    expect(recordHref('User', 'u 1')).toBe('/admin/users?q=u%201');
     expect(recordHref('CalendarEvent', 'e1')).toBe('/system/calendar');
     expect(recordHref('AcademicTerm', 't1')).toBe('/system/settings?tab=years');
     expect(recordHref('SchoolClass', 'c1')).toBe('/system/settings?tab=structure');

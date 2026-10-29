@@ -202,23 +202,3 @@ describe('recent activity', () => {
     expect(out).toContain('Nothing has been done yet');
   });
 });
-
-describe('the dashboard page', () => {
-  it('puts quick actions, cards, charts and lists on one screen', async () => {
-    const { isValidElement } = await import('react');
-    const { session } = await import('../helpers/session');
-    session.current = { ...A.users.ADMIN };
-    const mod = await import('@/app/(dashboard)/system/dashboard/page');
-    const found: string[] = [];
-    const walk = (node: unknown) => {
-      if (!node || typeof node !== 'object') return;
-      if (Array.isArray(node)) return node.forEach(walk);
-      if (!isValidElement(node)) return;
-      const el = node as { type: unknown; props: { children?: unknown } };
-      if (typeof el.type === 'function') found.push((el.type as { name: string }).name);
-      walk(el.props.children);
-    };
-    walk(await mod.default());
-    for (const n of ['QuickActions', 'StudentsCard', 'StaffCard', 'TermCard', 'ClassesCard', 'EnrolmentChart', 'ClassSizeChart', 'UpcomingEvents', 'RecentActivity']) expect(found).toContain(n);
-  });
-});

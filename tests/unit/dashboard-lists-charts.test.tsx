@@ -115,7 +115,7 @@ describe('quick actions', () => {
   it('offers the four actions to an administrator', () => {
     const html = renderToStaticMarkup(<QuickActions user={admin} />);
     for (const label of ['Add user', 'Import students', 'Add event', 'Open settings']) expect(html).toContain(label);
-    expect(html).toContain('/system/users?new=1');
+    expect(html).toContain('/admin/users?new=1');
     expect(html).toContain('/system/calendar?new=1');
   });
   it('hides actions the person may not do, and everything when none', () => {

@@ -307,7 +307,7 @@ describe('the page guard', () => {
   const user = (...keys: string[]): AccessUser => ({ id: 'me', schoolId: 's1', role: 'TEACHER', grants: keys });
 
   it('is the sidebar: each page needs the key (or one of the keys) of its menu item', () => {
-    expect(requiredKeysFor('/system/users')).toEqual(['system.users.view']);
+    expect(requiredKeysFor('/admin/users')).toEqual(['system.users.view']);
     expect(requiredKeysFor('/academics/attendance')).toEqual(['academics.attendance.mark', 'academics.attendance.view']);
     expect(routeRules().length).toBeGreaterThan(30);
   });
@@ -315,7 +315,7 @@ describe('the page guard', () => {
   it('asks the same of a page under a menu item, taking the longest match', () => {
     expect(requiredKeysFor('/students/abc123')).toEqual(['students.profiles.view']);
     expect(requiredKeysFor('/students/admissions/xyz')).toEqual(['students.admissions.view']);
-    expect(requiredKeysFor('/system/users/')).toEqual(['system.users.view']);
+    expect(requiredKeysFor('/admin/users/')).toEqual(['system.users.view']);
     expect(requiredKeysFor('/students?tab=1')).toEqual(['students.profiles.view']);
   });
 
@@ -325,9 +325,9 @@ describe('the page guard', () => {
   });
 
   it('refuses a page whose key is not held, opens it when it is, and respects a switched-off module and a deny', () => {
-    expect(mayOpen(user(), '/system/users')).toBe(false);
-    expect(mayOpen(user('system.users.view'), '/system/users')).toBe(true);
-    expect(mayOpen({ ...user('system.users.view'), disabledModules: ['system'] }, '/system/users')).toBe(true); // System cannot be switched off
+    expect(mayOpen(user(), '/admin/users')).toBe(false);
+    expect(mayOpen(user('system.users.view'), '/admin/users')).toBe(true);
+    expect(mayOpen({ ...user('system.users.view'), disabledModules: ['system'] }, '/admin/users')).toBe(true); // System cannot be switched off
     expect(mayOpen({ ...user('students.profiles.view'), disabledModules: ['students'] }, '/students/abc')).toBe(false);
     expect(mayOpen({ ...user('students.profiles.view'), denied: ['students.profiles.view'] }, '/students/abc')).toBe(false);
     expect(mayOpen(user('academics.attendance.view'), '/academics/attendance')).toBe(true);

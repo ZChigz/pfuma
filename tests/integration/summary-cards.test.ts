@@ -1,6 +1,5 @@
 // @vitest-environment node
 // Dashboard summary cards against a real database.
-import { isValidElement } from 'react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startTestDb, type TestDb } from '../helpers/test-db';
 import { seedSchool, type SeededSchool } from '../helpers/seed';
@@ -134,29 +133,7 @@ describe('staff card and last login', () => {
   });
 });
 
-describe('the cards on the dashboard', () => {
-  const names = async (sessionUser: SeededSchool['users']['ADMIN']) => {
-    const { session } = await import('../helpers/session');
-    session.current = { ...sessionUser };
-    const mod = await import('@/app/(dashboard)/system/dashboard/page');
-    const found: string[] = [];
-    const walk = (node: unknown) => {
-      if (!node || typeof node !== 'object') return;
-      if (Array.isArray(node)) return node.forEach(walk);
-      if (!isValidElement(node)) return;
-      const el = node as { type: unknown; props: { children?: unknown } };
-      if (typeof el.type === 'function') found.push((el.type as { name: string }).name);
-      walk(el.props.children);
-    };
-    walk(await mod.default());
-    return found;
-  };
-
-  it('has the four cards, each its own component', async () => {
-    const found = await names(A.users.ADMIN);
-    for (const c of ['StudentsCard', 'StaffCard', 'TermCard', 'ClassesCard']) expect(found).toContain(c);
-  });
-
+describe('the summary cards', () => {
   it('a card whose module is off renders nothing, while the others stay', async () => {
     const { StudentsCard } = await import('@/components/system/cards/StudentsCard');
     const { StaffCard } = await import('@/components/system/cards/StaffCard');

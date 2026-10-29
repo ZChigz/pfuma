@@ -22,6 +22,9 @@ import {
 import { ROLE_LABELS } from '@/components/layout/nav-config';
 import { ClassSizeSetting } from '@/components/admin/ClassSizeSetting';
 import { getOpenTerm } from '@/lib/academic/terms';
+import { can } from '@/lib/access-core';
+import { getViewTerm } from '@/lib/system/view-term';
+import { checklistVisible, evaluateSetup, loadSetupFacts, summarize } from '@/lib/system/setup-checklist';
 import { cn } from '@/lib/utils';
 import type { SessionUser, UserRole } from '@/types';
 
@@ -40,13 +43,23 @@ export default async function AdminDashboard() {
   const user = session.user as unknown as SessionUser;
   const db = getScopedDb(user.schoolId, user.id);
 
-  await guardPage(user, 'system.users.view');
+  const ctx = await guardPage(user, 'system.users.view');
   const { schoolId } = user;
+  // The "Set up your school" checklist (moved here from the old system dashboard) is for those who can change settings.
+  const showSetup = can(ctx, 'system.settings.edit');
 
-  const [school, openTerm] = await Promise.all([
-    db.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true } }),
+  const [school, openTerm, setupFacts] = await Promise.all([
+    db.school.findUnique({ where: { id: schoolId }, select: { maxClassSize: true, setupChecklistPinned: true } }),
     getOpenTerm(schoolId, db),
+    showSetup ? getViewTerm(schoolId, db).then(({ term }) => loadSetupFacts(db, schoolId, term)) : Promise.resolve(null),
   ]);
+  const setupSteps = setupFacts ? evaluateSetup(setupFacts) : null;
+  const setupSummary = setupSteps ? summarize(setupSteps) : null;
+  const setupPinned = school?.setupChecklistPinned ?? false;
+  const showSetupBlock = !!setupSummary && checklistVisible(setupSummary.complete, setupPinned);
+  const setupTodos: TodoItem[] = (setupSteps ?? [])
+    .filter((s) => !s.done)
+    .map((s) => ({ text: s.label, hint: s.hint, href: s.href, tone: 'bg-gold' }));
   const term = openTerm?.name;
   const openTermId = openTerm?.id ?? '';
 
@@ -100,7 +113,7 @@ export default async function AdminDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link href="/admin/users" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2">
+          <Link href="/admin/users?new=1" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2">
             <span aria-hidden="true" className="text-lg leading-none">+</span> Add user
           </Link>
           <Link href="/students" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-primary bg-white px-5 text-sm font-semibold text-primary transition-colors hover:bg-tint focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2">
@@ -144,6 +157,31 @@ export default async function AdminDashboard() {
         </Panel>
 
         <Panel title="Still to do">
+          {showSetupBlock && setupSummary && (
+            <div className="mb-3 border-b border-line pb-3">
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <h3 className="text-sm font-semibold text-ink">Set up your school</h3>
+                <span className="text-xs tabular-nums text-muted">{setupSummary.done} of {setupSummary.total} steps done</span>
+              </div>
+              <div
+                className="h-2 w-full overflow-hidden rounded-full bg-tint"
+                role="progressbar"
+                aria-valuenow={setupSummary.done}
+                aria-valuemin={0}
+                aria-valuemax={setupSummary.total}
+                aria-label={`${setupSummary.done} of ${setupSummary.total} setup steps done`}
+              >
+                <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${Math.round((setupSummary.done / setupSummary.total) * 100)}%` }} />
+              </div>
+              {setupTodos.length > 0 ? (
+                <div className="mt-2">
+                  <TodoList items={setupTodos} emptyText="" />
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted">All setup steps done. Shown because it is pinned in School Settings.</p>
+              )}
+            </div>
+          )}
           <TodoList items={nextSteps} emptyText="Nothing outstanding. Every student is in a class and every class has a teacher and subjects." />
         </Panel>
       </ChartRow>

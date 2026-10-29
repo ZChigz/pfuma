@@ -501,7 +501,7 @@ describe('older code that only knows one role', () => {
 describe('the page', () => {
   it('renders for an administrator, with the filters in the address, and is denied to others', async () => {
     session.current = { ...admin() };
-    const mod = await import('@/app/(dashboard)/system/users/page');
+    const mod = await import('@/app/(dashboard)/admin/users/page');
     for (const sp of [{}, { status: 'invited' }, { role: 'TEACHER', q: 'moyo', sort: 'lastLoginAt', dir: 'desc', page: '2' }, { role: 'GOD', sort: 'passwordHash' }]) {
       expect(await mod.default({ searchParams: sp })).toBeTruthy();
     }

@@ -6,8 +6,8 @@ import { usePathname } from 'next/navigation';
 import { useCrumbStore } from '@/lib/crumb-store';
 import { LEGACY_SECTIONS } from './nav-config';
 
-/** Where "/" sends everyone. The home page itself shows no breadcrumb. */
-const HOME = '/system/dashboard';
+/** The admin dashboard, home for those who manage users. It shows no breadcrumb. */
+const HOME = '/admin';
 
 // Pages that exist but are not in the sidebar.
 const EXTRA_LABELS: Record<string, string> = {

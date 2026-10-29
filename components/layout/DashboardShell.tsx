@@ -7,7 +7,7 @@ import { SubscriptionBanner } from './SubscriptionBanner';
 import { SupportBanner } from './SupportBanner';
 import { Sidebar } from './Sidebar';
 import { TopBar, type JumpItem } from './TopBar';
-import { workspaceFor } from './nav-config';
+import { workspaceFor, type NavItem, type Workspace } from './nav-config';
 import { STAFF_ROLES } from '@/lib/staff-roles';
 import type { ReactNode } from 'react';
 
@@ -25,9 +25,19 @@ export async function DashboardShell({ children }: { children: ReactNode }) {
   ]);
 
   const banner = school ? subscriptionView(school).banner : null;
-  const groups = buildNav(user);
+  const allGroups = buildNav(user);
   const roleLabel = STAFF_ROLES.filter((r) => user.roles.includes(r.key)).map((r) => r.label).slice(0, 2).join(' · ') || 'Staff';
-  const workspace = workspaceFor(user, roleLabel);
+  // The Dashboard & System pages are shown inside "My work" (top of the sidebar) rather than as their own group. lib/nav.ts still lists
+  // them under 'system', because the page guard (lib/access/routes.ts) reads its rules from there.
+  const systemItems: NavItem[] = (allGroups.find((g) => g.module === 'system')?.items ?? [])
+    .filter((i) => i.href)
+    .map((i) => ({ href: i.href as string, label: i.label, icon: i.icon as NavItem['icon'], permission: 'system.dashboard.view' }));
+  const groups = allGroups.filter((g) => g.module !== 'system');
+  const legacy = workspaceFor(user, roleLabel);
+  const workspace: Workspace | null =
+    legacy || systemItems.length
+      ? { header: roleLabel, sections: [...(legacy?.sections ?? []), ...(systemItems.length ? [{ title: 'System', items: systemItems }] : [])] }
+      : null;
   const jumpItems: JumpItem[] = [
     ...groups.flatMap((g) => g.items.filter((i) => i.href).map((i) => ({ label: i.label, href: i.href as string, icon: i.icon }))),
     ...(workspace?.sections.flatMap((s) => s.items) ?? []),

@@ -129,18 +129,19 @@ describe('new school settings fields', () => {
     expect((await saveProfile({}, A.users.TEACHER)).status).toBe(403);
   });
 
-  it('the dashboard page shows the checklist while steps are open and hides it when all are done', async () => {
+  it("the admin dashboard's Still to do panel shows the checklist while steps are open and hides it when all are done", async () => {
     const { session } = await import('../helpers/session');
     const { isValidElement } = await import('react');
     const hasChecklist = async () => {
       session.current = { ...A.users.ADMIN };
-      const mod = await import('@/app/(dashboard)/system/dashboard/page');
+      const mod = await import('@/app/(dashboard)/admin/page');
       const found = (node: unknown): boolean => {
+        if (node === 'Set up your school') return true;
         if (!node || typeof node !== 'object') return false;
         if (Array.isArray(node)) return node.some(found);
         if (!isValidElement(node)) return false;
-        const el = node as { type: unknown; props: { children?: unknown } };
-        return (typeof el.type === 'function' && (el.type as { name: string }).name === 'SetupChecklist') || found(el.props.children);
+        const el = node as { props: { children?: unknown } };
+        return found(el.props.children);
       };
       return found(await mod.default());
     };

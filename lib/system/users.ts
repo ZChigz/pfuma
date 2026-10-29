@@ -201,7 +201,7 @@ async function emailTaken(db: Db, email: string, exceptId?: string) {
 }
 
 async function tellAdmins(tx: Db, actor: Actor, title: string, body: string) {
-  await notifyUsers(tx, actor.schoolId, await adminIds(tx, actor.schoolId, actor.id), { type: 'USERS', title, body, link: '/system/users' });
+  await notifyUsers(tx, actor.schoolId, await adminIds(tx, actor.schoolId, actor.id), { type: 'USERS', title, body, link: '/admin/users' });
 }
 
 export async function createUser(db: ScopedDb, actor: Actor, input: NewUser) {

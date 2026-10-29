@@ -113,7 +113,7 @@ export const entityLabel = (type: string) => ENTITY_LABEL[type] ?? type;
 /** Where to open the record, for the kinds that have a page. */
 export function recordHref(entityType: string, entityId: string): string | null {
   switch (entityType) {
-    case 'User': return `/system/users?q=${encodeURIComponent(entityId)}`;
+    case 'User': return `/admin/users?q=${encodeURIComponent(entityId)}`;
     case 'CalendarEvent': return '/system/calendar';
     case 'School': return '/system/settings';
     case 'AcademicYear':

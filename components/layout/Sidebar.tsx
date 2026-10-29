@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { useSidebarStore } from '@/lib/sidebar-store';
 import { termLabel } from '@/lib/term-label';
 import type { NavGroup } from '@/lib/nav';
-import { icons, type Workspace } from './nav-config';
+import { EXACT_MATCH_ROUTES, icons, type Workspace } from './nav-config';
 
 function Icon({ path, className }: { path: string; className?: string }) {
   return (
@@ -38,7 +38,7 @@ function Logo() {
 interface SidebarProps {
   /** Groups the user may see (lib/nav.ts buildNav). */
   groups: NavGroup[];
-  /** The pages that already exist for the user's role, outside Dashboard & System. */
+  /** "My work", shown first: the user's own pages plus the Dashboard & System pages (built in DashboardShell). */
   workspace: Workspace | null;
   openTermName?: string;
 }
@@ -49,7 +49,7 @@ export function Sidebar({ groups, workspace, openTermName }: SidebarProps) {
 
   useEffect(() => { restore(); }, [restore]);
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) => pathname === href || (!EXACT_MATCH_ROUTES.has(href) && pathname.startsWith(`${href}/`));
   // On a phone the drawer is always full width with labels; "collapsed" only applies from md up.
   const label = cn(collapsed && 'md:hidden');
 
@@ -83,6 +83,22 @@ export function Sidebar({ groups, workspace, openTermName }: SidebarProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto" aria-label="Main navigation">
+          {workspace && workspace.sections.length > 0 && (
+            <div className="mb-5">
+              <p className={cn('mb-1.5 px-3 text-xs font-medium text-subtle', label)}>My work &middot; {workspace.header}</p>
+              {collapsed && <div className="mx-3 mb-1.5 hidden border-t border-line md:block" aria-hidden="true" />}
+              {workspace.sections.flatMap((s) => s.items).filter((item, i, all) => all.findIndex((x) => x.href === item.href) === i).map((item) => {
+                const active = isActive(item.href);
+                return (
+                  <Link key={item.href} href={item.href} title={item.label} onClick={() => close()} aria-current={active ? 'page' : undefined} className={linkClass(active)}>
+                    {active && <span className="absolute -left-4 bottom-2 top-2 w-1 rounded-r-full bg-primary" aria-hidden="true" />}
+                    <Icon path={icons[item.icon] ?? icons.dashboard} className={active ? 'text-primary' : ''} />
+                    <span className={cn('truncate', label)}>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
           {groups.map((group) => (
             <div key={group.module} className="mb-5">
               <p className={cn('mb-1.5 px-3 text-xs font-medium text-subtle', label)}>{group.label}</p>
@@ -116,23 +132,6 @@ export function Sidebar({ groups, workspace, openTermName }: SidebarProps) {
               })}
             </div>
           ))}
-
-          {workspace && workspace.sections.length > 0 && (
-            <div className="mb-5">
-              <p className={cn('mb-1.5 px-3 text-xs font-medium text-subtle', label)}>My work &middot; {workspace.header}</p>
-              {collapsed && <div className="mx-3 mb-1.5 hidden border-t border-line md:block" aria-hidden="true" />}
-              {workspace.sections.flatMap((s) => s.items).map((item) => {
-                const active = isActive(item.href);
-                return (
-                  <Link key={item.href} href={item.href} title={item.label} onClick={() => close()} aria-current={active ? 'page' : undefined} className={linkClass(active)}>
-                    {active && <span className="absolute -left-4 bottom-2 top-2 w-1 rounded-r-full bg-primary" aria-hidden="true" />}
-                    <Icon path={icons[item.icon] ?? icons.dashboard} className={active ? 'text-primary' : ''} />
-                    <span className={cn('truncate', label)}>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
         </nav>
 
         <button

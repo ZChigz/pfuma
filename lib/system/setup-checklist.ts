@@ -55,7 +55,7 @@ export function evaluateSetup(f: SetupFacts): SetupStep[] {
     { key: 'classes', label: 'Forms and streams set up, classes created', done: f.activeClasses > 0, hint: 'No classes yet', href: '/admin/classes' },
     { key: 'grading', label: 'Grading scale chosen', done: f.gradeBoundaries > 0, hint: 'No grade boundaries saved', href: '/admin/subjects' },
     { key: 'money', label: 'Currencies and receipt numbering set', done: money.length === 0, hint: `Missing: ${money.join(', ')}`, href: '/system/settings' },
-    { key: 'staff', label: 'Staff users added (at least one besides the admin)', done: f.activeUsers > 1, hint: 'Only one active user', href: '/system/users' },
+    { key: 'staff', label: 'Staff users added (at least one besides the admin)', done: f.activeUsers > 1, hint: 'Only one active user', href: '/admin/users' },
     { key: 'students', label: 'Students imported', done: f.students > 0, hint: 'No students yet', href: '/students/import' },
     {
       key: 'calendar', label: "Calendar has this term's key dates",

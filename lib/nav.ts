@@ -28,10 +28,9 @@ export const NAV_GROUPS: NavGroupDef[] = [
     module: 'system',
     label: 'Dashboard & System',
     items: [
-      { label: 'Dashboard',            href: '/system/dashboard',    permission: 'system.dashboard.view',    icon: 'dashboard' },
       { label: 'Calendar',             href: '/system/calendar',     permission: 'system.calendar.view',     icon: 'calendar' },
       { label: 'School Settings',      href: '/system/settings',     permission: 'system.settings.view',     icon: 'settings' },
-      { label: 'Users',                href: '/system/users',        permission: 'system.users.view',        icon: 'users' },
+      { label: 'Users',                href: '/admin/users',        permission: 'system.users.view',        icon: 'users' },
       { label: 'Roles & Permissions',  href: '/system/roles',        permission: 'system.roles.view',        icon: 'shield' },
       { label: 'Audit Log',            href: '/system/audit-log',    permission: 'system.audit.view',        icon: 'audit' },
       { label: 'Subscription',         href: '/system/subscription', permission: 'system.subscription.view', icon: 'card' },
